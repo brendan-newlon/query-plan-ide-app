@@ -71,7 +71,7 @@
       /* Full-bleed horizontally so the .topbar grid spans the SAME box as .workspace-main
          (which has no padding/border). Any horizontal padding/border here would inset the
          topbar and break the Hero Bar INVARIANT (topbar split must line up with the workspace
-         split). Keep only a bottom divider. See docs/claude/ui-layout-invariants.md "Hero Bar Layout — INVARIANT". */
+         split). Keep only a bottom divider. */
       border-left: 0;
       border-right: 0;
       border-top: 0;
@@ -149,8 +149,7 @@
     .code-editor-shell { position: relative; display:grid; grid-template-columns: 48px minmax(0, 1fr); grid-template-rows: 1fr auto; min-height:0; height:100%; border:1px solid rgba(159,177,204,0.1); border-radius:3px; background:#0a0f15; overflow:hidden; }
     .code-editor-gutter { padding: 8px 6px 8px 0; background: rgba(255,255,255,0.02); color: rgba(153,167,188,0.42); text-align: right; border-right: 1px solid rgba(159,177,204,0.08); font-family: var(--mono); font-size: 12.8px; line-height: 17.28px; overflow: hidden; user-select: none; }
     .code-editor-gutter-row { display:flex; align-items:flex-start; justify-content:flex-end; white-space: pre; }
-    /* resyncGutterRowHeights places each row at its line's measured top (never stacked heights;
-       see docs/claude/ui-layout-invariants.md "Cumulative drift"). The ::after keeps the scroll
+    /* resyncGutterRowHeights places each row at its line's measured top (never stacked heights). The ::after keeps the scroll
        range: last line's bottom plus the margin's bottom padding. */
     .code-editor-gutter.rows-placed { position:relative; }
     .code-editor-gutter.rows-placed::after { content:""; position:absolute; left:0; width:1px; top:var(--gutter-end, 0px); height:var(--gutter-pad-b, 0px); pointer-events:none; }
@@ -1005,8 +1004,7 @@
        Any of those would make this row taller than the plain <textarea> row underneath it
        can ever be (a textarea can't apply per-line margin/padding), which is what caused
        click position, native selection, native caret, and native scroll-into-view to all
-       drift once a banner was involved — see FUNCTION-MAP.md's Key Sets/Mappings banner
-       history for the chain of symptoms this caused. inset box-shadow gives the same
+       drift once a banner was involved. inset box-shadow gives the same
        top/bottom rule look as a real border without adding to the row's box height. */
     .ks-ds-banner { display:flex; align-items:center; gap:6px; width:100%;
       background:color-mix(in srgb, var(--ds-c,#5ba8e8) 7%, transparent);
@@ -1732,8 +1730,7 @@
     .sq-r-tag.on { color:rgba(55,198,163,0.65); }
     .sq-r-tag.off { color:rgba(153,167,188,0.38); }
     .selector-divider { padding:4px 8px; font-size:0.72rem; color:var(--muted); border-top:1px solid rgba(159,177,204,0.12); margin-top:2px; white-space: nowrap; }
-    /* Select Project dropdown — card rows (#projectMenu, renderProjectMenu). See FUNCTION-MAP.md
-       "Select Project dropdown — live project cards" for the query these render. */
+    /* Select Project dropdown — card rows (#projectMenu, renderProjectMenu). */
     .project-card { display:grid; gap:3px; padding:7px 9px; border-radius:5px; cursor:pointer; border:1px solid transparent; white-space:normal; width:100%; min-width:260px; box-sizing:border-box; }
     .project-card:hover { background: rgba(255,255,255,0.06); border-color: rgba(159,177,204,0.18); }
     .project-card-name { font-size:0.92rem; font-weight:600; color:var(--ink); }
@@ -2575,7 +2572,7 @@
       /* NOTE: the .topbar column ratios must stay identical to .workspace-main at every width
          above the narrow breakpoint, or the hero-bar split drifts from the workspace split.
          Previously this forced `minmax(320px,1fr) 1fr` (equal halves) which broke alignment
-         between 1280–1650px. See docs/claude/ui-layout-invariants.md "Hero Bar Layout — INVARIANT". */
+         between 1280–1650px. */
       .topbar-tools { justify-content: flex-start; }
     }
     @media (max-width: 1200px) {
@@ -2585,8 +2582,7 @@
          two-column grid down to the narrow-layout breakpoint (≤960px, a JS class — not a
          media query), so the topbar must keep matching .workspace-main's tracks at every
          width above narrow. A previous `minmax(280px,1fr) minmax(0,auto)` override here threw
-         the hero-bar split off by ~197px between 961–1200px. See docs/claude/ui-layout-invariants.md "Hero Bar Layout —
-         INVARIANT" and the topbarMediaAudit / alignment sweep in tests/selftest.js. */
+         the hero-bar split off by ~197px between 961–1200px. */
     }
     /* ── Panel nav bar ────────────────────────────────────────────────────────
        Slim row between topbar and workspace, visible only in narrow layout.
@@ -3972,7 +3968,7 @@
       state.ui.logSearchText = "";
       state.ui.manualPaneHeights = {};  // key → px, set by vertical drag resize
       state.ui.columnSplit = null;       // left-panel px width, null = auto
-      state.ui.editMode = false;         // Safe-write "Edit Mode" — OFF on every load; enabled only via hamburger + confirm. Gates the Projects dropdown + Publish button. See developer-docs/PLAN-SAFE-WRITE-TESTING.md.
+      state.ui.editMode = false;         // Safe-write "Edit Mode" — OFF on every load; enabled only via hamburger + confirm. Gates the Projects dropdown + Publish button.
       state.ui.publishKeyValid = false;  // set true only after edited key columns verify against the data source; gates the Publish button.
       state.ui.publishKeyErrors = [];    // [{editorKey, table, col, available[], missingTable}] from the last key check.
       state.ui.publishConsoleActive = false; // true while a publish is running → _dlog() streams to the in-panel console.
@@ -4051,7 +4047,6 @@
 
       // ── Mapping Analysis state ──────────────────────────────────────────────
       // Findings are emitted plan-first (observed) and gap-filled statically (predicted).
-      // See developer-docs/PLAN-MAPPING-ANALYSIS-BUILD.md for the full model.
       state.ui.mappingAnalysis = {
         active: false,
         status: "idle",                 // "idle" | "running" | "done" | "cancelled" | "stale"
@@ -4843,8 +4838,7 @@
       // (below) reads the dropdown's live <optgroup>/<option> structure and merges in this
       // metadata, so a command added to the dropdown without a matching entry here still
       // gets a row — labeled with a visible "Documentation not yet written" placeholder
-      // rather than being silently skipped. See docs/claude/user-facing-docs.md "Adding a New User-Facing
-      // Capability" protocol: fill this in whenever a command is added or changed in
+      // rather than being silently skipped. Fill this in whenever a command is added or changed in
       // #labPresetSelect.
       //   method:     HTTP verb shown as a badge (omit for commands that open a dedicated
       //               panel instead of the generic Lab request builder)
@@ -9493,8 +9487,7 @@
       // triggerStardogMismatchAlert() on a failed check to: log full detail, show a
       // dismissible banner (not a blocking modal — the request itself already failed/
       // fell back, so nothing is waiting on the user), and let the user download a
-      // self-contained .zip bug-report package for filing with Stardog. See
-      // FUNCTION-MAP.md "Stardog Response-Mismatch Reporting" for the full pattern.
+      // self-contained .zip bug-report package for filing with Stardog.
 
       // ---- Minimal ZIP writer (STORE method, i.e. uncompressed) ----
       // No external library — this app is a single self-contained file with no build
@@ -12686,8 +12679,7 @@
       // sparqlQuery, inferenceRules, ontologyModel, sms2Mappings AND Key Sets (uniqueKeySets/
       // foreignKeySets) — all banner-styled panes share this one renderer; do not fork it.
       // rowClassFn(line), if given, returns an extra class name for a row's wrapper div
-      // ("ks-ds-banner-row", now a styleless marker — banner rows are one line tall, see the
-      // "Key Sets / Mappings text areas are EXTREMELY delicate" section in FUNCTION-MAP.md).
+      // ("ks-ds-banner-row", now a styleless marker — banner rows are one line tall).
       // Every layer over a text box (colors, search and selection matches, bracket mirror, the
       // off-screen line measure) must break each line at exactly the character the text box does.
       // clientWidth is a whole number while the text box's real inner width is fractional, and the
@@ -12756,7 +12748,7 @@
         // line the visible colored text wrapped at a WIDER column than the textarea's real
         // character flow, so lines near the right margin appeared to "jump" to the next line
         // and brackets gained/lost indentation. Live clientWidth only — never an estimated
-        // scrollbar constant (see docs/claude/ui-layout-invariants.md "Exact Measurements in All Things").
+        // scrollbar constant.
         overlay.style.width = `${editorWrapWidth(editor)}px`;
         const lines = splitLines(editor.value || "");
         overlay.innerHTML = lines.map((line) => {
@@ -12779,8 +12771,7 @@
         // wrapped line landed on the wrong row (scrollAndFlashTextareaLine measures the
         // overlay row directly and does NOT re-pin first). Re-pinning WIDTH ONLY — never
         // innerHTML — is the safe, uniform fix: it can only make a pane's own width more
-        // correct and cannot leave a sibling overlay stale (see docs/claude/ui-layout-invariants.md "Syntax-overlay
-        // width is measured"). Caught by the self-test harness (tests/selftest.js).
+        // correct and cannot leave a sibling overlay stale. Caught by the self-test harness.
         if (!editor._syntaxWidthObserved && typeof ResizeObserver !== "undefined") {
           editor._syntaxWidthObserved = true;
           // ONE shared observer for the whole app, not one-per-render. renderEditor
@@ -13331,7 +13322,7 @@
           const matchIndexes = paneMatchLineIndexes(key, editor.value || "");
           const currentMatch = paneMatchIndexState(key, matchIndexes);
           // Each row's own measured top in the overlay's content (padding included), never a
-          // running sum of row heights (sums drift; docs/claude/ui-layout-invariants.md).
+          // running sum of row heights (sums drift).
           const ovRect = overlay.getBoundingClientRect();
           const ovOrigin = ovRect.top - overlay.scrollTop + (parseFloat(getComputedStyle(overlay).borderTopWidth) || 0);
           const lastRow = rows[rows.length - 1];
@@ -13756,8 +13747,7 @@
         // Stacking adds every row's sub-pixel snap onto all rows below it: the browser draws a
         // 17.275px row as 17.275 or 17.2625 depending on where it sits, and 600 stacked rows came
         // out 4px off. A placed row (position:absolute; top = its line's top) can be off by its
-        // own snap only, and that never reaches the next row. Rules and history:
-        // docs/claude/ui-layout-invariants.md, "Cumulative drift". Content coordinates on both
+        // own snap only, and that never reaches the next row. Content coordinates on both
         // sides, so the current scroll positions don't matter.
         const cRect = container.getBoundingClientRect(), gRect = gutter.getBoundingClientRect();
         const cOrigin = cRect.top - container.scrollTop;
@@ -13892,15 +13882,14 @@
         // The CSS line height is the canonical single-line height for panes measured from the
         // off-screen mirror (see the else-branch below). Row heights here are provisional:
         // resyncGutterRowHeights then places every row at its line's measured top, which is what
-        // keeps numbers level (stacked heights drift; docs/claude/ui-layout-invariants.md).
+        // keeps numbers level (stacked heights drift).
         const cssLineH = Math.max(1, parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.35 || 17.28);
         // For banner-styled editors, the syntax overlay (rendered just above, see syncNow) is
         // the ACTUAL visible content — its banner rows can be taller than a plain text line
         // because the pill carries its own padding and the DS/VG chip adds height. Measuring
         // real overlay row heights directly (rather than estimating from the offscreen
         // plain-text `display` div via a line-height/margin formula) is the only way to
-        // guarantee the gutter numbers land on the exact row the user sees, per CLAUDE.md's
-        // "measure actual rendered dimensions, never estimate" rule.
+        // guarantee the gutter numbers land on the exact row the user sees.
         const bannerOverlay = isBannerStyledEditor
           ? document.querySelector(`[data-syntax-overlay="${CSS.escape(editorKey)}"]`)
           : null;
@@ -14969,7 +14958,7 @@
       // Render cursor bars + selection highlights using the mirror-text technique: the
       // overlay copies the textarea's computed styles so spans/cursors land at EXACT pixel
       // positions via natural text flow. No hardcoded char width / line height (those caused
-      // rounding-error misalignment). See docs/claude/ui-layout-invariants.md "Exact Measurements in All Things".
+      // rounding-error misalignment).
       function _updateMultiCursorOverlay() {
         if (!_multiCursorState) return;
         const { activeEditor, cursors } = _multiCursorState;
@@ -17220,7 +17209,7 @@ ORDER BY ?table ?ordinal`;
       // with its folds and panels and shows the textarea's caret and selection. Mouse gestures map
       // the point under the pointer to a text offset. Positions are measured from the DOM
       // (Range.getClientRects, getBoundingClientRect) and never rounded; each rect is placed at its
-      // own measured top (docs/claude/ui-layout-invariants.md).
+      // own measured top.
       // The same editing model serves the query, mappings and rules panes. qfCtx describes one pane:
       // its textarea, its folded view, which element is a line's row, and which parts of a row are
       // not the line's text (fold arrows, sparkles, "{ … }" summaries, chips).
@@ -18471,7 +18460,6 @@ ORDER BY ?table ?ordinal`;
       // Two-stage analyzer: plan-first correlation (observed findings) +
       // mapping/static gap-filling (predicted findings). Optional per-finding
       // EXPLAIN probes can upgrade predicted findings to probe-confirmed.
-      // See developer-docs/PLAN-MAPPING-ANALYSIS-BUILD.md for the full model.
 
       const MAPPING_ANALYSIS_EXPANSION_CAP = 20;
       const MAPPING_ANALYSIS_LARGE_EXPANSION_THRESHOLD = 5;
@@ -20625,7 +20613,7 @@ ORDER BY ?table ?ordinal`;
       // classes/properties the query text never names is how Stardog answers one query
       // pattern under reasoning (subclasses, sub-properties, and properties whose domain or
       // range implies the class). Native plans name every branch, so no model is needed.
-      // Fixture: samples/native_perfdemo (parent-class / scoped-reasoning-off / cartesian).
+      // Fixture: (parent-class / scoped-reasoning-off / cartesian).
       // @detect: observed-reasoning-expansion
       function detectReasoningExpansions({ nodes, planText, queryText, queryPatterns, isProfile }) {
         const RDF_TYPE = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>";
@@ -20958,7 +20946,7 @@ ORDER BY ?table ?ordinal`;
       }
 
       function sortFindingsByImpact(findings) {
-        // Ordinal ranking only — see developer-docs/PLAN-DEFERRED-FEATURES.md re: impactScore calibration.
+        // Ordinal ranking only.
         const severityRank = { expensive: 0, warn: 1, info: 2 };
         const modeRank = { observed: 0, "probe-confirmed": 1, predicted: 2 };
         return [...findings].sort((a, b) => {
@@ -23960,7 +23948,7 @@ ORDER BY ?table ?ordinal`;
         return Array.from(byHeader.values());
       }
 
-      // ── SPARQL query pretty-print (see FUNCTION-MAP.md "Query Pretty-Print") ──────
+      // ── SPARQL query pretty-print ──────
       // formatSparqlPretty tokenizes and reformats a SPARQL query into a tab-indented,
       // subject-grouped layout. It never guesses at malformed/unsupported input — see
       // _sqPrettyHasUnsupported — returning the original text unchanged instead.
@@ -24405,7 +24393,7 @@ ORDER BY ?table ?ordinal`;
         }
       }
 
-      // ── Scope-aware format and typing aids (see FUNCTION-MAP.md "Query Pretty-Print") ──
+      // ── Scope-aware format and typing aids ──
       // The ✨ formats the query being edited (caret in it) or just the selected text; with no caret in the
       // panel it formats every query. Text the formatter cannot read with confidence is only re-indented
       // by brace depth (unfinished queries), or left alone.
@@ -24655,8 +24643,7 @@ ORDER BY ?table ?ordinal`;
         else editor.blur();
         // The editor's input handler also copies the text into .working, but set it here explicitly so
         // "Re-run" (AnalysisPipeline.buildRunContext reads .working directly) can never re-analyze the
-        // PRE-reformat text, whatever order the input events arrive in (see
-        // docs/claude/findings-and-navigation.md "Query-Structure Finding Line Numbers").
+        // PRE-reformat text, whatever order the input events arrive in.
         if (state.artifacts.sparqlQuery) state.artifacts.sparqlQuery.working = pretty;
         // A full-text reformat reflows every line, so any existing mapping-analysis
         // finding cards/gutter pills still anchored to their pre-reformat line indices
@@ -26151,10 +26138,10 @@ ORDER BY ?table ?ordinal`;
       const _AA_MAP_ICON = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M1 3 L5.5 1.5 L10.5 4 L15 2.5 L15 13 L10.5 14.5 L5.5 12 L1 13.5 Z"/><line x1="5.5" y1="1.5" x2="5.5" y2="12"/><line x1="10.5" y1="4" x2="10.5" y2="14.5"/></svg>`;
       // ===== App version and release notes =====
       // APP_VERSION is {major}.{minor}.{patch}. On main it is exactly that. On an unmerged branch it is main's version plus
-      // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges (see docs/claude/versioning.md).
+      // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.42.3";
+      const APP_VERSION = "1.42.4";
       const RELEASE_NOTES = [
         { version: "1.42.0", date: "2026-11-04", title: "Matching brackets are boxed", items: [
           "In the query, mappings, rules and model editors, a thin box marks the pair of round, square or curly brackets, the angle brackets of an IRI, or the quotes of a string around the caret, so you can see where a block opens and closes. A caret right beside one of them boxes its pair. The boxes disappear while text is selected."
@@ -30686,8 +30673,7 @@ ORDER BY ?table ?ordinal`;
               // A full renderEditor() would rebuild every left artifact textarea — the visible
               // flash AND the syntax-overlay width-remeasure hazard that misaligns Key Sets — for
               // no content change. The plan pane renders through its own flow (setPlanLoading /
-              // plan-var-map / renderProvenance), not renderEditor. See docs/claude/ui-layout-invariants.md "Scope is
-              // query-defined; the plan only folds".
+              // plan-var-map / renderProvenance), not renderEditor.
               restoreQueryViewport(queryViewport);
               if (!refreshMappingAnalysisAfterPlanChange("fresh-plan-arrived") && typeof markMappingAnalysisStale === "function") markMappingAnalysisStale();
               log("retrieve", "Explain plan loaded from Stardog.", { variant: variant.name, path: response.url, contentType: response.contentType });
@@ -30942,7 +30928,7 @@ ORDER BY ?table ?ordinal`;
           recordPlanSource(query);
           state.ui.lastPlanWasProfile = true;
           state.currentArtifact = "queryPlan";
-          // No renderEditor() — see the matching note in fetchExplain and docs/claude/ui-layout-invariants.md. The profile
+          // No renderEditor() — see the matching note in fetchExplain. The profile
           // changes no left-side content; folding + pills update via refreshMappingAnalysisAfterPlanChange.
           if (!refreshMappingAnalysisAfterPlanChange("fresh-profile-arrived") && typeof markMappingAnalysisStale === "function") markMappingAnalysisStale();
           log("retrieve", "Query profiler output loaded from Stardog.");
@@ -35859,9 +35845,8 @@ acme:temperature rdfs:range xsd:string .`
 
       // Demos 13–17 — data stored in Stardog (no virtual graph). The data isn't shipped: each demo
       // carries the profile Stardog 12.2 returned for the query over the synthetic perfdemo database
-      // (samples/native_perfdemo: gen_perfdemo.py builds it, capture.py captured the plans), so the
+      // (captured on a test server), so the
       // analysis, the plan pills and the Source Map behave as they would against that database.
-      // Regenerate the plans with capture.py if the parser's expectations change.
       (function addStoredDataDemos() {
         const ontology = "@prefix : <http://example.com/perf/> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n@prefix owl: <http://www.w3.org/2002/07/owl#> .\n\n:Agent a owl:Class .\n:Person rdfs:subClassOf :Agent .\n:Employee rdfs:subClassOf :Person .\n:Engineer rdfs:subClassOf :Employee .\n:Manager rdfs:subClassOf :Employee .\n:Salesperson rdfs:subClassOf :Employee .\n:Contact rdfs:subClassOf :Person .\n:Organization rdfs:subClassOf :Agent .\n:Company rdfs:subClassOf :Organization .\n:Customer rdfs:subClassOf :Company .\n:Supplier rdfs:subClassOf :Company .\n:Department rdfs:subClassOf :Organization .\n:Product a owl:Class .\n:Order a owl:Class .\n:LineItem a owl:Class .\n:relatedTo a owl:ObjectProperty .\n:worksIn rdfs:subPropertyOf :relatedTo ; rdfs:domain :Employee ; rdfs:range :Department .\n:manages rdfs:subPropertyOf :relatedTo ; rdfs:domain :Manager .\n:reportsTo rdfs:subPropertyOf :relatedTo .\n:placedBy rdfs:subPropertyOf :relatedTo ; rdfs:range :Customer .\n:handledBy rdfs:subPropertyOf :relatedTo ; rdfs:range :Salesperson .\n:suppliedBy rdfs:subPropertyOf :relatedTo .\n:contactFor rdfs:subPropertyOf :relatedTo .\n:partOf a owl:TransitiveProperty .\n:hasItem a owl:ObjectProperty .\n:product a owl:ObjectProperty .\n:name a owl:DatatypeProperty .\n:email a owl:DatatypeProperty .\n:price a owl:DatatypeProperty .\n:qty a owl:DatatypeProperty .\n:orderDate a owl:DatatypeProperty .\n:status a owl:DatatypeProperty .";
         [
@@ -35885,7 +35870,7 @@ acme:temperature rdfs:range xsd:string .`
 
       // Sample 18: one query over two databases (two virtual graphs on separate data sources),
       // two stored named graphs and the default graph, with reasoning from a model split over two
-      // named graphs. Captured from LENNY mixdemo (samples/mixed_sources, setup.sh + capture.py).
+      // named graphs. Captured from a Stardog test server.
       (function addMixedSourcesDemo() {
         DEMO_SCENARIOS.push({ name: "18 · Mixed Sources: Two Databases, Named Graphs, Reasoning", _demo: true, kinds: ["predicted-cross-vg-shared-variable", "observed-profile-service-join"],
           queryText: "PREFIX : <http://example.com/mix/>\nPREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n\n# Revenue by manager, region and product category. Orders come from one database, customers\n# from another, managers and categories from two stored named graphs, region names from the\n# default graph. Run with reasoning on: :Order, :Party and :Manager are answered through the model.\nSELECT ?managerName ?regionName ?categoryLabel (SUM(?amount) AS ?revenue) (COUNT(?order) AS ?orders)\nWHERE {\n  GRAPH <virtual://mix_erp> {\n    ?order a :Order ;\n           :placedBy ?cust ;\n           :amount ?amount ;\n           :forProduct ?prod .\n  }\n  GRAPH <virtual://mix_crm> {\n    ?cust a :Party ;\n          :inRegion ?region ;\n          :accountManager ?mgr .\n  }\n  GRAPH <http://example.com/mix/graph/hr> {\n    ?mgr a :Manager ;\n         :name ?managerName .\n  }\n  GRAPH <http://example.com/mix/graph/catalog> {\n    ?prod :inCategory ?cat .\n    ?cat rdfs:label ?categoryLabel .\n  }\n  ?region rdfs:label ?regionName .\n}\nGROUP BY ?managerName ?regionName ?categoryLabel\nORDER BY DESC(?revenue)\nLIMIT 50",
@@ -35895,7 +35880,7 @@ acme:temperature rdfs:range xsd:string .`
           ontology: "@prefix : <http://example.com/mix/> .\n@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .\n@prefix owl: <http://www.w3.org/2002/07/owl#> .\n@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .\n@prefix so: <https://schema.org/> .\n\n# The reasoning model is the union of two named graphs.\n\n# graph <http://example.com/mix/model/core>\n:Party a owl:Class .\n:Customer a owl:Class ; rdfs:subClassOf :Party .\n:PremiumCustomer a owl:Class ; rdfs:subClassOf :Customer .\n:Employee a owl:Class ; rdfs:subClassOf :Party .\n:Order a owl:Class .\n:OnlineOrder a owl:Class ; rdfs:subClassOf :Order .\n:Product a owl:Class .\n:Category a owl:Class .\n:Region a owl:Class .\n\n:name a owl:DatatypeProperty ; so:domainIncludes :Party ; so:rangeIncludes xsd:string .\n:inRegion a owl:ObjectProperty ; so:domainIncludes :Customer ; so:rangeIncludes :Region .\n:accountManager a owl:ObjectProperty ; so:domainIncludes :Customer ; so:rangeIncludes :Employee .\n:placedBy a owl:ObjectProperty ; so:domainIncludes :Order ; so:rangeIncludes :Customer .\n:amount a owl:DatatypeProperty ; so:domainIncludes :Order ; so:rangeIncludes xsd:decimal .\n:forProduct a owl:ObjectProperty ; so:domainIncludes :Order ; so:rangeIncludes :Product .\n:orderDate a owl:DatatypeProperty ; so:domainIncludes :Order ; so:rangeIncludes xsd:date .\n:sku a owl:DatatypeProperty ; so:domainIncludes :Product ; so:rangeIncludes xsd:string .\n:inCategory a owl:ObjectProperty ; so:domainIncludes :Product ; so:rangeIncludes :Category .\n:manages a owl:ObjectProperty ; so:domainIncludes :Employee ; so:rangeIncludes :Employee .\n\n# graph <http://example.com/mix/model/sales>\n:Manager a owl:Class ; rdfs:subClassOf :Employee .\n:SalesManager a owl:Class ; rdfs:subClassOf :Manager .\n:RegionalDirector a owl:Class ; rdfs:subClassOf :Manager .\n:AccountExecutive a owl:Class ; rdfs:subClassOf :Employee .\n:placedBy rdfs:domain :Order ;\n          rdfs:range :Customer .\n:manages rdfs:domain :Manager ." });
       })();
 
-      // Sample 19: a federated query. Captured on LENNY by samples/federated/setup.sh + capture.py
+      // Sample 19: a federated query. Captured on a Stardog test server
       // (databases fedhub and fedremote; the virtual graph fed_wh belongs to fedremote only).
       (function addFederatedDemo() {
         DEMO_SCENARIOS.push({ name: "19 · Federated: Another Database and Its Virtual Graph", _demo: true, kinds: [],
@@ -38145,7 +38130,6 @@ acme:temperature rdfs:range xsd:string .`
         // unused in-scope mappings are handled by *folding* (isMappingBlockRelevant /
         // applyDefaultMappingCollapseState → renderArtifactFlowView overlay), never by changing
         // what is loaded or shown — which also means plan arrival never rebuilds a left textarea.
-        // See docs/claude/ui-layout-invariants.md "Scope is query-defined; the plan only folds".
         state.ui.relevantMappingVgs = scopedVirtualGraphsFromPlan();
       }
 
@@ -38377,8 +38361,7 @@ acme:temperature rdfs:range xsd:string .`
       // @feature: auto-revise
       // Plain-language status note for a datetimestamped Auto Revise snapshot ZIP (see
       // saveAutoReviseSnapshot). This is the history mechanism for Auto Revise: an ordinary
-      // file download per step, not a database — see CLAUDE.md "UI-Facing Text" and
-      // FUNCTION-MAP.md "Auto Revise" for why.
+      // file download per step, not a database.
       function autoReviseStatusText(best, attempt, phase) {
         const session = state.ui.autoReviseSession;
         const lines = phase === "original"
@@ -39357,7 +39340,7 @@ acme:temperature rdfs:range xsd:string .`
       // table or custom-SQL mapping block, runs a zero-row probe (`SELECT … WHERE 1=0`) —
       // the DB resolves table/column names and fails fast if any are gone, but no rows are
       // read. Independently designed around that same "zero-row probe" technique (not
-      // ported from any specific tool) — see FUNCTION-MAP.md "Test Source for Schema Drift".
+      // ported from any specific tool).
 
       function openSchemaDriftPanel() {
         const panel = $("schemaDriftPanel");
@@ -39453,8 +39436,7 @@ acme:temperature rdfs:range xsd:string .`
       // The columns a mapping block's TO-block templates actually reference, e.g. the
       // {ID} in a subject template <urn:foo:{ID}> or a predicate's object template. Reuses
       // normalizeTemplateShape's {col} extraction (already computed per block/triple by
-      // parseRichMappingBlocks) instead of re-parsing — see FUNCTION-MAP.md "Mapping Block
-      // Location & Navigation".
+      // parseRichMappingBlocks) instead of re-parsing.
       function schemaDriftColumnsForBlock(block) {
         const cols = new Set();
         (block.subjectShape?.columns || []).forEach((c) => cols.add(c));
@@ -46097,7 +46079,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
       // ---- STORED-DATA scene (@feature: qsm-native). Plans over data stored in Stardog have no
       //      VirtualGraphSql blocks: their sources are graphs, read by index Scan operators. Built
       //      from the plan + query text alone (no mappings needed). Virtual graphs in the same plan
-      //      appear as their own source boxes. Fixture: samples/native_perfdemo/plans.
+      //      appear as their own source boxes.
       const _QSM_RDF_TYPE = "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>";
       function _qsmNativeTerm(t, prefixes){
         t=String(t||"").trim(); if(!t) return "";
@@ -50522,7 +50504,6 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       }
 
       // ---- Safe-write "Edit Mode" + Publish (increment 1: UI + dry-run plan + scary gate; NO writes) ----
-      // Full design: developer-docs/PLAN-SAFE-WRITE-TESTING.md and SESSION-RESUME-AND-PROJECTS.md.
       function _qpideShortId(text) {
         // Deterministic 6-char id from the project name (placeholder; final scheme is part of G1).
         let h = 2166136261 >>> 0;
@@ -50555,7 +50536,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       ];
       function _artifactWorking(key) {
         // Read the LIVE editor value — artifact editors don't flush to state.*.working on every
-        // keystroke (see docs/claude/findings-and-navigation.md), so state.working is stale for change detection. Fall back to
+        // keystroke, so state.working is stale for change detection. Fall back to
         // state.working for artifacts with no visible editor.
         const ed = document.querySelector('[data-artifact-editor="' + key + '"]');
         if (ed && typeof ed.value === "string") return ed.value;
@@ -53689,7 +53670,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       // Card row for one project in the #projectMenu dropdown (Select Project). Queries the registry
       // graph for every project plus its LATEST step's analytics (query label, findings severity,
       // query time, plan line count) via a MAX(?at)-subselect join — the same pattern used by the
-      // Project Insights query 2c (developer-docs/mockups/mockup-project-insights.html).
+      // Project Insights query 2c.
       async function renderProjectMenu() {
         const menu = $("projectMenu");
         if (!menu) return;
@@ -54099,7 +54080,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           .replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t") + '"';
       }
       const _iri = (s) => "<" + String(s) + ">";
-      // Ontology style enforcement (developer-docs/ontology/ONTOLOGY-STYLE-GUIDE.md): a logical term
+      // Ontology style enforcement: a logical term
       // name is cased at IRI-build time — Uppercase-initial → CLASS in Title_Snake_Case, otherwise a
       // PROPERTY in lower_snake_case. Every term IRI is built through _pred/QC/cls/prop, all of which
       // run this, so a term's schema definition and its read/write queries always get identical casing.
@@ -54140,7 +54121,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       const QPIDE_SCHEMA_GRAPH = "tag:stardog:api:context:schema"; // default reasoning-schema graph
 
       // rdfs:label is DERIVED, never hand-written: it is the styled IRI local name with
-      // underscores replaced by spaces (per developer-docs/ontology/ONTOLOGY-STYLE-GUIDE.md).
+      // underscores replaced by spaces.
       // So a class label starts capitalized ("Plan Metrics") and a property label is lower-case
       // ("plan join count"), and the label can never drift from the IRI. The rich human
       // description lives in rdfs:comment, which IS authored per term.
@@ -54154,7 +54135,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       // the IRI's local name whenever the IRI carries no human-interpretable information (a step's IRI
       // segment is a numeric timestamp digest) — but must still aim to avoid two same-class instances
       // rendering an identical label; concatenate distinguishing fields when one field alone would
-      // collide (see developer-docs/ontology/ONTOLOGY-STYLE-GUIDE.md § "Instance labels").
+      // collide.
       const _instLabel = (iri, text) => iri + " <" + QPIDE_RDFS + "label> " + _sparqlLit(text) + " .\n";
       function _qpideSchemaTriples() {
         const cls = (local, comment) =>
@@ -54172,9 +54153,8 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         const subProp = (child, parent) =>
           `<${_qname(child)}> <${QPIDE_RDFS}subPropertyOf> <${_qname(parent)}> .\n`;
         // Every property is specific to ONE (source class → target) pair — no property is reused
-        // across classes, and inter-instance references are object properties, not name strings
-        // (see developer-docs/ontology/ONTOLOGY-STYLE-GUIDE.md § "Properties are specific" and
-        // "Prefer relationships over string references"). rdfs:subClassOf is declared where a
+        // across classes, and inter-instance references are object properties, not name strings.
+        // rdfs:subClassOf is declared where a
         // genuine specialization exists (VirtualGraphClone ⊑ Virtual_Graph).
         let t = "";
         t += cls("Project", "A resumable unit of safe-write testing work; groups the captured artifact steps, data-source locks, and baselines for one query investigation.");
@@ -55490,7 +55470,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       // Friendly checkbox UI layered over the Server Logs preset's raw Query Params
       // JSON textarea — lets the user pick log types / rotated / line-count without
       // hand-editing JSON, while the textarea (what runLabRequest() actually reads)
-      // stays the single source of truth. See FUNCTION-MAP.md "Server Logs quick controls".
+      // stays the single source of truth.
       const SERVER_LOGS_TYPES = ["stardog", "starrocks", "audit", "gc"];
 
       function renderServerLogsQuickControls() {
@@ -56048,8 +56028,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       // Parse Logs panel — fetches stardog.log (tail-N, to bound memory) or
       // accepts an uploaded .log/.txt/.zip, parses entries with the same
       // classification logic as the standalone Stardog log-parser desktop
-      // tool, and lets the user filter/export live. See FUNCTION-MAP.md
-      // "Parse Logs Panel" for the full map of these functions.
+      // tool, and lets the user filter/export live.
       // ===================================================================
 
       const PARSE_LOGS_FIELDS = [
@@ -56679,9 +56658,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         download(new Blob([pl.rawText], { type: "text/plain" }), "stardog_raw.log");
       }
 
-      // Only place that clears large in-memory state on panel close (see
-      // FUNCTION-MAP.md "Floating Panel Header Convention" — every other panel
-      // just hides). Returns false (and leaves the panel open) if the user cancels.
+      // Only place that clears large in-memory state on panel close (every other panel just hides). Returns false (and leaves the panel open) if the user cancels.
       function confirmCloseParseLogsPanel() {
         const pl = state.ui.parseLogs;
         if (!pl.entries.length && !pl.rawEntries.length && !pl.rawText) return true;
@@ -57130,8 +57107,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       // Finds which artifact Auto Revise actually staged a change into, and which lines are
       // new, by diffing the live artifact text against the pre-stage snapshot. Generic across
       // every recommendation kind — so the "Show Me" button never has to know which finding
-      // kind fired, only where the resulting text differs. See CLAUDE.md "UI-Facing Text —
-      // Never Expose Internal Names".
+      // kind fired, only where the resulting text differs.
       function findAutoChangeLocation(pending) {
         if (!pending) return null;
         const keys = (pending.targets && pending.targets.length) ? pending.targets : Object.keys(state.artifacts);
@@ -62899,7 +62875,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       // cache of what an earlier lookup on a data source returned (filtered locally as the user types, never re-queried).
       // (3) A lookup on the data source itself: only ever started by an explicit action (Ctrl+Space again, or choosing the
       // "Look up ..." row), one whole-list query per level (all tables, or all columns of one table), cached for the session.
-      // Typing never starts a query. Details: developer-docs/FUNCTION-MAP.md "Typeahead".
+      // Typing never starts a query.
       const TA_MIN_CHARS = 3;
       const TA_MAX_ITEMS = 30;
       const TA_RDF_TYPE = "http://www.w3.org/1999/02/22-rdf-syntax-ns#type";
@@ -63482,7 +63458,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       // The harness itself stays external (edit/run it without touching this 900KB
       // file, and without spending agent tokens — just open ?selftest in a browser).
       // If tests/selftest.js is absent (HTML copied without its tests/ dir) the tag
-      // 404s harmlessly. See tests/selftest.js and FUNCTION-MAP.md §"Self-test harness".
+      // 404s harmlessly.
       if (/[?&]selftest\b/.test(location.search)) {
         window.__APP_TESTHOOKS__ = {
           state,
@@ -63543,7 +63519,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           splitProfileResponse,  // finds the profile in a response that also carries results (Stardog 12+)
           parseSparqlResultsXml, // parses SPARQL XML results into {columns, rows} (regression net — see normalizeResults)
           normalizeResults,      // JSON/XML SPARQL-results normalizer used by fetchProfile's mismatch fallback (regression net)
-          createZipBlob,         // hand-rolled STORE-zip writer (regression net — see FUNCTION-MAP.md)
+          createZipBlob,         // hand-rolled STORE-zip writer (regression net)
           buildStardogMismatchBugReportFiles, // bug-report file-list builder (Stardog response-mismatch alerts)
           triggerStardogMismatchAlert, // shows the dismissible mismatch banner + logs + records alert state
           dismissStardogMismatchAlert, // removes an alert by id and re-renders the banner container
