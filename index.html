@@ -815,6 +815,17 @@
     .se-tl-tools { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin-top:6px; font-size:0.74rem; }
     .se-tl-tools button, .se-tl-hint button, .se-tl-summary button { padding:1px 8px; font-size:0.72rem; }
     .se-tl-hint { font-size:0.74rem; margin-top:4px; }
+    .se-tl-table { width:100%; border-collapse:collapse; font-size:0.76rem; margin:6px 0; }
+    .se-tl-table th { text-align:left; font-weight:600; color:var(--muted, #8b9bb4); padding:2px 8px 3px 0; border-bottom:1px solid var(--border); white-space:nowrap; }
+    .se-tl-table td { padding:3px 8px 3px 0; border-bottom:1px solid rgba(159,177,204,0.1); vertical-align:top; }
+    .se-tl-table tbody tr { cursor:pointer; }
+    .se-tl-table tbody tr:hover { background:rgba(255,255,255,0.04); }
+    .se-tl-table tbody tr.is-sel { background:rgba(127,230,205,0.1); }
+    .se-tl-diff { font-family:var(--mono, ui-monospace, Consolas, monospace); font-size:0.74rem; margin:2px 0 6px; border:1px solid rgba(159,177,204,0.16); border-radius:4px; overflow:hidden; }
+    .se-tl-diff > div { white-space:pre-wrap; word-break:break-word; padding:0 6px 0 4px; }
+    .se-tl-diff > div > span { display:inline-block; width:1.2em; opacity:0.8; }
+    .se-tl-add { background:rgba(55,198,163,0.14); }
+    .se-tl-del { background:rgba(240,90,90,0.14); }
     .se-rp-wrap { max-height:46vh; overflow:auto; border:1px solid var(--border); border-radius:6px; }
     .se-rp { width:100%; border-collapse:collapse; font-size:0.78rem; }
     .se-rp th, .se-rp td { text-align:left; padding:4px 8px; border-bottom:1px solid var(--border); }
@@ -26216,8 +26227,13 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.44.0";
+      const APP_VERSION = "1.45.0";
       const RELEASE_NOTES = [
+        { version: "1.45.0", date: "2026-11-05", title: "Compare profiled versions of a query", items: [
+          "Without turning on editing, each time you run Profile the app keeps that version of the query with its query time and row count. Edit the query and run Profile again to build a list of versions; the {*Compare*} bar at the bottom lists them.",
+          "The timeline there shows a table of every kept version: its time, how much faster or slower it was than the version before, its rows, its joins and which panes changed. Selecting a version shows the lines that changed since the version before.",
+          "While you edit, the panes are compared with the version last profiled, so the margin and the {*Compare*} bar show what you have changed since. The versions stay in the app until the page closes; {*Save text to a file*} in the timeline keeps them."
+        ] },
         { version: "1.44.0", date: "2026-11-05", title: "Choose the ontology diagram's layout", items: [
           "A list in the [[Ontology Visualization|aa-tool-ontology]] toolbar chooses how the classes are laid out: {*Auto*}, {*Compact*}, {*Grouped*}, {*Force*} or {*Tree*}. Choosing one redraws the diagram at once.",
           "{*Compact*} places every class by how many links separate it from the others, then reduces crossed links, moves classes off links that pass through them and shortens long links. It suits models of up to a few dozen classes.",
@@ -26733,6 +26749,7 @@ ORDER BY ?table ?ordinal`;
             <p><strong>Before writing</strong>, the app reads the resource again. If someone changed it since you loaded it, you choose to skip, compare, or overwrite. Saving key sets reloads every virtual graph that uses that data source, which can be slow. When a change hasn't shown up yet, the save finishes anyway and a note at the bottom left checks the server again after 15 seconds and 1, 2 and 5 minutes, then confirms with a message. If it still hasn't shown up after 5 minutes, the note stays with <em>Check again</em> until you dismiss it. <strong>Save all</strong> in the pencil menu saves every changed pane in a fixed order (key sets, mappings, schema, query), keeps the server's previous versions, and offers to roll back the items that saved.</p>
             <p><strong>Snapshots.</strong> Turning on live editing can first download a .zip of the server's current versions, read fresh from Stardog rather than from the panes. Its manifest records which virtual graph, data source, graph and stored query each file belongs to. <strong>Restore snapshot…</strong> loads a .zip, or individual .sms, .ttl, key-set .txt or .rq files, into the panes as unsaved changes. You can point each file at a different target, including a different database that reaches the same data sources, after a clear warning.</p>
             <p><strong>Compare drawer.</strong> While editing is on and a pane differs, a bar appears along the bottom of the screen. <em>Compared with</em> chooses the version: the <em>Server</em>, a <em>Saved version</em> you keep with <em>Save as version</em> (it stays in the app; nothing is written to Stardog), or any snapshot loaded this session (<em>↻</em> reads the server again; saving a version never changes what is compared). In each pane's line-number margin, a thin strip at the right edge marks the differences: <strong>green</strong> for added lines, <strong>blue</strong> for changed lines, and a <strong>red wedge</strong> where lines were removed. Click <em>Compare</em> to list only the panes that differ, each as a small diff: removed lines in red with <strong>−</strong>, added lines in green with <strong>+</strong>, the pane's own line numbers on the left, the changed part of a line highlighted. Long runs of untouched lines are folded; <em>show</em> opens one and <em>Hide</em> folds it again (reading the server again also folds them all). <em>Go to</em> finds a change in the pane (opening a folded mapping first) and <em>Revert</em> puts the compared version's lines back. <em>Revert pane to …</em> replaces the whole pane, and the arrow beside it offers every other stored version (Server, Saved version, snapshots). Drag a pane's title bar to move it: up or down to change the order, to the left or right half to show it in one of two side-by-side columns, or to the top or bottom edge to give it the full width again. Any pane can go anywhere from wherever it is, and the line between the two columns moves when you drag it (double-click it for an even split). The <em>timeline</em> button beside <em>Save as version</em> shows every recorded change as a point on a line whose height is the query time at that step; the colour tells whether the number of result rows matched the step before, and a click on a point says what changed, how the plan was affected, and whether the results stayed the same. <em>Load into panes</em> puts that step's text back in the panes as unsaved changes. Points appear for saves made with <em>Track changes</em> on and for clone Publishes; row counts and times come from running the query with Profile. The drawer is as tall as its content needs, never more than 40% of the window, until you drag its top edge to another height (double-click the edge to go back to automatic). Ctrl+Z in a pane undoes a revert. The drawer itself can't be edited.</p>
+            <p><strong>Comparing versions without editing.</strong> The compare bar does not need editing turned on. With editing off, every time you run Profile the app keeps that version of the query (and the other panes) with its query time and row count, and the <em>Compare</em> bar appears at the bottom. Edit the query and run Profile again to add another version; running the same text again adds a run to the same version. The panes are compared with the version last profiled, so you can see what you changed since. The timeline there lists every version in a table (time, how much faster or slower than the version before, rows, joins, which panes changed); select a version to see its changed lines in full. <em>Compare profiled versions</em> in the pencil menu opens it. These versions stay in the app until the page closes; <em>Save text to a file</em> in the timeline keeps them, and <em>Clear these versions</em> forgets them.</p>
             <p><strong>Write queries.</strong> With live editing on, the query pane can run INSERT, DELETE, LOAD, CLEAR and other SPARQL Update requests after a confirmation. With editing off, running one opens the pencil menu instead.</p>
             <p><strong>Plan changed, nothing else did.</strong> If you refresh the plan and it differs from the last plan for exactly the same query and panes, the app offers to check the server for changes made outside the app, and lets you take or keep each changed item.</p>`
         },
@@ -31017,6 +31034,8 @@ ORDER BY ?table ?ordinal`;
           // changes no left-side content; folding + pills update via refreshMappingAnalysisAfterPlanChange.
           if (!refreshMappingAnalysisAfterPlanChange("fresh-profile-arrived") && typeof markMappingAnalysisStale === "function") markMappingAnalysisStale();
           log("retrieve", "Query profiler output loaded from Stardog.");
+          // With editing on Stardog off, each Profile run is kept in the app as a version of the query to compare.
+          try { if (seState().mode === "off") qpideKeepLocalStep(null, { profile: true }).catch((e) => log("debug", "[QPIDE] could not keep the Profile run: " + String((e && e.message) || e))); } catch (e) { /* not kept */ }
         } catch (error) {
           if (error?.name === "AbortError" && _planAbortCtl.signal.aborted) {
             _planAborted = true;
@@ -52107,7 +52126,9 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       }
       // The note for the version being worked on: kept with the next step that is recorded.
       function seDraftNote() { const st = seState(); return st.draftNote || (st.draftNote = { text: "", at: 0 }); }
-      async function qpideKeepLocalStep(saved) {
+      // With `opts.profile` the step is a Profile run kept while editing on Stardog is off: it takes the Profile's time and
+      // row count, and a run of the very same text as the last step is added to that step instead of making a new one.
+      async function qpideKeepLocalStep(saved, opts = {}) {
         const st = seState(), h = st.localHistory;
         const { pid, proj } = seTimelineProject();
         const scan = _publishScan();
@@ -52116,22 +52137,43 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         const prev = qpideLocalSteps(pid).slice(-1)[0];
         const texts = {}; scan.forEach((r) => { texts[r.key] = _artifactWorking(r.key); });
         const hash = await qpideContentHash(texts);
+        const qt = m.queryTimeMs != null ? m.queryTimeMs : null;
+        if (opts.profile && prev && prev.hash === hash) {
+          // Same text profiled again: the step keeps its place; the latest time is the one drawn, every run is listed.
+          prev.runs = (prev.runs || (prev.qt != null ? [prev.qt] : [])).concat(qt != null ? [qt] : []);
+          prev.qt = qt; prev.rc = m.resultRowCount != null ? m.resultRowCount : prev.rc; prev.jc = m.planJoinCount != null ? m.planJoinCount : prev.jc; prev.uc = m.planUnionCount != null ? m.planUnionCount : prev.uc;
+          prev.at = new Date().toISOString(); prev.findings = findings;
+          st.timelineSteps = true;
+          seApplyDrawerLayout();
+          if (st.drawer.view === "timeline" && st.drawer.size !== "collapsed") seTimelineRefresh();
+          return;
+        }
         const draft = seDraftNote(), userNote = draft.text.trim();
-        const diff = prev && prev.texts ? qpideStepDiff(prev.texts, texts, scan.filter((r) => r.changed).map((r) => r.key)) : null;
+        // Panes that differ from the step before; for a first step (or one whose text is on disk) the panes changed since the last load.
+        const changedKeys = opts.profile && prev && prev.texts ? scan.filter((r) => (prev.texts[r.key] || "") !== texts[r.key]).map((r) => r.key) : scan.filter((r) => r.changed).map((r) => r.key);
+        const diff = prev && prev.texts ? qpideStepDiff(prev.texts, texts, changedKeys) : null;
         h.seq += 1;
-        h.steps.push({
+        const step = {
           iri: "local:" + pid + ":" + Date.now() + "-" + h.seq, pid, proj, at: new Date().toISOString(),
-          note: "Saved to live server: " + saved.map((r) => r.t.label).join("; "),
+          note: opts.profile ? "Profile run" : "Saved to live server: " + saved.map((r) => r.t.label).join("; "),
           userNote, noteAt: userNote ? draft.at || Date.now() : 0, noteHash: "", diff,
-          qt: m.queryTimeMs != null ? m.queryTimeMs : null, rc: m.resultRowCount != null ? m.resultRowCount : null, jc: m.planJoinCount != null ? m.planJoinCount : null, uc: m.planUnionCount != null ? m.planUnionCount : null,
+          qt, rc: m.resultRowCount != null ? m.resultRowCount : null, jc: m.planJoinCount != null ? m.planJoinCount : null, uc: m.planUnionCount != null ? m.planUnionCount : null,
           shape: m.planShapeHash || "", hash, shapeChanged: Boolean(prev && prev.shape && m.planShapeHash && prev.shape !== m.planShapeHash), findings,
-          keys: scan.map((r) => r.key), changedKeys: scan.filter((r) => r.changed).map((r) => r.key), texts, file: null,
-        });
+          keys: scan.map((r) => r.key), changedKeys, texts, file: null, runs: qt != null ? [qt] : [],
+        };
+        h.steps.push(step);
         if (userNote) { st.draftNote = { text: "", at: 0 }; if (st.noteTarget === "draft") seRenderNotePanel(); }
-        log("publish", "[QPIDE] tracked live save in this app (no history database)", { project: proj, steps: h.steps.length });
-        if (!h.noticed) { h.noticed = true; showStatusToast("No history database is available, so changes are tracked in this app only. The record is lost when the page closes unless you save it to a file from the timeline.", "info", 9000); }
+        log("publish", opts.profile ? "[QPIDE] kept Profile run in this app" : "[QPIDE] tracked live save in this app (no history database)", { project: proj, steps: h.steps.length });
+        if (opts.profile) {
+          // The panes are compared with the version just profiled, so the next edit shows what changed since it.
+          const n = qpideLocalSteps(pid).length;
+          st.stepSource = { iri: step.iri, n, at: step.at, texts: Object.assign({}, texts) };
+          st.drawer.source = "step";
+          if (!h.noticed) { h.noticed = true; showStatusToast("This Profile run is kept in the Compare bar below, with the query it ran. Edit the query and run Profile again to compare versions. It is kept in this app only, so it is lost when the page closes.", "info", 10000); }
+        } else if (!h.noticed) { h.noticed = true; showStatusToast("No history database is available, so changes are tracked in this app only. The record is lost when the page closes unless you save it to a file from the timeline.", "info", 9000); }
         st.timelineSteps = true;
         seApplyDrawerLayout();
+        if (opts.profile) { seRenderDrawer(); seApplyDrawerLayout(); seRefreshChangeMarkers(); }
         if (st.drawer.view === "timeline" && st.drawer.size !== "collapsed") seTimelineRefresh();
         await qpideLocalCheck();
       }
@@ -52270,7 +52312,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       // The timeline of this project from the steps kept in this app.
       function qpideFillLocalTimeline(tl, mine, prevSel) {
         tl.local = true;
-        tl.steps = mine.map((s) => ({ iri: s.iri, at: s.at, note: s.note, userNote: s.userNote, noteLen: s.noteLen || (s.userNote || "").length, onDisk: !s.texts, file: s.file, diff: s.diff || null, qt: s.qt, rc: s.rc, jc: s.jc, uc: s.uc, resolved: null, introduced: null, shapeChanged: s.shapeChanged, findings: s.findings }));
+        tl.steps = mine.map((s) => ({ iri: s.iri, at: s.at, note: s.note, userNote: s.userNote, noteLen: s.noteLen || (s.userNote || "").length, onDisk: !s.texts, file: s.file, diff: s.diff || null, qt: s.qt, rc: s.rc, jc: s.jc, uc: s.uc, runs: s.runs || [], resolved: null, introduced: null, shapeChanged: s.shapeChanged, findings: s.findings }));
         tl.artMap = {};
         mine.forEach((s) => {
           const m = {};
@@ -52915,7 +52957,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         const st = state.ui.stardogEdit;
         const gutterRows = paneGutterLineRows(key);
         if (!gutterRows.length) return;
-        const active = st && st.mode !== "off" && SE_ARTIFACT_LABELS[key];
+        const active = st && seCompareOn(st) && SE_ARTIFACT_LABELS[key];
         let added = null, changed = null, delAfter = null, delBefore = null;
         if (active) {
           const src = seSourceTextFor(key, st.drawer.source);
@@ -53039,6 +53081,12 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         return el;
       }
       function seSetDrawerStatus(text) { const s = $("seDrawer")?.querySelector("[data-se-status]"); if (s) s.textContent = text || ""; }
+      // The compare drawer is available while editing on Stardog is on, and also with it off once a Profile run
+      // has been kept in this app (or the drawer was opened from the menu): comparing versions of a query needs no write access.
+      function seCompareOn(st) {
+        st = st || seState();
+        return st.mode !== "off" || st.localHistory.steps.length > 0 || st.drawer.size !== "collapsed";
+      }
       // Panes whose text differs from the version chosen in the compare bar.
       function seDrawerChangedCount() {
         const st = seState();
@@ -53052,7 +53100,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         const el = $("seDrawer");
         // The collapsed bar only appears once something differs; an opened drawer stays until
         // collapsed (it then says "No differences").
-        const on = st.mode !== "off" && (st.drawer.size !== "collapsed" || seDrawerChangedCount() > 0 || st.timelineSteps);
+        const on = seCompareOn(st) && (st.drawer.size !== "collapsed" || seDrawerChangedCount() > 0 || st.timelineSteps);
         if (!el) return;
         el.classList.toggle("hidden", !on);
         el.setAttribute("data-size", st.drawer.size);
@@ -53135,6 +53183,17 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         if (t.hasAttribute("data-se-tl-resolve")) { await seTimelineSetResolved(t.getAttribute("data-se-tl-resolve") === "1"); return; }
         if (t.hasAttribute("data-se-tl-tidy")) { await seTimelineTidy(); return; }
         if (t.hasAttribute("data-se-tl-savefile")) { await qpideSaveLocalSnapshot(); return; }
+        if (t.hasAttribute("data-se-tl-clearlocal")) {
+          const { pid } = seTimelineProject(), n = qpideLocalSteps(pid).length;
+          const ok = await seModal({ title: "Clear the kept versions?", bodyHtml: `<p>The ${n} kept version${n === 1 ? "" : "s"} of this query (their text, times and notes) are forgotten. The panes are not changed.</p>`, buttons: [{ label: "Cancel", value: false }, { label: "Clear", value: true }] });
+          if (!ok) return;
+          st.localHistory.steps = st.localHistory.steps.filter((x) => x.pid !== pid);
+          if (st.stepSource && String(st.stepSource.iri).startsWith("local:" + pid + ":")) { st.stepSource = null; if (st.drawer.source === "step") st.drawer.source = st.base ? "base" : "server"; }
+          st.timelineSteps = st.localHistory.steps.length > 0;
+          await seTimelineRefresh();
+          seApplyDrawerLayout(); seRefreshChangeMarkers();
+          return;
+        }
         if (t.hasAttribute("data-se-tl-openfile")) { qpideOpenLocalSnapshot(); return; }
         if (t.hasAttribute("data-se-tl-loadfile")) { qpideOpenLocalSnapshot(t.getAttribute("data-se-tl-loadfile")); return; }
         if (t.hasAttribute("data-se-tl-note")) { seOpenNotePanel(t.getAttribute("data-se-tl-note")); return; }
@@ -53230,18 +53289,19 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         const sources = el.querySelector("[data-se-sources]");
         if (sources) {
           const gone = { base: !st.base, step: !st.stepSource, before: !st.beforeLoad };
-          if (gone[st.drawer.source]) st.drawer.source = "server";
+          const offline = st.mode === "off";   // no server to compare with: the versions kept in this app are the sources
+          if (gone[st.drawer.source] || (offline && st.drawer.source === "server")) st.drawer.source = offline ? (st.stepSource ? "step" : st.base ? "base" : "server") : "server";
           const opt = (value, label) => `<option value="${esc(value)}"${st.drawer.source === value ? " selected" : ""}>${esc(label)}</option>`;
           sources.innerHTML = `
             <label class="se-muted" for="seSourceSelect">Compared with</label>
             <select id="seSourceSelect" class="se-source-select" data-se-source-select title="The version every pane is compared with">
-              ${opt("server", seSourceLabel("server").replace(" · ", " (") + ")")}
+              ${offline ? "" : opt("server", seSourceLabel("server").replace(" · ", " (") + ")")}
               ${st.base ? opt("base", seSourceLabel("base").replace(" · ", " (") + ")") : ""}
               ${st.stepSource ? opt("step", seSourceLabel("step").replace(" · ", " (") + ")") : ""}
               ${st.beforeLoad ? opt("before", seSourceLabel("before").replace(" · ", " (") + ")") : ""}
               ${st.snapshots.map((s) => opt("snap:" + s.id, "Snapshot: " + s.label)).join("")}
             </select>
-            <button type="button" class="secondary icon-btn" data-se-refresh-server title="Read the server's current versions again">&#x21bb;</button>`;
+            ${offline ? "" : `<button type="button" class="secondary icon-btn" data-se-refresh-server title="Read the server's current versions again">&#x21bb;</button>`}`;
         }
         const keys = Object.keys(SE_ARTIFACT_LABELS);
         const blocks = keys.map((key) => {
@@ -53352,7 +53412,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
             <div class="se-d-content" data-se-content="${SE_TIMELINE_KEY}"${height ? ` style="height:${height}px;max-height:none"` : ""}>${seTimelineHtml()}</div>
             <div class="se-d-resize" data-se-resize="${SE_TIMELINE_KEY}" title="Drag to change the height of the timeline. Double-click to go back to automatic heights."></div></div>`;
         };
-        const empty = st.drawer.source === "server" && !st.server ? "The server's versions haven't been read yet. Use ↻." : !blocks.length ? "This version has nothing for the panes shown." : `No differences from ${srcName}.`;
+        const empty = st.mode === "off" && st.drawer.source === "server" ? "Nothing to compare with yet. Run Profile on a version of the query to keep it here, or use Save as version." : st.drawer.source === "server" && !st.server ? "The server's versions haven't been read yet. Use ↻." :!blocks.length ? "This version has nothing for the panes shown." : `No differences from ${srcName}.`;
         // Panes keep the order and side the user gave them; ones never moved follow the pane order, timeline first.
         const rank = (k) => { const i = (st.drawer.order || []).indexOf(k); return i >= 0 ? i : k === SE_TIMELINE_KEY ? -1 : 1000 + keys.indexOf(k); };
         const defaults = seDefaultDrawerSides(changed.map((x) => x.key));
@@ -53656,6 +53716,8 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         const st = seState();
         if (st.mode === "clones") { const proj = ($("publishProjectName")?.value.trim()) || "query-test"; return { pid: _qpideShortId(proj), proj }; }
         const db = selectedDatabase(), qn = state.live.storedQueryName || "";
+        // Read-only: the versions are the Profile runs kept in this app, named for the query alone.
+        if (st.mode === "off") return { pid: _qpideShortId(`runs|${db}|${qn || "ad hoc query"}`), proj: qn || "ad hoc query" };
         return { pid: _qpideShortId(`live|${db}|${qn || "ad hoc query"}`), proj: `live ${db}${qn ? " · " + qn : ""}` };
       }
       // Removes the timeline from the open drawer; the changes stay where they are. False when it isn't showing.
@@ -53711,7 +53773,8 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         try {
           // No history database to read: the steps kept in this app are the timeline.
           const mine = qpideLocalSteps(pid);
-          if (mine.length && (!qpideDbKnown() || qpideAccess().state === "none")) { qpideFillLocalTimeline(tl, mine, prevSel); st.timelineSteps = true; return; }
+          if (mine.length && (st.mode === "off" || !qpideDbKnown() || qpideAccess().state === "none")) { qpideFillLocalTimeline(tl, mine, prevSel); st.timelineSteps = true; return; }
+          if (st.mode === "off") { tl.empty = "No Profile run has been kept for this query yet. Run Profile, edit the query, and run it again: each version is listed here with its time, what changed, and how it compares."; return; }
           if (!state.connection.baseUrl) { tl.empty = "Connect to Stardog to read the recorded steps."; return; }
           const list = await requestDetailed({ method: "GET", path: "/admin/databases", accept: "application/json, */*;q=0.8" });
           if (!list.ok) { tl.error = `Couldn't look for recorded steps: the server answered ${list.status} ${list.statusText || ""}`.trim(); return; }
@@ -53876,7 +53939,9 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         const cleared = p && Object.keys(arts).some((k) => arts[k].changed && (arts[k].kept === false || (pArts[k] && pArts[k].kept === false)));
         const savedFile = (Object.values(arts).concat(Object.values(pArts)).find((a) => a.file) || {}).file;
         const textKept = Object.values(arts).some((a) => a.kept !== false);
+        const fullDiff = p && tl.local ? seStepDiffHtml(arts, pArts) : null;
         if (!p) changed = `<div>The first recorded state of this query. Later points are compared with it.</div>`;
+        else if (fullDiff) changed = fullDiff;
         else if (tl.local && s.diff) {
           const keys = Object.keys(s.diff);
           const unit = (a, total) => a.slice(0, 2).map((u) => `<code>${esc(clip(u))}</code>`).join(" ") + (total > 2 ? ` and ${total - 2} more` : "");
@@ -53906,6 +53971,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           else { effect.push(`Query time went from ${fmtMs(p.qt)} to ${fmtMs(s.qt)}, ${pct.toFixed(0)}% ${d < 0 ? "faster" : "slower"}.`); verdict = d < 0 ? "Faster" : "Slower"; vcls = d < 0 ? "is-better" : "is-worse"; }
         } else if (s.qt != null) effect.push(`Query time is ${fmtMs(s.qt)}${p ? " (the step before has no timing to compare with)" : ""}.`);
         else effect.push(`No timing was recorded here: the plan was explained, not run. Run the query with Profile to record a time.`);
+        if (s.runs && s.runs.length > 1) effect.push(`This version was profiled ${s.runs.length} times (${s.runs.map(fmtMs).join(", ")}); the latest is the one shown.`);
         if (p && s.jc != null && p.jc != null && s.jc !== p.jc) effect.push(`The plan has ${s.jc} join${s.jc === 1 ? "" : "s"}, was ${p.jc}.`);
         if (p && s.uc != null && p.uc != null && s.uc !== p.uc) effect.push(`The plan has ${s.uc} union${s.uc === 1 ? "" : "s"}, was ${p.uc}.`);
         if (s.shapeChanged) effect.push("The shape of the plan changed.");
@@ -53928,9 +53994,38 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
             <h5>Results</h5>${results}
           </div>`;
         const mem = tl.local ? qpideLocalBytes() : 0;
-        const localNote = tl.local ? `<div class="se-tl-hint se-muted">Kept in this app only: no history database is available${qpideAccess().state === "none" ? " to you on this server" : ""}, so this record is lost when the page closes. The recorded text uses about ${esc(qpideMb(mem))} of memory.</div>` : "";
-        const tools = tl.local ? `<div class="se-tl-tools"><button type="button" class="secondary" data-se-tl-savefile title="Save every step's files and note to one versioned zip and free their memory. Timings, row counts and short notes stay in the timeline.">Save text to a file</button><button type="button" class="secondary" data-se-tl-openfile title="Bring steps back from a zip saved here before. Each step is checked against what was recorded.">Open a saved file…</button></div>` : `<div class="se-tl-tools"><button type="button" class="secondary" data-se-tl-resolve="${tl.resolved ? 0 : 1}" title="${tl.resolved ? "Mark this query as open again" : "The problem is solved: this record is then offered for clearing"}">${tl.resolved ? "Reopen" : "Mark resolved"}</button><button type="button" class="secondary" data-se-tl-tidy title="Keep the text of the first, the fastest and the latest step and clear the text of the rest. Timings and results stay.">Keep first, fastest and latest</button><button type="button" class="secondary" data-se-tl-projects title="See every recorded project and clear the ones you no longer need">Recorded projects…</button></div>`;
-        return `<div class="se-tl">${summary}<div class="se-tl-chart">${svg}</div>${legend}${note}${tools}${localNote}${hint}</div>`;
+        const localNote = tl.local ? `<div class="se-tl-hint se-muted">${st.mode === "off" ? "Kept in this app only: Profile runs are not written to Stardog, so this record is lost when the page closes unless you save it to a file" : `Kept in this app only: no history database is available${qpideAccess().state === "none" ? " to you on this server" : ""}, so this record is lost when the page closes`}. The recorded text uses about ${esc(qpideMb(mem))} of memory.</div>` : "";
+        // One row per step: how long it took, against the step before, and which panes changed. A click selects the step.
+        const bestI = best && bestShown ? best.i : -1;
+        const table = `<table class="se-tl-table"><thead><tr><th>Step</th><th>Query time</th><th>Against the step before</th><th>Rows</th><th>Joins</th><th>Panes changed</th></tr></thead><tbody>${steps.map((x, j) => {
+          const pv = j > 0 ? steps[j - 1] : null;
+          let vs = "";
+          if (pv && x.qt != null && pv.qt != null) { const d = x.qt - pv.qt, pct = pv.qt > 0 ? Math.abs(d) / pv.qt * 100 : 0; vs = pct < 3 ? `<span class="se-tl-chip is-neutral">about the same</span>` : `<span class="se-tl-chip ${d < 0 ? "is-better" : "is-worse"}">${pct.toFixed(0)}% ${d < 0 ? "faster" : "slower"}</span>`; }
+          else if (pv) vs = `<span class="se-muted">not timed</span>`;
+          const keys = Object.keys(tl.artMap[x.iri] || {}).filter((k) => tl.artMap[x.iri][k].changed);
+          const what = j === 0 ? `<span class="se-muted">first version</span>` : keys.length ? esc(keys.map((k) => _PUB_LABEL[k] || k).join(", ")) : `<span class="se-muted">none</span>`;
+          return `<tr class="${x.iri === tl.selected ? "is-sel" : ""}" data-se-tl-goto="${j}" title="Show the details of step ${j + 1}"><td>${j + 1}${j === bestI ? ` <span class="se-tl-chip is-better" title="Fastest with the same rows">fastest</span>` : ""}</td><td>${x.qt != null ? esc(fmtMs(x.qt)) : `<span class="se-muted">not timed</span>`}</td><td>${vs}</td><td>${x.rc != null ? esc(String(x.rc)) : `<span class="se-muted">—</span>`}</td><td>${x.jc != null ? esc(String(x.jc)) : `<span class="se-muted">—</span>`}</td><td>${what}</td></tr>`;
+        }).join("")}</tbody></table>`;
+        const tools = tl.local ? `<div class="se-tl-tools"><button type="button" class="secondary" data-se-tl-clearlocal title="Forget every kept version of this query. The panes are not changed.">Clear these versions</button><button type="button" class="secondary" data-se-tl-savefile title="Save every step's files and note to one versioned zip and free their memory. Timings, row counts and short notes stay in the timeline.">Save text to a file</button><button type="button" class="secondary" data-se-tl-openfile title="Bring steps back from a zip saved here before. Each step is checked against what was recorded.">Open a saved file…</button></div>` : `<div class="se-tl-tools"><button type="button" class="secondary" data-se-tl-resolve="${tl.resolved ? 0 : 1}" title="${tl.resolved ? "Mark this query as open again" : "The problem is solved: this record is then offered for clearing"}">${tl.resolved ? "Reopen" : "Mark resolved"}</button><button type="button" class="secondary" data-se-tl-tidy title="Keep the text of the first, the fastest and the latest step and clear the text of the rest. Timings and results stay.">Keep first, fastest and latest</button><button type="button" class="secondary" data-se-tl-projects title="See every recorded project and clear the ones you no longer need">Recorded projects…</button></div>`;
+        return `<div class="se-tl">${summary}<div class="se-tl-chart">${svg}</div>${legend}${table}${note}${tools}${localNote}${hint}</div>`;
+      }
+      // The lines that changed in each pane between a step and the one before, in full (red = the step before, green = this step).
+      // Null when the text of either step is not kept in the app, so the shorter summary is shown instead.
+      function seStepDiffHtml(arts, pArts) {
+        const keys = Object.keys(arts).filter((k) => arts[k].changed && arts[k].kept !== false && arts[k].text !== undefined && (!pArts[k] || (pArts[k].kept !== false && pArts[k].text !== undefined)));
+        if (!keys.length) return null;
+        const MAX = 40;
+        return keys.map((k) => {
+          const a = splitLines((pArts[k] && pArts[k].text) || ""), b = splitLines(arts[k].text || "");
+          const hunks = seDiffLines(a, b, { ignoreSpace: true });
+          const rows = []; let del = 0, add = 0;
+          hunks.forEach((h) => {
+            for (let i = h.aStart; i < h.aEnd; i++) { rows.push(`<div class="se-tl-del"><span>&minus;</span>${esc(a[i])}</div>`); del++; }
+            for (let i = h.bStart; i < h.bEnd; i++) { rows.push(`<div class="se-tl-add"><span>+</span>${esc(b[i])}</div>`); add++; }
+          });
+          const more = rows.length - MAX;
+          return `<div><strong>${esc(_PUB_LABEL[k] || k)}</strong> <span class="se-muted">${rows.length ? `${del} line${del === 1 ? "" : "s"} removed, ${add} added` : "no line differs"}</span>${rows.length ? `<div class="se-tl-diff">${rows.slice(0, MAX).join("")}${more > 0 ? `<div class="se-muted">… ${more} more changed lines. “Compare with panes” shows everything.</div>` : ""}</div>` : ""}</div>`;
+        }).join("");
       }
       // The text of one recorded step, ready for the panes: only panes whose text is still kept. Null (after a message) when none is.
       async function seTimelineStepTexts(iri) {
@@ -54112,7 +54207,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         if ($("seDrawer")) { seRenderDrawer(); seApplyDrawerLayout(); }
       }
       function seScheduleAfterChange() {
-        if (!state.ui.stardogEdit || state.ui.stardogEdit.mode === "off") return;
+        if (!state.ui.stardogEdit || !seCompareOn(state.ui.stardogEdit)) return;
         clearTimeout(_seAfterTimer);
         _seAfterTimer = setTimeout(seAfterChange, 350);
       }
@@ -54196,7 +54291,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         if (mode !== "clones") { $("projectMenu")?.classList.add("hidden"); $("publishPanel")?.classList.add("hidden"); }
         seUpdateEditButton();
         seEnsureDrawer();
-        if (mode === "off") { seWatchCancelAll(); st.drawer.size = "collapsed"; st.drawer.view = "changes"; st.timeline = null; st.timelineSteps = false; seApplyDrawerLayout(); seAfterChange(); return; }
+        if (mode === "off") { seWatchCancelAll(); st.drawer.size = "collapsed"; st.drawer.view = "changes"; st.timeline = null; st.timelineSteps = st.localHistory.steps.length > 0; if (st.drawer.source === "server") st.drawer.source = st.stepSource ? "step" : st.base ? "base" : "server"; seApplyDrawerLayout(); seAfterChange(); return; }
         seApplyDrawerLayout();
         if (prev === "off" || !st.server) {
           const prog = seProgressBanner(mode === "live" ? "Turning on live editing" : "Turning on clone testing");
@@ -54349,6 +54444,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         const dbTitle = noDb ? QPIDE_NO_ACCESS_TEXT : "Choose which database holds the change history and test copies on this server";
         if (st.mode === "off") {
           menu.innerHTML = `<div class="se-menu-head"><strong>Read-only.</strong> Nothing is written to Stardog.</div>`
+            + item("data-se-menu=\"timeline\"", "Compare profiled versions", "Each Profile run is kept in this app with the query it ran. See their times side by side and what changed between them.")
             + item("data-se-menu=\"choose\"", "Enable editing on Stardog&hellip;", "Choose: test on clones, or edit the live server")
             + item("data-se-menu=\"historydb\"", "History database&hellip;", dbTitle, noDb);
           return;
@@ -54461,7 +54557,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         });
         document.addEventListener("click", (e) => { if (!e.target.closest("#seEditWrap")) $("seEditMenu")?.classList.add("hidden"); });
         seUpdateEditButton();
-        window.addEventListener("resize", () => { if (state.ui.stardogEdit?.mode !== "off") { seApplyDrawerLayout(); if (state.ui.stardogEdit.drawer.size !== "collapsed") seRenderDrawer(); } }, { passive: true });
+        window.addEventListener("resize", () => { if (state.ui.stardogEdit && seCompareOn(state.ui.stardogEdit)) { seApplyDrawerLayout(); if (state.ui.stardogEdit.drawer.size !== "collapsed") seRenderDrawer(); } }, { passive: true });
       }
 
 
@@ -64341,7 +64437,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           detectDisconnectedPatterns, // GRAPH ?g alone is not a disconnected variable
           detectUnboundSelectVars, detectInvalidDatatypeOperations, // computed SELECT columns: inputs must be bound and numeric
           attributePlanElement, refetchPlanForRefresh, testConnection, updateConnectionUi, detectPushdownMisses, parseOntologyForGraph, _qsmParsePlan, _qsmBuildNativeScene, buildQuerySourceMap, qfKeepCaretOutOfFolds, qfRemapFolds, setGutterShrinkHoldMs: (ms) => { GUTTER_SHRINK_HOLD_MS = ms; }, _qsmRenderNative, _qsmServiceInfo, _qsmDataSourceFor, associatedVirtualGraphsForQuery, planReadsVgWithoutSql, // Why? on stored-data plans, refresh refetches, connect feedback, mixed-source map
-          seState, seSetMode, qpideAccess, qpideLocalLevel, qpideKeepLocalStep, qpideSaveLocalSnapshot, qpideLoadSnapshotBlob, qpideContentHash, qpideFillLocalTimeline, seOpenNotePanel, seSetStepNote, seStepNoteInfo, seDraftNote, keySetsFitForSpace, readZipEntries, createZipBlob, qpideLocalBytes, qpideLocalSteps, seRenderEditMenu, seTimelineHtml, seAfterChange, seOpenDrawer, sePaneFormOfQuery, seTargetsFor, seGoToLine, seMoveDrawerPane, sePaneLineLabels, seOpenModeChooser, seTimelineVerdicts, seTimelineMissingText, seTimelineBest, seRegistryCleanable, seDefaultDrawerSides, seToggleTimeline, evaluateProfileFindings, ensureAppDb, qpideDbKnown, qpideDbForget, qpideNeverCreate, qpideSetNeverCreate, getQpideDb: () => QPIDE_DB, // history database approval gate; mode state (off-by-default check, manual smoke tests), compare drawer jump / reorder / numbering
+          seState, seSetMode, qpideAccess, qpideLocalLevel, qpideKeepLocalStep, qpideSaveLocalSnapshot, qpideLoadSnapshotBlob, qpideContentHash, qpideFillLocalTimeline, seOpenNotePanel, seSetStepNote, seStepNoteInfo, seDraftNote, keySetsFitForSpace, readZipEntries, createZipBlob, qpideLocalBytes, qpideLocalSteps, seRenderEditMenu, seTimelineHtml, seAfterChange, seOpenDrawer, sePaneFormOfQuery, seTargetsFor, seGoToLine, seMoveDrawerPane, sePaneLineLabels, seOpenModeChooser, seTimelineVerdicts, seTimelineMissingText, seTimelineBest, seRegistryCleanable, seDefaultDrawerSides, seToggleTimeline, qpideKeepLocalStep, seCompareOn, seStepDiffHtml, fetchProfile, evaluateProfileFindings, ensureAppDb, qpideDbKnown, qpideDbForget, qpideNeverCreate, qpideSetNeverCreate, getQpideDb: () => QPIDE_DB, // history database approval gate; mode state (off-by-default check, manual smoke tests), compare drawer jump / reorder / numbering
           runSqlQuery, stopSqlQuery, // SQL Query panel: Run turns into Stop while running
           renderArtifactFlowView, renderQueryFlowView, resyncGutterRowHeights, expandArtifactPane, gutterNeededWidth, seProgressBanner, // gutter rebuild race / hidden-pane re-level / margin width / popup checks
           splitGraphSections, matchGraphBannerLine, graphSectionLineLabels, buildSectionedModelRules, parseSchemaGraphLists, parseOntologyForGraph, // multi-graph model: banners, numbering, union parse, schema option parse
