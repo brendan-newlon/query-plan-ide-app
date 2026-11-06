@@ -26214,7 +26214,7 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.43.3";
+      const APP_VERSION = "1.43.4";
       const RELEASE_NOTES = [
         { version: "1.43.0", date: "2026-11-05", title: "Cluster layout for the ontology diagram", items: [
           "The [[Ontology Visualization|aa-tool-ontology]] diagram opens, and {*Redraw layout, spread out*} in its menu redraws it, with the classes as groups of closely linked classes joined by long links. Classes that link to another group sit on the side facing it, and a class with a single link sits beside the class it links to.",
@@ -39318,6 +39318,7 @@ acme:temperature rdfs:range xsd:string .`
                 <button type="button" id="sqlQueryMaximizeBtn" class="secondary icon-btn" title="Maximize">${_PANEL_MAXIMIZE_SVG}</button>`;
             } else if (panelId === "sparqlResultsPanel") {
               extraControls = `
+                <button type="button" id="sparqlExecStopBtn" class="secondary" title="Execute Query again">&#9654; Run again</button>
                 <div class="pane-search-cluster" id="sparqlExecSearchCluster">
                   <label class="pane-search-wrap" id="sparqlExecSearchWrap" title="Search results">
                     <input id="sparqlExecSearch" class="pane-search-input" type="text" placeholder="Search">
@@ -42225,6 +42226,13 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
           : "Execute Query — run the SPARQL query as shown and preview the results" + (state.ui.sqRunHint ? "\n" + state.ui.sqRunHint : "");
         btn.setAttribute("aria-label", isRunning ? "Stop Query" : "Execute Query");
         btn.classList.toggle("warning", isRunning);
+        const panelBtn = $("sparqlExecStopBtn");
+        if (panelBtn) {
+          panelBtn.innerHTML = isRunning ? "&#9632; Stop" : "&#9654; Run again";
+          panelBtn.title = isRunning ? "Stop Query — kill this query on Stardog and stop waiting" : "Execute Query again";
+          panelBtn.classList.toggle("warning", isRunning);
+          panelBtn.classList.toggle("secondary", !isRunning);
+        }
       }
 
       // ── Multi-query editor support (@feature: multi-query) ───────────────────────
@@ -62492,6 +62500,10 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           setTimeout(() => URL.revokeObjectURL(url), 2000);
         });
         on("executeSparqlQueryBtn", "click", () => {
+          if (_sparqlExec) killExecuteSparqlQuery().catch(handleError);
+          else runExecuteSparqlQuery().catch(handleError);
+        });
+        on("sparqlExecStopBtn", "click", () => {
           if (_sparqlExec) killExecuteSparqlQuery().catch(handleError);
           else runExecuteSparqlQuery().catch(handleError);
         });
