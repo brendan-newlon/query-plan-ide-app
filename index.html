@@ -12372,11 +12372,33 @@
             if (isPaneCollapsed(key)) { state.ui.collapsedPanes[key] = false; changed = true; }
           }
         });
+        // Once anything is loaded, a left pane with nothing in it folds to its header row so the panes
+        // that hold content get the space. Same contract as above: only a pane this code folded is
+        // unfolded by it (when text arrives), and a pane the user opened stays open. The structural
+        // model starts hidden; once it holds text and the user has not hidden it, it opens.
+        const emptyFolded = state.ui.emptyPaneAutoFolded || (state.ui.emptyPaneAutoFolded = {});
+        const selected = (state.ui.selectedArtifacts || []).filter((k) => META[k]);
+        const anyLoaded = hasQuery || selected.some((k) => vgPaneHasContent(k));
+        const ksGrouped = keySetsLayout().grouped;
+        const ksAnyContent = ksGrouped && KEYSET_GROUP.some((g) => selected.includes(g.key) && vgPaneHasContent(g.key));
+        selected.forEach((key) => {
+          const has = vgPaneHasContent(key);
+          const inGroup = ksGrouped && KEYSET_GROUP.some((g) => g.key === key);
+          const wantFold = anyLoaded && !(inGroup ? ksAnyContent : has) && !opened[key];
+          if (wantFold && !isPaneCollapsed(key)) {
+            state.ui.collapsedPanes[key] = true; emptyFolded[key] = true; changed = true;
+          } else if (!wantFold && emptyFolded[key]) {
+            delete emptyFolded[key];
+            if (isPaneCollapsed(key)) { state.ui.collapsedPanes[key] = false; changed = true; }
+          } else if (key === "ontologyModel" && has && isPaneCollapsed(key) && !state.ui._ontologyManuallyCollapsed && !opened[key]) {
+            state.ui.collapsedPanes[key] = false; changed = true;
+          }
+        });
         if (changed && apply) applyPaneVisibilitySurgical();
         return changed;
       }
       function markVgPaneUserChoice(key, opened) {
-        if (!VG_ONLY_PANES.includes(key)) return;
+        delete (state.ui.emptyPaneAutoFolded || (state.ui.emptyPaneAutoFolded = {}))[key];
         delete (state.ui.vgPaneAutoFolded || (state.ui.vgPaneAutoFolded = {}))[key];
         const o = state.ui.vgPaneUserOpened || (state.ui.vgPaneUserOpened = {});
         if (opened) o[key] = true; else delete o[key];
@@ -15379,7 +15401,7 @@
         state.ui._uniqueKeysManuallyExpanded = false;
         state.ui._mappingsAutoHidden = true;
         state.ui._mappingsManuallyUncollapsed = false;
-        state.ui.vgPaneUserOpened = {};
+        state.ui.vgPaneUserOpened = {}; state.ui.emptyPaneAutoFolded = {};
         state.ui.keySetsUserLayout = false;
         renderEditor();
         renderMappingCostDriversStrip();
@@ -27008,7 +27030,7 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.48.0";
+      const APP_VERSION = "1.48.1";
       const RELEASE_NOTES = [
         { version: "1.48.0", date: "2026-11-05", title: "Permission CSVs and a write query preview", items: [
           "The ☰ menu of the Get or Compare Permissions panel downloads two CSV files: every user with their roles (one role per row, ordered by user) and every role with its permissions (one permission per row).",
@@ -32395,7 +32417,7 @@ ORDER BY ?table ?ordinal`;
         state.ui._uniqueKeysManuallyExpanded = false;
         state.ui._mappingsAutoHidden = true;
         state.ui._mappingsManuallyUncollapsed = false;
-        state.ui.vgPaneUserOpened = {};
+        state.ui.vgPaneUserOpened = {}; state.ui.emptyPaneAutoFolded = {};
         state.ui.keySetsUserLayout = false;
         refreshQueryControls();
         if (payload.metadata.schema) setValue("reasoningSchemaSelect", payload.metadata.schema);
@@ -37159,7 +37181,7 @@ acme:temperature rdfs:range xsd:string .`
         if (state.ui.foreignKeySetsSupported === false) state.ui.collapsedPanes.foreignKeySets = true;
         if (state.ui.functionalDependencySetsSupported === false) state.ui.collapsedPanes.functionalDependencySets = true;
         state.ui.vgPaneAutoFolded = {};
-        state.ui.vgPaneUserOpened = {};
+        state.ui.vgPaneUserOpened = {}; state.ui.emptyPaneAutoFolded = {};
         state.ui.keySetsUserLayout = false;
         state.ui._rulesAutoHidden = false;
         state.ui._uniqueKeysAutoHidden = false;
