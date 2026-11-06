@@ -688,8 +688,6 @@
     .code-editor-gutter-row.se-g-del-top::after { background-image:linear-gradient(to bottom right, transparent 50%, #f85149 50%); background-size:5px 6px; background-position:0 0; }
     .code-editor-gutter-row.se-g-add.se-g-del::after { background-image:linear-gradient(to top right, transparent 50%, #f85149 50%), linear-gradient(#3fb950, #3fb950); background-size:5px 6px, 3px 100%; background-position:0 100%, 1px 0; }
     .code-editor-gutter-row.se-g-mod.se-g-del::after { background-image:linear-gradient(to top right, transparent 50%, #f85149 50%), linear-gradient(#4c9aff, #4c9aff); background-size:5px 6px, 3px 100%; background-position:0 100%, 1px 0; }
-    .sq-active-label { font-size:0.72rem; color:var(--accent); white-space:nowrap; cursor:help; }
-    .sq-active-label.is-warn { color:#f0b25a; }
     .plan-target-label.is-other { color:#9fb4d6; }
     .plan-target-label { font-size:0.72rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:30ch; cursor:help; }
     .plan-target-label.is-stale { color:#f0b25a; }
@@ -3622,7 +3620,6 @@
                 <div class="artifact-pane-header-main">
                   <span class="artifact-pane-label">SPARQL Query</span>
                   <button id="executeSparqlQueryBtn" class="secondary icon-btn" title="Execute Query — run the SPARQL query as shown and preview the results" aria-label="Execute Query"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"><path d="M3.2 2.2v7.6L9.6 6 3.2 2.2z"/></svg></button>
-                  <span id="sqActiveLabel" class="sq-active-label hidden"></span>
                   <button type="button" class="secondary icon-btn se-save-btn hidden" data-se-save="sparqlQuery" aria-label="Save to Stardog"></button>
                   <span id="inferenceRulesBadge" class="inference-rules-badge hidden"></span>
                   <span id="mappingCostDriversHost" class="pill-strip-host"></span>
@@ -26141,7 +26138,7 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.43.1";
+      const APP_VERSION = "1.43.2";
       const RELEASE_NOTES = [
         { version: "1.43.0", date: "2026-11-05", title: "Cluster layout for the ontology diagram", items: [
           "The [[Ontology Visualization|aa-tool-ontology]] diagram opens, and {*Redraw layout, spread out*} in its menu redraws it, with the classes as groups of closely linked classes joined by long links. Classes that link to another group sit on the side facing it, and a class with a single link sits beside the class it links to.",
@@ -42148,7 +42145,8 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         const btn = $("executeSparqlQueryBtn");
         if (!btn) return;
         btn.innerHTML = isRunning ? _SPARQL_EXEC_STOP_ICON : _SPARQL_EXEC_PLAY_ICON;
-        btn.title = isRunning ? "Stop Query — kill this query on Stardog and stop waiting" : "Execute Query — run the SPARQL query as shown and preview the results";
+        btn.title = isRunning ? "Stop Query — kill this query on Stardog and stop waiting"
+          : "Execute Query — run the SPARQL query as shown and preview the results" + (state.ui.sqRunHint ? "\n" + state.ui.sqRunHint : "");
         btn.setAttribute("aria-label", isRunning ? "Stop Query" : "Execute Query");
         btn.classList.toggle("warning", isRunning);
       }
@@ -42213,7 +42211,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
                 if (!cur) begin(0);
                 else if (cur.form && cur.complete && !cur.afterSemicolon) begin(boundaryFor(i));
                 const kind = _SQ_QUERY_FORMS.has(word) ? "query" : "update";
-                if (!cur.form) { cur.form = word; cur.kind = kind; }
+                if (!cur.form) { cur.form = word; cur.kind = kind; cur.formPos = i; }
                 if (cur.afterSemicolon) { cur.afterSemicolon = false; cur.sawWhere = false; cur.dataOrWhere = false; }
                 if (kind === "update" && /^(LOAD|CLEAR|CREATE|DROP|COPY|MOVE|ADD)$/.test(word)) cur.complete = true;
                 if (word === "DESCRIBE") cur.complete = true;
@@ -42241,7 +42239,10 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
           let a = s.start; while (a < s.end && /\s/.test(text[a])) a++;
           let b = s.end; while (b > a && /\s/.test(text[b - 1])) b--;
           const startLine = lineAt(a);
-          return { start: s.start, end: s.end, form: s.form, kind: s.kind, startLine, endLine: b > a ? lineAt(b - 1) : startLine };
+          // formLine: the line of the query keyword (SELECT, ASK, ...), which is what the user calls
+          // "the query's line"; startLine also covers the PREFIX/comment lines above it.
+          const formLine = Number.isFinite(s.formPos) ? lineAt(s.formPos) : startLine;
+          return { start: s.start, end: s.end, form: s.form, kind: s.kind, startLine, formLine, endLine: b > a ? lineAt(b - 1) : startLine };
         });
       }
 
@@ -42335,15 +42336,12 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
           row.classList.toggle("sq-g-active", Boolean(a.multi && a.seg && line >= a.seg.startLine && line <= a.seg.endLine));
           row.classList.toggle("sq-g-start", starts.has(line));
         });
-        const label = $("sqActiveLabel");
-        if (label) {
-          label.classList.toggle("hidden", !a.multi);
-          label.classList.toggle("is-warn", Boolean(a.multi && !a.seg));
-          label.textContent = !a.multi ? "" : a.seg ? `runs line ${a.seg.startLine + 1}` : "selection spans 2 queries";
-          label.title = !a.multi ? "" : a.seg
-            ? `This pane holds ${a.segs.length} queries. Run (▶), Ctrl+Enter, the plan and the profiler use the one holding the cursor: the query starting at line ${a.seg.startLine + 1}, marked in the line-number margin. Click inside another query to switch.`
-            : "Your selection covers more than one query. Click inside one query, or select text within it, to choose which one runs.";
-        }
+        // Which query runs is shown as a note in the Run button's tooltip (no text in the header).
+        state.ui.sqRunHint = !a.multi ? "" : a.seg
+          ? `This pane holds ${a.segs.length} queries. Run, Ctrl+Enter, the plan and the profiler use the one holding the cursor: the query starting at line ${a.seg.formLine + 1}, marked in the line-number margin. Click inside another query to switch.`
+          : "Your selection covers more than one query. Click inside one query, or select text within it, to choose which one runs.";
+        const runBtn = $("executeSparqlQueryBtn");
+        if (runBtn && !runBtn.classList.contains("warning")) _setSparqlExecBtnRunning(false);
         updatePlanTargetLabel();
       }
 
@@ -42368,12 +42366,12 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
           tone = "is-stale";
           title = `This plan was fetched at ${at} for a version of the query that's no longer in the pane. Click ↻ to fetch a plan for the query holding the cursor.`;
         } else if (a.multi && a.seg && a.seg !== planSeg) {
-          text = `for line ${planSeg.startLine + 1} · cursor elsewhere ↻`;
+          text = `for line ${planSeg.formLine + 1} · cursor elsewhere ↻`;
           tone = "is-other";
-          title = `This plan (fetched ${at}) is for the query starting at line ${planSeg.startLine + 1}. The cursor is in the query starting at line ${a.seg.startLine + 1}; click ↻ to plan that one.`;
+          title = `This plan (fetched ${at}) is for the query starting at line ${planSeg.formLine + 1}. The cursor is in the query starting at line ${a.seg.formLine + 1}; click ↻ to plan that one.`;
         } else if (a.multi) {
-          text = `for line ${planSeg.startLine + 1}`;
-          title = `Plan fetched ${at} for the query starting at line ${planSeg.startLine + 1}.`;
+          text = `for line ${planSeg.formLine + 1}`;
+          title = `Plan fetched ${at} for the query starting at line ${planSeg.formLine + 1}.`;
         }
         el.textContent = text;
         el.title = title;
@@ -42385,7 +42383,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
       // Record which query text a freshly arrived plan belongs to (called from fetchExplain/fetchProfile).
       function recordPlanSource(serverText) {
         const a = activeSparqlSegment();
-        state.ui.planSourceInfo = { serverText: String(serverText || ""), multi: a.multi, line: a.seg ? a.seg.startLine + 1 : 1, at: Date.now(), reasoning: inferenceReasoningEnabled() };
+        state.ui.planSourceInfo = { serverText: String(serverText || ""), multi: a.multi, line: a.seg ? a.seg.formLine + 1 : 1, at: Date.now(), reasoning: inferenceReasoningEnabled() };
         updatePlanTargetLabel();
         seNotePlanForDrift(serverText);
       }
