@@ -14010,21 +14010,137 @@
         return statements;
       }
 
+      function isRuleStatement(statement) {
+        return /SPARQLRule/i.test(statement)
+          && /(?:rule:content|<tag:stardog:api:rule:content>)/i.test(statement)
+          && /\bIF\s*\{[\s\S]*?\}\s*THEN\s*\{/i.test(statement);
+      }
+
+      // Reasoning axioms: OWL / RDFS statements the reasoner uses to infer new facts (the
+      // constructs Stardog's reasoner supports). They live in the inference panel next to the
+      // rules, not in the structural model. Domain and range are NOT listed: the structural model
+      // keeps them because the natural-language layer and the datatype-mismatch check read them there.
+      const REASONING_AXIOM_PREDICATES = ["subClassOf", "subPropertyOf", "equivalentClass", "equivalentProperty", "inverseOf", "disjointWith", "propertyDisjointWith", "propertyChainAxiom", "hasKey"];
+      const REASONING_AXIOM_TYPES = ["TransitiveProperty", "SymmetricProperty", "AsymmetricProperty", "ReflexiveProperty", "IrreflexiveProperty", "FunctionalProperty", "InverseFunctionalProperty", "AllDisjointClasses", "AllDisjointProperties"];
+      function _reasoningTermMatches(term, names) {
+        const t = String(term || "").trim();
+        const m = /^(?:(?:rdfs|owl):|<http:\/\/www\.w3\.org\/(?:2002\/07\/owl|2000\/01\/rdf-schema)#)([A-Za-z]+)>?$/.exec(t);
+        return Boolean(m && names.includes(m[1]));
+      }
+      // End index of the Turtle term starting at i (IRI, string, [..], (..) or a bare token).
+      function _ttlTermEnd(s, i) {
+        const c = s[i];
+        if (c === "<") { const j = s.indexOf(">", i); return j < 0 ? s.length : j + 1; }
+        if (c === "\"" || c === "'") {
+          const q = s.startsWith(c.repeat(3), i) ? c.repeat(3) : c;
+          let j = i + q.length;
+          while (j < s.length && !s.startsWith(q, j)) j += s[j] === "\\" ? 2 : 1;
+          return Math.min(s.length, j + q.length);
+        }
+        if (c === "[" || c === "(") {
+          let depth = 0, j = i;
+          while (j < s.length) {
+            const ch = s[j];
+            if (ch === "<" || ch === "\"" || ch === "'") { j = _ttlTermEnd(s, j); continue; }
+            if (ch === "[" || ch === "(") depth += 1;
+            else if (ch === "]" || ch === ")") { depth -= 1; if (depth === 0) return j + 1; }
+            j += 1;
+          }
+          return s.length;
+        }
+        let j = i;
+        while (j < s.length && !/\s/.test(s[j])) j += 1;
+        return j;
+      }
+      // Splits s on sep at nesting depth 0 (outside IRIs, strings and brackets).
+      function _ttlSplitTop(s, sep) {
+        const out = [];
+        let last = 0, i = 0;
+        while (i < s.length) {
+          const ch = s[i];
+          if (ch === "<" || ch === "\"" || ch === "'" || ch === "[" || ch === "(") { i = _ttlTermEnd(s, i); continue; }
+          if (ch === "#") { const nl = s.indexOf("\n", i); i = nl < 0 ? s.length : nl; continue; }
+          if (ch === sep) { out.push(s.slice(last, i)); last = i + 1; }
+          i += 1;
+        }
+        out.push(s.slice(last));
+        return out;
+      }
+      // Splits one Turtle statement into the part that stays in the structural model and the
+      // reasoning axioms that move to the inference panel. Returns null when it holds none.
+      function splitReasoningAxioms(statement) {
+        const full = String(statement || "");
+        const leadM = /^(?:\s*#[^\n]*\n)*/.exec(full);
+        const lead = leadM ? leadM[0] : "";
+        const body = full.slice(lead.length).trim();
+        if (!body || /^(?:@prefix|@base|prefix\b|base\b)/i.test(body)) return null;
+        if ((body.match(/"/g) || []).length % 2) return null; // a fragment cut mid-string: leave alone
+        const subjEnd = _ttlTermEnd(body, 0);
+        const subj = body.slice(0, subjEnd);
+        if (!/^(?:<[^>\s]*>|[A-Za-z_][\w.-]*:\S*|:\S*|_:\S+|\[[\s\S]*\])$/.test(subj)) return null;
+        const rest = body.slice(subjEnd).replace(/\s*\.\s*$/, "");
+        if (subj.startsWith("[")) {
+          return _reasoningTermMatches("owl:" + ((/\bAllDisjoint(?:Classes|Properties)\b/.exec(subj) || [])[0] || ""), REASONING_AXIOM_TYPES)
+            ? { keep: "", move: [lead + body] } : null;
+        }
+        const keepItems = [], move = [];
+        _ttlSplitTop(rest, ";").map((x) => x.trim()).filter(Boolean).forEach((item) => {
+          const predEnd = _ttlTermEnd(item, 0);
+          const pred = item.slice(0, predEnd);
+          const objText = item.slice(predEnd).trim();
+          if (pred === "a" || /^(?:rdf:type|<http:\/\/www\.w3\.org\/1999\/02\/22-rdf-syntax-ns#type>)$/.test(pred)) {
+            const keepObjs = [];
+            _ttlSplitTop(objText, ",").map((x) => x.trim()).filter(Boolean).forEach((o) => {
+              if (_reasoningTermMatches(o, REASONING_AXIOM_TYPES)) move.push(`${subj} a ${o} .`);
+              else keepObjs.push(o);
+            });
+            if (keepObjs.length) keepItems.push(`${pred} ${keepObjs.join(", ")}`);
+          } else if (_reasoningTermMatches(pred, REASONING_AXIOM_PREDICATES)) {
+            _ttlSplitTop(objText, ",").map((x) => x.trim()).filter(Boolean).forEach((o) => move.push(`${subj} ${pred} ${o} .`));
+          } else {
+            keepItems.push(item);
+          }
+        });
+        if (!move.length) return null;
+        const keep = keepItems.length ? `${lead}${subj} ${keepItems.join(" ;\n    ")} .` : "";
+        return { keep, move: keep ? move : [lead.trim() ? lead + move[0] : move[0], ...move.slice(1)] };
+      }
+
       function extractRulesFromModel(text) {
         const statements = splitTurtleStatements(text);
         const ruleStatements = [];
+        const axiomStatements = [];
         const modelStatements = [];
         statements.forEach((statement) => {
-          const isRule = /SPARQLRule/i.test(statement)
-            && /(?:rule:content|<tag:stardog:api:rule:content>)/i.test(statement)
-            && /\bIF\s*\{[\s\S]*?\}\s*THEN\s*\{/i.test(statement);
-          if (isRule) ruleStatements.push(statement);
-          else modelStatements.push(statement);
+          if (isRuleStatement(statement)) { ruleStatements.push(statement); return; }
+          const split = splitReasoningAxioms(statement);
+          if (!split) { modelStatements.push(statement); return; }
+          if (split.keep) modelStatements.push(split.keep);
+          axiomStatements.push(...split.move);
         });
         return {
           modelText: modelStatements.join("\n\n").trim(),
-          rulesText: ruleStatements.join("\n\n").trim()
+          rulesText: [axiomStatements.join("\n"), ruleStatements.join("\n\n")].filter(Boolean).join("\n\n").trim()
         };
+      }
+
+      // The non-rule statements of the inference panel (the reasoning axioms plus prefixes).
+      // Everything but the rule statements stays as written, so graph banners keep their place.
+      function reasoningAxiomText(rulesText) {
+        let t = String(rulesText || "");
+        splitTurtleStatements(t).filter(isRuleStatement).forEach((st) => {
+          const i = t.indexOf(st);
+          if (i >= 0) t = t.slice(0, i) + t.slice(i + st.length);
+        });
+        return t;
+      }
+      // Structural model plus the reasoning axioms kept in the inference panel — what hierarchy
+      // lookups and the ontology graph read.
+      function modelWithReasoningAxioms() {
+        const model = String(state.artifacts.ontologyModel?.working || "");
+        const rules = String(state.artifacts.inferenceRules?.working || "");
+        const axioms = rules.trim() ? reasoningAxiomText(rules) : "";
+        return axioms.trim() ? `${model}\n\n${axioms}` : model;
       }
 
       function commentSelectedLines(value, selectionStart, selectionEnd) {
@@ -15107,6 +15223,15 @@
             nextRulesText = split.rulesText ? renderWithKnownPrefixes(split.rulesText, state.ui.namespaces, inheritedPrefixes, true) : "";
           }
           const rulesArtifact = state.artifacts.inferenceRules;
+          // A model that carries only reasoning axioms (no rules of its own) must not wipe rules already
+          // in the panel, unless this is a fresh load that is meant to replace them.
+          const freshLoad = Boolean(note && /Loaded ontology\/model|Loaded structural ontology|Loaded via custom request/i.test(note));
+          if (nextRulesText && !freshLoad && rulesArtifact.working && !splitTurtleStatements(nextRulesText).some(isRuleStatement)) {
+            const old = splitTurtleStatements(rulesArtifact.working);
+            const keptRules = old.filter(isRuleStatement).join("\n\n");
+            const missingPrefixes = old.filter((s) => /^(?:@prefix|prefix)\b/i.test(s) && !nextRulesText.includes(s));
+            if (keptRules) nextRulesText = `${missingPrefixes.join("\n")}\n${nextRulesText}\n\n${keptRules}`.trim();
+          }
           if (nextRulesText) {
             rulesArtifact.working = nextRulesText;
             // Always refresh original on any external model load — "original vars" toggle
@@ -18154,7 +18279,7 @@ ORDER BY ?table ?ordinal`;
       }
 
       function getOntologyHierarchy() {
-        const ontologyText = state.artifacts.ontologyModel?.working || "";
+        const ontologyText = modelWithReasoningAxioms();
         const cache = state.ui.ontologyHierarchy;
         if (cache && cache._lastOntologyText === ontologyText) return cache;
         const fresh = buildOntologyHierarchyIndex(ontologyText);
@@ -26760,8 +26885,12 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.46.1";
+      const APP_VERSION = "1.47.0";
       const RELEASE_NOTES = [
+        { version: "1.47.0", date: "2026-11-05", title: "Reasoning axioms beside the rules", items: [
+          "When a model is loaded, the statements the reasoner uses (subclass, subproperty, equivalent, inverse, disjoint, property chains, transitive, symmetric and functional property types) go to the {*Inference Rules*} panel with the rules. The structural model keeps classes, properties, labels, domains and ranges.",
+          "Hierarchy checks, the ontology diagram and the jump from a query's reasoning inset all read the axioms from the {*Inference Rules*} panel."
+        ] },
         { version: "1.46.0", date: "2026-11-05", title: "Organize a query by data source", items: [
           "{*Organize query by data source*} in the query area's menu rewrites the query so the triples answered by the same source sit together under a comment naming it: stored named graphs first, then virtual graphs, then {{SERVICE}} calls. It reads the loaded query plan to tell which source answers each triple, and puts a triple it cannot place in a group of its own.",
           "A subject whose predicates come from different sources is written once in each source's group, and a comment on each such triple names the other group that shares the variable, so a group is not mistaken for a stand-alone query. {{OPTIONAL}}, {{MINUS}} and {{BIND}} keep their place and filters follow the triples, so the query means the same thing. One {{Ctrl+Z}} puts the original back.",
@@ -44161,7 +44290,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
       }
       function _ogModelSourceText() {
         if (_ogOwnDb()) return state.ui.ogModelIri ? (state.ui.ogModelText || "") : "";
-        return state.ui.ogModelIri ? (state.ui.ogModelText || "") : (state.artifacts.ontologyModel?.working || "");
+        return state.ui.ogModelIri ? (state.ui.ogModelText || "") : modelWithReasoningAxioms();
       }
       function _ogSyncDbSelect() {
         const input = $("ogDbSelect");
@@ -44426,14 +44555,17 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         try {
           if(inf.kind==="rule"){ if(typeof jumpToRuleInPanel==="function") jumpToRuleInPanel(inf.ruleIndex, inf.patternIndex, inf.ruleLineIdx); return; }
           // subproperty/subclass → the ontology-model line declaring child sub*Of parent
-          const text=(state.artifacts.ontologyModel?.working)||(document.querySelector('[data-artifact-editor="ontologyModel"]')?.value)||"";
-          const lines=text.split(/\r?\n/);
+          // the declaration lives in the inference panel (reasoning axioms) or, for older content, the structural model
           const pred = inf.kind==="subclass" ? "subClassOf" : "subPropertyOf";
           const childRe = new RegExp("(?:^|[\\s:#/(])"+String(inf.childTerm||inf.mappedTerm||"").replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b");
-          let best=-1, decl=-1;
-          for(let i=0;i<lines.length;i++){ const L=lines[i]||""; if(childRe.test(L)){ if(decl<0) decl=i; if(new RegExp(pred).test(L)){ best=i; break; } } }
-          const li = best>=0?best:decl;
-          if(li>=0 && typeof jumpToArtifactFlowLine==="function") jumpToArtifactFlowLine("ontologyModel", li);
+          for(const key of ["inferenceRules","ontologyModel"]){
+            const text=(state.artifacts[key]?.working)||(document.querySelector('[data-artifact-editor="'+key+'"]')?.value)||"";
+            const lines=text.split(/\r?\n/);
+            let best=-1, decl=-1;
+            for(let i=0;i<lines.length;i++){ const L=lines[i]||""; if(childRe.test(L)){ if(decl<0) decl=i; if(new RegExp(pred).test(L)){ best=i; break; } } }
+            const li = best>=0?best:decl;
+            if(li>=0 && typeof jumpToArtifactFlowLine==="function"){ jumpToArtifactFlowLine(key, li); break; }
+          }
         } catch(e){ log("debug","[QSM] inference jump: "+e.message); }
       }
 
@@ -64914,6 +65046,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           sparqlFormatScoped, sparqlEnterInsertion, sparqlCloseBraceInsertion, // scoped ✨ and typing indentation
           organizeSparqlBySource, parseScopedQueryPatterns, _orgCanon, _orgBuildSources, _orgMapsTerm, // Organize query by data source (pure rewrite, its equivalence check, source lookup)
           mappingSectionFormatPlan, // SMS2 TO / WHERE section tidy
+          extractRulesFromModel, reasoningAxiomText, buildOntologyHierarchyIndex, // model → rules + reasoning axioms split; hierarchy lookups
           bracketPairMap, bracketPairAtCaret, // matching-bracket highlight pairing
           highlightPlanLine,     // plan line → coloured HTML (one item, one colour checks)
           planMarksContinuation, // tree prefix of a formatted plan SQL line
