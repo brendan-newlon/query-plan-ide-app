@@ -24255,7 +24255,7 @@ ORDER BY ?table ?ordinal`;
           // one further level ending in " ,", then a standalone "." line closes the
           // subject's statement.
           const out = [`${tab}${subject}`, `${tab1}${predicate}`];
-          objs.forEach((o) => out.push(`${tab2}${o} ,`));
+          objs.forEach((o, oi) => out.push(`${tab2}${o}${oi < objs.length - 1 ? " ," : ""}`));
           out.push(`${tab}.`);
           return out.join("\n");
         }
@@ -24308,6 +24308,8 @@ ORDER BY ?table ?ordinal`;
             lines.push(`${tab}}`);
             return;
           }
+          // a VALUES { } block holds data rows, not triples: they stay as written, on one line
+          if (/^VALUES(?![\w:-])/i.test(header)) { lines.push(`${tab}${header.replace(/\s+/g, " ")} { ${item.body.replace(/\s+/g, " ").trim()} }`); return; }
           lines.push(`${tab}${header ? header + " " : ""}{`);
           lines.push(_sqPrettyFormatWhereBody(item.body, depth + 1));
           lines.push(`${tab}}`);
@@ -24802,6 +24804,8 @@ ORDER BY ?table ?ordinal`;
       // lighter line. Both, and the "↔" notes on a triple, are replaced (not stacked) when run again.
       const _ORG_HEADER_RE = /^#\s*(?:═|──\s*table:)/;
       const _ORG_NOTE_RE = /\s*#\s*↔.*$/;
+      // a comment that looks like query text (a commented-out triple or block), not prose
+      const _ORG_CODE_RE = /^#\s*(?:[?<$]|[\w-]*:\S|a\s|GRAPH\b|OPTIONAL\b|FILTER\b|BIND\b|VALUES\b|MINUS\b|[{}])/;
       const _orgBanner = (tab, label) => { const bar = tab + "# " + "═".repeat(56); return [bar, `${tab}# ═══ data source: ${label} ═══`, bar]; };
       function _orgKey(s, p, o) { return (String(s) + String(p) + String(o)).replace(/\s+/g, ""); }
       // The scanner behind parseScopedQueryPatterns reads `{ A } UNION { B }` written on one line as
@@ -24947,12 +24951,7 @@ ORDER BY ?table ?ordinal`;
             list.forEach((a) => { (a.lead || []).forEach((c) => lead.push(c)); if (a.trailing) trailing.push(a.trailing); });
           });
           lead.forEach((c) => lines.push(tab + c));
-          // One predicate with several objects: the formatter's own layout would end the last object
-          // with a comma, which SPARQL does not allow, so it is written here without it.
-          const only = pm.size === 1 ? [...pm.values()][0] : null;
-          const st = only && only.length > 1
-            ? [`${tab}${s}`, `${tab}\t${[...pm.keys()][0]}`, ...only.map((a, i) => `${tab}\t\t${a.o}${i < only.length - 1 ? " ," : ""}`), `${tab}.`]
-            : _sqPrettyFormatTripleStatement(`${s} ${clauses.join(" ; ")}`, depth).split("\n");
+          const st = _sqPrettyFormatTripleStatement(`${s} ${clauses.join(" ; ")}`, depth).split("\n");
           const note = noteFor ? noteFor(s, [...pm.values()].flat()) : "";
           const tail = [...trailing, ...(note ? [note] : [])];
           if (tail.length) st[st.length - 1] += " " + tail.join(" ");
@@ -24967,21 +24966,23 @@ ORDER BY ?table ?ordinal`;
         const items = _orgSplitScope(bodyText);
         const units = [];
         let lead = [];
+        // commented-out query text under a source banner stays with that source (a chunk the user
+        // switched off to see what it costs), keyed by the source's label
+        const disabled = new Map();
+        let afterBanner = null;
         const withTrailing = (lines, it) => { if (it.trailing && lines.length) lines[lines.length - 1] += " " + it.trailing; return lines; };
-        const verbatim = (it) => {
-          const lines = [];
-          // a VALUES { } block holds data rows, not triples: the general layout would add a `.` to them
-          if (it.kind === "block" && /^VALUES(?![\w:-])/i.test(it.header)) lines.push(`${tab}${it.header.replace(/\s+/g, " ")} { ${it.body.replace(/\s+/g, " ").trim()} }`);
-          else _sqPrettyFormatWhereItem(it, depth, tab, lines);
-          return withTrailing(lines, it);
-        };
+        const verbatim = (it) => { const lines = []; _sqPrettyFormatWhereItem(it, depth, tab, lines); return withTrailing(lines, it); };
         const inner = (body) => { const t = _orgFormatGroup(body, depth + 1, ctx); return t ? [t] : []; };
         items.forEach((it) => {
           if (it.kind === "comment") {
+            const bm = /^#\s*═+\s*data source:\s*(.*?)\s*═+\s*$/.exec(it.text);
+            if (bm) { afterBanner = bm[1]; return; }
             if (_ORG_HEADER_RE.test(it.text)) return; // a header from an earlier run: rewritten below
+            if (afterBanner && _ORG_CODE_RE.test(it.text)) { if (!disabled.has(afterBanner)) disabled.set(afterBanner, []); disabled.get(afterBanner).push(it.text); return; }
             lead.push(it.text);
             return;
           }
+          afterBanner = null;
           const myLead = lead; lead = [];
           if (it.kind === "stmt") {
             if (/^BIND\b/i.test(it.text)) { units.push({ type: "bind", lead: myLead, lines: verbatim(it) }); return; }
@@ -25105,6 +25106,8 @@ ORDER BY ?table ?ordinal`;
               lines.push(`${tab}}${g.trailing ? " " + g.trailing : ""}`);
             });
             c.blocks.forEach((u) => { u.lead.forEach((x) => lines.push(tab + x)); lines.push(...u.lines); });
+            (disabled.get(c.src.label) || []).forEach((x) => lines.push(tab + x));
+            disabled.delete(c.src.label);
             blocks.push(lines);
           });
           const freeLines = [];
@@ -25124,6 +25127,8 @@ ORDER BY ?table ?ordinal`;
           else seg.free.push(u);
         });
         emitSeg();
+        // a source switched off entirely keeps its banner and its commented-out lines, after the rest
+        disabled.forEach((list, label) => { out.push("", ..._orgBanner(tab, label), ...list.map((x) => tab + x)); });
         return out.join("\n");
       }
 
@@ -25185,11 +25190,24 @@ ORDER BY ?table ?ordinal`;
         return { text: out, changed: out.replace(/\s+$/, "") !== core, sourceCount: used.size + (sources.some((s) => !s) ? 1 : 0) };
       }
 
+      // Does a virtual graph's mapping text mention the triple's predicate (or, for a type triple, its
+      // class)? null when there is no mapping text to ask.
+      function _orgMapsTerm(mapText, q) {
+        const text = String(mapText || "");
+        if (!text) return null;
+        const t = q.predicate.key === "<http://www.w3.org/1999/02/22-rdf-syntax-ns#type>" ? q.object : q.predicate;
+        if (t.kind !== "iri") return null;
+        const full = t.key.slice(1, -1);
+        const local = full.replace(/^.*[#/:]/, "");
+        return text.includes(full) || new RegExp("[:#/]" + local.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "(?![\\w-])").test(text);
+      }
+
       // Which source answers each triple of the query, from the loaded plan and the Source Map's logic:
       // stored graphs by their index scans, virtual graphs by the SQL block that binds the triple's
       // variables, SERVICE calls by their endpoint. A triple the plan cannot place goes to an
       // "undetermined" group rather than a guess. Returns { sources } or { error }.
       function _orgBuildSources(queryText, qps) {
+        if (state.ui.showOriginalQueryVars) return { error: "The query is showing its original variable names while the plan uses the readable ones, so they cannot be matched. Choose Show clean vars in this menu first." };
         const planText = (typeof displayedPlanText === "function" ? displayedPlanText() : "") || "";
         if (!planText.trim()) return { error: "Load or fetch a query plan first: the plan is what says which source answers each triple." };
         let scene = null, parsed = null;
@@ -25232,9 +25250,14 @@ ORDER BY ?table ?ordinal`;
               const aliases = new Set((b.scans || []).map((s) => s.alias));
               if (terms.every((v) => { const e = b.vars && b.vars[v]; return e && e.cols.some((c) => aliases.has(c.alias)); })) hit.add(b.vg);
             });
+            if (hit.size > 1) {
+              // a join variable binds in several graphs: the one whose mapping mentions the
+              // predicate (or class) is the one that answers this triple
+              const named = [...hit].filter((v) => _orgMapsTerm((state.ui.mappingTextsByVg || {})[v], q) === true);
+              if (named.length) { hit.clear(); named.forEach((v) => hit.add(v)); }
+            }
             if (hit.size === 1) return vgSrc([...hit][0]);
-            // several virtual graphs bind these variables (the same data mapped twice, or a join
-            // variable): they are named together rather than guessing one
+            // several virtual graphs still fit (the same data mapped twice): they are named together
             if (hit.size > 1) { const names = [...hit].sort(); return mk("vgs:" + names.join("+"), "virtual graphs " + names.join(" + "), "virtual", names); }
           }
           if (fromList.length === 1 && /^<virtual:\/\//i.test(fromList[0])) return vgSrc(vgName(fromList[0]));
@@ -26737,7 +26760,7 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.46.0";
+      const APP_VERSION = "1.46.1";
       const RELEASE_NOTES = [
         { version: "1.46.0", date: "2026-11-05", title: "Organize a query by data source", items: [
           "{*Organize query by data source*} in the query area's menu rewrites the query so the triples answered by the same source sit together under a comment naming it: stored named graphs first, then virtual graphs, then {{SERVICE}} calls. It reads the loaded query plan to tell which source answers each triple, and puts a triple it cannot place in a group of its own.",
@@ -64889,7 +64912,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           splitLines,            // count lines exactly as renderSyntaxOverlay does
           formatSparqlPretty,    // SPARQL query format (comments, SERVICE blocks)
           sparqlFormatScoped, sparqlEnterInsertion, sparqlCloseBraceInsertion, // scoped ✨ and typing indentation
-          organizeSparqlBySource, parseScopedQueryPatterns, _orgCanon, _orgBuildSources, // Organize query by data source (pure rewrite, its equivalence check, source lookup)
+          organizeSparqlBySource, parseScopedQueryPatterns, _orgCanon, _orgBuildSources, _orgMapsTerm, // Organize query by data source (pure rewrite, its equivalence check, source lookup)
           mappingSectionFormatPlan, // SMS2 TO / WHERE section tidy
           bracketPairMap, bracketPairAtCaret, // matching-bracket highlight pairing
           highlightPlanLine,     // plan line → coloured HTML (one item, one colour checks)
