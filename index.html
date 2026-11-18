@@ -207,6 +207,8 @@
        are drawn here, each rect placed at its own measured position (see qfDrawCaret). */
     .qf-caret-layer { position:absolute; left:0; top:0; width:0; height:0; pointer-events:none; z-index:3; }
     .qf-sel { position:absolute; background:rgba(120,170,255,0.38); }
+    .qf-match { position:absolute; background:rgba(100,160,255,0.30); box-shadow:0 -1px 0 rgba(100,160,255,0.30),0 1px 0 rgba(100,160,255,0.30); border-radius:2px; }
+    .qf-fold-hits { position:absolute; display:flex; align-items:center; box-sizing:border-box; padding:0 6px; font:600 0.72rem/1 var(--mono); white-space:nowrap; color:#cfe1ff; background:rgba(100,160,255,0.28); border:1px solid rgba(100,160,255,0.55); border-radius:9px; }
     .qf-caret { position:absolute; width:1.5px; background:#dfe8f8; animation: blink 1s steps(1,start) infinite; }
     .query-flow-panel { margin: 0; padding:5px 8px; background:rgba(12,18,28,0.97); border-top:1px solid rgba(245,166,35,0.4); border-bottom:1px solid rgba(245,166,35,0.25); color:rgba(200,175,130,0.9); border-radius:3px; }
     .query-flow-line-group .query-flow-panel { margin-top:4px; margin-bottom:2px; }
@@ -2902,7 +2904,7 @@
               <input id="snapshotIncludeContexts" type="checkbox" checked>
               <span>Inject selected contexts as FROM</span>
             </label>
-            <label class="dropdown-item"><input class="snapshot-artifact-check" data-artifact="plan" type="checkbox" checked><span>Query Plan</span></label>
+            <label class="dropdown-item"><input class="snapshot-artifact-check" data-artifact="plan" type="checkbox" checked><span id="snapshotPlanLabel">Query Plan</span></label>
             <label class="dropdown-item"><input class="snapshot-artifact-check" data-artifact="mappings" type="checkbox" checked><span>SMS2 Mappings</span></label>
             <label class="dropdown-item"><input class="snapshot-artifact-check" data-artifact="uniqueKeys" type="checkbox" checked><span>Unique Key Sets</span></label>
             <label class="dropdown-item"><input class="snapshot-artifact-check" data-artifact="foreignKeys" type="checkbox" checked><span>Foreign Key Sets</span></label>
@@ -13402,6 +13404,9 @@
       // no mismatch left for the browser's native handling to trip over.
       function updateSelectionOverlay(editor, overlay) {
         if (!overlay) return;
+        // While the folded view shows, it draws the matches itself (qfDrawCaret): this layer follows the
+        // unfolded text box, so its boxes would land where the text would be if every fold were open.
+        if (qfActiveKey() === editor.getAttribute("data-artifact-editor")) { overlay.innerHTML = ""; return; }
         const selStart = editor.selectionStart, selEnd = editor.selectionEnd;
         const rawSel = selStart !== selEnd ? editor.value.slice(selStart, selEnd) : "";
         const term = rawSel.replace(/\s+/g, " ").trim();
@@ -14537,7 +14542,27 @@
             schedulePush();
           };
 
+          // A double-click in a gap of spaces/tabs selects the whole gap (the browser picks a word or one
+          // space). Only when the click cannot be read as a word; the folded views do this in qfMouseDown.
+          if (!editor._gapDblBound) {
+            editor._gapDblBound = true;
+            let clickAt = -1;
+            editor.addEventListener("mousedown", (ev) => { clickAt = ev.detail === 2 && editor.selectionStart === editor.selectionEnd ? editor.selectionStart : -1; });
+            editor.addEventListener("dblclick", () => {
+              const at = clickAt; clickAt = -1;
+              if (at < 0) return;
+              const w = qfWordAt(editor.value || "", at);
+              if (w.blank) editor.setSelectionRange(w.start, w.end);
+            });
+          }
           editor.onkeydown = (event) => {
+            // Tab types a tab character instead of moving focus out of the text (Shift+Tab still leaves).
+            // insertText keeps it on the native undo stack. A multi-cursor Tab already handled it.
+            if (event.key === "Tab" && !event.shiftKey && !event.ctrlKey && !event.altKey && !event.metaKey && !event.isComposing && !event.defaultPrevented && !editor.readOnly) {
+              event.preventDefault();
+              document.execCommand("insertText", false, "\t");
+              return;
+            }
             // Ctrl+Z — undo
             if (event.ctrlKey && !event.shiftKey && !event.altKey && (event.key === "z" || event.key === "Z")) {
               // Typing not yet snapshotted (or a change made since the last snapshot): undo returns to
@@ -17548,11 +17573,23 @@ ORDER BY ?table ?ordinal`;
         const col = Math.min((lines[li] || "").length, qfColFromDom(row, node, off, c));
         return starts[li] + col;
       }
+      // Spaces and tabs (not line breaks): a double-click in a gap selects the whole gap.
+      function qfIsBlank(c) { return c === " " || c === "\t" || c === " "; }
       function qfWordAt(text, off) {
         const isW = (c) => /[A-Za-z0-9_\-]/.test(c || "");
         let a = off, b = off;
         if (!isW(text[a]) && isW(text[a - 1])) a = b = off - 1;
-        if (!isW(text[a])) return { start: off, end: Math.min(text.length, off + (text[off] && text[off] !== "\n" ? 1 : 0)) };
+        if (!isW(text[a])) {
+          // Not on a word: in a gap of spaces/tabs, the whole gap up to the next non-blank character.
+          const at = qfIsBlank(text[off]) ? off : (off > 0 && qfIsBlank(text[off - 1]) ? off - 1 : -1);
+          if (at >= 0) {
+            let s = at, e = at + 1;
+            while (s > 0 && qfIsBlank(text[s - 1])) s--;
+            while (e < text.length && qfIsBlank(text[e])) e++;
+            return { start: s, end: e, blank: true };
+          }
+          return { start: off, end: Math.min(text.length, off + (text[off] && text[off] !== "\n" ? 1 : 0)) };
+        }
         while (a > 0 && isW(text[a - 1])) a--;
         while (b < text.length && isW(text[b])) b++;
         if (text[a - 1] === "?" || text[a - 1] === "$") a--; // ?var reads as one word
@@ -17596,9 +17633,16 @@ ORDER BY ?table ?ordinal`;
           const pos = qfOffsetAtPoint(c, ev.clientX, y);
           if (pos != null) extendTo(pos);
         };
-        const up = () => { document.removeEventListener("mousemove", move, true); document.removeEventListener("mouseup", up, true); if (c.key === "sparqlQuery") updateQuerySourceUi?.(); };
+        const up = () => { document.removeEventListener("mousemove", move, true); document.removeEventListener("mouseup", up, true); flow._qfDragging = false; qfDrawCaret(c.key); if (c.key === "sparqlQuery") updateQuerySourceUi?.(); };
+        flow._qfDragging = true;
         document.addEventListener("mousemove", move, true);
         document.addEventListener("mouseup", up, true);
+      }
+      // The outermost collapsed fold that hides text line `li` (or null). Regions say whether they are
+      // folded themselves (mappings, rules); the query's are named in state.
+      function qfFoldHiding(flow, li) {
+        const folded = state.ui.queryFolds?.collapsed || new Set();
+        return (flow._qfRegions || []).filter((r) => (r.collapsed != null ? r.collapsed : folded.has(r.id)) && r.headerLine < li && li <= r.end).sort((a, b) => a.headerLine - b.headerLine)[0] || null;
       }
       // A caret that lands on a folded (hidden) line moves out of the fold: forward to the line
       // after it, backward to the end of its header line. Returns true when it moved.
@@ -17609,9 +17653,7 @@ ORDER BY ?table ?ordinal`;
         const back = editor.selectionDirection === "backward";
         const focus = back ? editor.selectionStart : editor.selectionEnd, anchor = back ? editor.selectionEnd : editor.selectionStart;
         const li = qfLineOf(st, focus); if (!hidden.has(li)) return false;
-        const folded = state.ui.queryFolds?.collapsed || new Set();
-        // Regions say whether they are folded themselves (mappings, rules); the query's are named in state.
-        const reg = (flow._qfRegions || []).filter((r) => (r.collapsed != null ? r.collapsed : folded.has(r.id)) && r.headerLine < li && li <= r.end).sort((a, b) => a.headerLine - b.headerLine)[0]; // outermost collapsed fold hiding this line
+        const reg = qfFoldHiding(flow, li); // outermost collapsed fold hiding this line
         if (!reg) return false;
         const forward = prevFocus == null || focus >= prevFocus;
         const lines = splitLines(text);
@@ -17657,6 +17699,50 @@ ORDER BY ?table ?ordinal`;
           const rb = row.getBoundingClientRect(), cs = getComputedStyle(row);
           return { left: rb.left + parseFloat(cs.paddingLeft || "0"), top: rb.top, height: parseFloat(cs.lineHeight) || rb.height };
         };
+        // Other occurrences of the selected text, drawn on their own rows so they scroll with the text.
+        // (The text-box-aligned match layer is cleared while this view shows: it lined the matches up
+        // with the UNFOLDED text and stayed put on screen when the view scrolled.) Matches on lines a
+        // collapsed fold hides are counted onto that fold's header line as a badge instead.
+        const matchTerm = (s0 !== e0 ? text.slice(s0, e0) : "").replace(/\s+/g, " ").trim();
+        // Not while a mouse drag is growing the selection: the term changes on every move, and measuring
+        // every match each time would cost time proportional to the query on every pointer move.
+        if (matchTerm.length >= 2 && !flow._qfDragging) {
+          const re = new RegExp(escapeRegex(matchTerm), "ig"), hiddenSet = flow._qfHidden;
+          const foldedRegions = (flow._qfRegions || []).filter((r) => r.collapsed != null ? r.collapsed : (state.ui.queryFolds?.collapsed || new Set()).has(r.id)).sort((a, b) => a.headerLine - b.headerLine);
+          const inFold = new Map(); // header line -> matches hidden under it
+          let drawn = 0;
+          for (let li = 0; li < lines.length; li++) {
+            const line = lines[li];
+            re.lastIndex = 0;
+            let m;
+            while ((m = re.exec(line))) {
+              if (m[0].length === 0) { re.lastIndex++; continue; }
+              const absA = st[li] + m.index, absB = absA + m[0].length;
+              if (absA < e0 && absB > s0) continue; // the selection itself is drawn by the selection boxes
+              if (hiddenSet && hiddenSet.has(li)) {
+                const reg = foldedRegions.find((r) => r.headerLine < li && li <= r.end); // outermost collapsed fold
+                if (reg) inFold.set(reg.headerLine, (inFold.get(reg.headerLine) || 0) + 1);
+                continue;
+              }
+              if (fmtBlockAt(li) || drawn >= 200) continue;
+              const row = qfRow(c, li); if (!row) continue;
+              const pa = qfDomFromCol(row, m.index, c), pb = qfDomFromCol(row, m.index + m[0].length, c);
+              if (!pa || !pb) continue;
+              const r = document.createRange(); r.setStart(pa.node, pa.offset); r.setEnd(pb.node, pb.offset);
+              Array.from(r.getClientRects()).forEach((q) => { if (q.width > 0) box(q.left, q.top, q.width, q.height, "qf-match"); });
+              drawn++;
+            }
+          }
+          inFold.forEach((count, headerLine) => {
+            const row = qfRow(c, headerLine); if (!row) return;
+            const sum = row.querySelector(".query-fold-collapsed-summary, .mapping-fold-collapsed-summary");
+            const q = sum ? sum.getBoundingClientRect() : pointRect(headerLine, (lines[headerLine] || "").length);
+            if (!q) return;
+            const right = sum ? q.right : q.left;
+            if (sum) box(q.left, q.top, q.width, q.height, "qf-match");
+            html += `<div class="qf-fold-hits" style="left:${right + 6 - ox}px;top:${q.top - oy}px;height:${q.height}px">${count} ${count === 1 ? "match" : "matches"} inside</div>`;
+          });
+        }
         if (s0 !== e0) {
           const la = qfLineOf(st, s0), lb = qfLineOf(st, e0);
           for (let li = la; li <= lb; li++) {
@@ -24253,10 +24339,11 @@ ORDER BY ?table ?ordinal`;
         return { text: text.slice(i, j), end: j };
       }
 
-      function _sqPrettyHasUnsupported(text) {
+      function _sqPrettyHasUnsupported(text, allowParenComments) {
         // Bail-out guard: comments inside parenthesized groups, blank-node [ ] shorthand
         // outside strings/IRIs/comments, and unbalanced braces/parens. formatSparqlPretty never emits a guess for these —
         // it returns the input unchanged rather than risk corrupting or losing content.
+        // allowParenComments: the caller keeps such statements as written (Organize query by data source).
         let i = 0;
         let braceDepth = 0;
         let parenDepth = 0;
@@ -24266,7 +24353,7 @@ ORDER BY ?table ?ordinal`;
           if (ch === "#") {
             // Whole-line / trailing comments are preserved by the formatter; one inside a
             // parenthesized group (FILTER/BIND/projection) can't be re-flowed safely.
-            if (parenDepth > 0) return true;
+            if (parenDepth > 0 && !allowParenComments) return true;
             while (i < text.length && text[i] !== "\n") i++;
             continue;
           }
@@ -24533,12 +24620,42 @@ ORDER BY ?table ?ordinal`;
         return out;
       }
 
+      // Is there a # comment (outside strings and IRIs) in this text?
+      function _sqPrettyHasComment(text) {
+        for (let i = 0; i < text.length;) {
+          const ch = text[i];
+          if (ch === "<" || ch === "\"" || ch === "'") { i = Math.max(i + 1, _sqPrettyScanTerm(text, i).end); continue; }
+          if (ch === "#") return true;
+          i++;
+        }
+        return false;
+      }
+      // The lines of a query's text before its WHERE { (SELECT list, FROM lines), comments where they
+      // are, one trimmed line each. A WHERE keyword that ends the text is dropped: the caller writes
+      // "WHERE {" itself.
+      function _sqPrettyFrameLines(text) {
+        let whereAt = -1;
+        for (let i = 0; i < text.length;) {
+          const ch = text[i];
+          if (ch === "#") { while (i < text.length && text[i] !== "\n") i++; continue; }
+          if (ch === "<" || ch === "\"" || ch === "'") { i = Math.max(i + 1, _sqPrettyScanTerm(text, i).end); whereAt = -1; continue; }
+          if (/\s/.test(ch)) { i++; continue; }
+          if (/^WHERE\b/i.test(text.slice(i, i + 6)) && !/[\w?$:.-]/.test(text[i - 1] || " ")) { whereAt = i; i += 5; continue; }
+          whereAt = -1; i++;
+        }
+        const t = whereAt >= 0 ? text.slice(0, whereAt) + text.slice(whereAt + 5) : text;
+        return t.split(/\r\n|\r|\n/).map((l) => l.trim()).filter(Boolean);
+      }
+
       // opts.whereFormatter(whereBody) may replace the layout of the WHERE body (used by
       // "Organize query by data source"); it throws to leave the query unchanged.
+      // opts.keepFrame: comments before the WHERE { } (SELECT list, FROM lines) or after it (modifiers),
+      // and comments inside parentheses, no longer stop the rewrite: those parts are written as they were.
       function formatSparqlPretty(queryText, opts) {
         const raw = String(queryText || "");
         if (!raw.trim()) return raw;
-        if (_sqPrettyHasUnsupported(raw)) return raw;
+        const keepFrame = Boolean(opts && opts.keepFrame);
+        if (_sqPrettyHasUnsupported(raw, keepFrame)) return raw;
         try {
           const lines = raw.split(/\r\n|\r|\n/);
           const preludeLines = [];
@@ -24579,7 +24696,11 @@ ORDER BY ?table ?ordinal`;
             let i = searchFrom;
             while (i < bodyText.length) {
               const ch = bodyText[i];
-              if (ch === "#") return raw; // comment between SELECT and WHERE: leave the text alone
+              if (ch === "#") {
+                if (!keepFrame) return raw; // comment between SELECT and WHERE: leave the text alone
+                while (i < bodyText.length && bodyText[i] !== "\n") i++;
+                continue;
+              }
               if (ch === "<" || ch === "\"" || ch === "'") { i = _sqPrettyScanTerm(bodyText, i).end; continue; }
               if (ch === "{") { whereOpenIdx = i; break; }
               i++;
@@ -24605,7 +24726,7 @@ ORDER BY ?table ?ordinal`;
           const whereClose = _sqPrettyMatchBrace(bodyText, whereOpenIdx);
           const whereBody = bodyText.slice(whereOpenIdx + 1, whereClose - 1);
           const afterWhere = bodyText.slice(whereClose).trim();
-          if (afterWhere.includes("#")) return raw; // trailing comment after the WHERE block: leave the text alone
+          if (afterWhere.includes("#") && !keepFrame) return raw; // trailing comment after the WHERE block: leave the text alone
 
           const out = [];
           preludeLines.forEach((p) => out.push(p));
@@ -24620,23 +24741,32 @@ ORDER BY ?table ?ordinal`;
             selHeader += " " + selMods[1].toUpperCase();
             selRest = selectClauseText.slice(selMods[0].length).trim();
           }
-          if (selRest === "*") {
-            out.push(`${selHeader} *`);
+          if (keepFrame && _sqPrettyHasComment(bodyText.slice(0, whereOpenIdx))) {
+            // a comment among the SELECT list or FROM lines: they stay as written, comments included
+            _sqPrettyFrameLines(bodyText.slice(0, whereOpenIdx)).forEach((l) => out.push(l));
           } else {
-            const selItems = _sqPrettySplitProjection(selRest);
-            if (selItems.length <= 1) {
-              out.push(selItems.length ? `${selHeader} ${selItems[0]}` : selHeader);
+            if (selRest === "*") {
+              out.push(`${selHeader} *`);
             } else {
-              out.push(selHeader);
-              selItems.forEach((it) => out.push(`\t${it}`));
+              const selItems = _sqPrettySplitProjection(selRest);
+              if (selItems.length <= 1) {
+                out.push(selItems.length ? `${selHeader} ${selItems[0]}` : selHeader);
+              } else {
+                out.push(selHeader);
+                selItems.forEach((it) => out.push(`\t${it}`));
+              }
             }
+            fromLines.forEach((l) => out.push(l));
           }
-          fromLines.forEach((l) => out.push(l));
           out.push("WHERE {");
           const formattedWhere = opts && opts.whereFormatter ? opts.whereFormatter(whereBody) : _sqPrettyFormatWhereBody(whereBody, 1);
           if (formattedWhere) out.push(formattedWhere);
           out.push("}");
-          if (afterWhere) _sqPrettyFormatModifiers(afterWhere).forEach((l) => out.push(l));
+          if (afterWhere) {
+            // modifiers with a comment among them stay as written, one trimmed line each
+            if (keepFrame && _sqPrettyHasComment(afterWhere)) afterWhere.split(/\r\n|\r|\n/).map((l) => l.trim()).filter(Boolean).forEach((l) => out.push(l));
+            else _sqPrettyFormatModifiers(afterWhere).forEach((l) => out.push(l));
+          }
           return out.join("\n") + "\n";
         } catch (e) {
           return raw;
@@ -25052,7 +25182,9 @@ ORDER BY ?table ?ordinal`;
           if (/^(OPTIONAL|MINUS)$/i.test(header)) { flush(); parts.push(header.toUpperCase() + "{" + _orgCanon(it.body) + "}"); return; }
           const isSub = _SQ_PRETTY_SUBSELECT_KEYWORDS.test(header) || (!header && _SQ_PRETTY_SUBSELECT_KEYWORDS.test(it.body.trim()));
           if (isSub || (header && !/^UNION$/i.test(header))) {
-            const inside = isSub || /^VALUES/i.test(header) ? norm(it.body) : _orgCanon(it.body);
+            // a sub-SELECT is compared by its own WHERE block, as the organizer reorganizes inside it
+            const sp = isSub && (!header || /^UNION$/i.test(header)) ? _orgSubParts(it.body) : null;
+            const inside = sp ? "SUB " + norm(sp.pre) + " {" + _orgCanon(sp.whereBody) + "} " + norm(sp.after) : isSub || /^VALUES/i.test(header) ? norm(it.body) : _orgCanon(it.body);
             seg.push("B " + norm(header) + "{" + inside + "}");
             lastUnion = -1;
             return;
@@ -25123,7 +25255,15 @@ ORDER BY ?table ?ordinal`;
         const disabled = new Map();
         let afterBanner = null;
         const withTrailing = (lines, it) => { if (it.trailing && lines.length) lines[lines.length - 1] += " " + it.trailing; return lines; };
-        const verbatim = (it) => { const lines = []; _sqPrettyFormatWhereItem(it, depth, tab, lines); return withTrailing(lines, it); };
+        const verbatim = (it) => {
+          if (it.kind === "stmt" && _sqPrettyHasComment(it.text)) {
+            // a FILTER/BIND with a comment inside it: written line by line as it was (collapsing it onto one
+            // line would let the comment swallow the rest), without the closing "." that would land in it
+            const kept = it.text.split(/\r\n|\r|\n/).map((l) => l.trim()).filter(Boolean).map((l, i) => tab + (i ? "\t" : "") + l);
+            return withTrailing(kept, it);
+          }
+          const lines = []; _sqPrettyFormatWhereItem(it, depth, tab, lines); return withTrailing(lines, it);
+        };
         const inner = (body) => { const t = _orgFormatGroup(body, depth + 1, ctx); return t ? [t] : []; };
         items.forEach((it) => {
           if (it.kind === "comment") {
@@ -25186,6 +25326,18 @@ ORDER BY ?table ?ordinal`;
               if (uniform0 && !inLead.length) { units.push({ type: "graphblock", src: uniform0, header, atoms, trailing: it.trailing, lead: myLead }); return; }
               // mixed sources, or a trailing comment: kept as written (its triples are already taken off the queue)
               units.push({ type: "block", lead: myLead, lines: verbatim(it) });
+              return;
+            }
+          }
+          if (isSub && (!header || /^UNION$/i.test(header))) {
+            // A sub-query keeps its own scope, and is organized on its own level: its triples are grouped by
+            // source inside its WHERE block, the same way as the outer query's.
+            const parts = _orgSubParts(it.body);
+            if (parts) {
+              const t1 = tab + "\t";
+              const innerText = _orgFormatGroup(parts.whereBody, depth + 2, ctx);
+              const lines = [`${tab}${header ? header + " " : ""}{`, `${t1}${parts.pre} {`, ...(innerText ? [innerText] : []), `${t1}}`, ...(parts.after ? [`${t1}${parts.after}`] : []), `${tab}}`];
+              units.push({ type: "block", lead: myLead, lines: withTrailing(lines, it) });
               return;
             }
           }
@@ -25322,15 +25474,14 @@ ORDER BY ?table ?ordinal`;
           take: (a) => next(_orgKey(a.s, a.p, a.o)),
           advance: (region) => _orgRealPatterns("SELECT * WHERE {\n" + region + "\n}").map((q) => next(_orgKey(q.subject.raw, q.predicate.raw, q.object.raw)).src)
         };
-        const opts = { called: false, error: "" };
+        const opts = { called: false, error: "", keepFrame: true };
         opts.whereFormatter = (body) => {
           opts.called = true; opts.whereBefore = body;
           try { return _orgFormatGroup(body, 1, ctx); } catch (e) { opts.error = e.message; throw e; }
         };
-        const unsupported = { error: "This query has a shape that cannot be rewritten safely (for example a comment inside a statement, blank-node [ ] brackets, or an update). It was left as it is." };
         let out = formatSparqlPretty(raw, opts);
         if (opts.error) return { error: "Left as it is: " + opts.error + "." };
-        if (!opts.called) return unsupported;
+        if (!opts.called) return { error: "Left as it is: " + _orgWhyNot(raw) + "." };
         if ([...queues.values()].some((q) => q.length)) return { error: "Left as it is: some triples could not be matched to their sources." };
         const core = raw.replace(/\s+$/, "");
         out = out.replace(/\s+$/, "") + raw.slice(core.length);
@@ -25340,6 +25491,49 @@ ORDER BY ?table ?ordinal`;
         } catch (e) { return { error: "Left as it is: the reorganized query could not be checked." }; }
         const used = new Set(sources.filter(Boolean).map((s) => s.key));
         return { text: out, changed: out.replace(/\s+$/, "") !== core, sourceCount: used.size + (sources.some((s) => !s) ? 1 : 0) };
+      }
+
+      // Why the query could not be reorganized, in words a user can act on (the rewrite bailed out before
+      // reading the WHERE block).
+      function _orgWhyNot(raw) {
+        const lineOf = (i) => raw.slice(0, i).split("\n").length;
+        let braces = 0, parens = 0, code = "";
+        for (let i = 0; i < raw.length;) {
+          const ch = raw[i];
+          if (ch === "<" || ch === "\"" || ch === "'") { const e = Math.max(i + 1, _sqPrettyScanTerm(raw, i).end); code += raw.slice(i, e); i = e; continue; }
+          if (ch === "#") { while (i < raw.length && raw[i] !== "\n") i++; continue; }
+          if (ch === "[" || ch === "]") return `the query uses blank-node [ ] brackets (line ${lineOf(i)}), which this cannot reorder yet`;
+          if (ch === "{") braces++; else if (ch === "}") braces--; else if (ch === "(") parens++; else if (ch === ")") parens--;
+          code += ch; i++;
+        }
+        if (braces || parens) return "the braces or parentheses in the query do not balance";
+        const form = /(?:^|\n)\s*(?:(?:PREFIX|BASE)\b[^\n]*\n\s*)*(SELECT|ASK|CONSTRUCT|DESCRIBE|INSERT|DELETE|WITH|LOAD|CLEAR|DROP|CREATE|COPY|MOVE|ADD)\b/i.exec(code.replace(/^\s+/, "\n"));
+        const kw = form ? form[1].toUpperCase() : "";
+        if (/^(INSERT|DELETE|WITH|LOAD|CLEAR|DROP|CREATE|COPY|MOVE|ADD)$/.test(kw)) return "this is an update, and only SELECT queries can be organized";
+        if (kw === "CONSTRUCT" || kw === "DESCRIBE") return `only SELECT queries can be organized, and this is a ${kw}`;
+        if (!kw) return "the text does not start like a SELECT query (a PREFIX or BASE line holding other text?)";
+        return "the query's layout is not one this can read safely";
+      }
+
+      // A sub-SELECT's text split at its WHERE { }: { pre, whereBody, after }, or null when it holds a comment
+      // outside the braces (those sub-queries are copied as written).
+      function _orgSubParts(text) {
+        const t = String(text || "").trim();
+        const fm = /^(SELECT|ASK)\b/i.exec(t);
+        if (!fm) return null;
+        let open = -1;
+        for (let i = fm[0].length; i < t.length;) {
+          const ch = t[i];
+          if (ch === "#") return null;
+          if (ch === "<" || ch === "\"" || ch === "'") { i = Math.max(i + 1, _sqPrettyScanTerm(t, i).end); continue; }
+          if (ch === "{") { open = i; break; }
+          i++;
+        }
+        if (open < 0) return null;
+        const close = _sqPrettyMatchBrace(t, open);
+        const after = t.slice(close).trim();
+        if (_sqPrettyHasComment(after) || _sqPrettyHasComment(t.slice(0, open))) return null;
+        return { pre: t.slice(0, open).replace(/\bWHERE\s*$/i, "").replace(/\s+/g, " ").trim(), whereBody: t.slice(open + 1, close - 1), after: after.replace(/\s+/g, " ") };
       }
 
       // Does a virtual graph's mapping text mention the triple's predicate (or, for a type triple, its
@@ -27030,7 +27224,7 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.51.0";
+      const APP_VERSION = "1.51.1";
       const RELEASE_NOTES = [
         { version: "1.51.0", date: "2026-11-07", title: "Taxonomies drawn as trees, same layout everywhere", items: [
           "{*Tree*} in the [[Ontology Visualization|aa-tool-ontology]] layout list draws subclasses below their superclasses. Each class stands one level below its deepest superclass, and each level sits deep enough that no line from a class to its subclass runs through another class.",
@@ -27426,7 +27620,7 @@ ORDER BY ?table ?ordinal`;
           loc: null,
           source: null,
           body: `<p>The &#9776; menu beside the query's search box holds <strong>Show original vars</strong>, which switches between the readable variable names the workbench gives autogenerated variables and the names as originally written. Show original vars is greyed out until the query has variables to rename. The &#10024; in the editor's corner formats the query. Comments in the query are kept when it is formatted; a comment in the middle of a statement, or inside a FILTER, stops formatting rather than risk moving it. The &#10024; shows while the pointer is over the query or the cursor is in it. With the cursor in a query it formats just that query, or only the selected text when some is selected; click away from the text first and it formats every query in the panel, tidying what it can read and leaving the rest alone. A query that is still unfinished is only re-indented. While you type, Enter keeps the layout (one tab deeper inside each pair of braces, one more for lines that continue a statement) and a closing <code>}</code> steps back out.</p>
-            <p><strong>Organize query by data source</strong>, also in the &#9776; menu, rewrites the query so the triples answered by the same source sit together under a comment line naming it (<code># ── data source: virtual graph mix_erp ──</code>). Stored named graphs come first, then virtual graphs, then <code>SERVICE</code> calls, then any triple the plan cannot place. Which source answers a triple comes from the loaded query plan: a stored graph by the index scans that read the triple, a virtual graph by its <code>GRAPH</code> block or by the SQL that binds the triple's variables, a <code>SERVICE</code> call by its endpoint. A triple the plan cannot tell apart (two virtual graphs map the same data) is grouped under their names together.</p>
+            <p><strong>Organize query by data source</strong>, also in the &#9776; menu, rewrites the query so the triples answered by the same source sit together under a comment line naming it (<code># ── data source: virtual graph mix_erp ──</code>). Stored named graphs come first, then virtual graphs, then <code>SERVICE</code> calls, then any triple the plan cannot place. Which source answers a triple comes from the loaded query plan: a stored graph by the index scans that read the triple, a virtual graph by its <code>GRAPH</code> block or by the SQL that binds the triple's variables, a <code>SERVICE</code> call by its endpoint. A triple the plan cannot tell apart (two virtual graphs map the same data) is grouped under their names together. A sub-query keeps its own scope and is organized on its own level, inside its braces. Comments around the query and inside a <code>FILTER</code> stay where they are; a blank-node <code>[ ]</code> bracket stops the rewrite, and the message says on which line.</p>
             <p>Triples move only inside their own <code>{ }</code> group, and never across an <code>OPTIONAL</code>, <code>MINUS</code> or <code>BIND</code>, so each stretch between those is organized on its own. When one subject uses predicates from several sources (written with <code>;</code> or <code>,</code>), the subject is repeated in each group, and a trailing comment (<code># ↔ ?cust also appears in: virtual graph mix_erp</code>) on every triple whose subject or variable is also used in another group says where the join is. Inside a virtual graph the triples are grouped by the table of its SQL that binds their variables (<code># ── table: orders ──</code>, lighter than the heavy banner of the graph), and a triple that needs two tables carries a note naming both. <code>GRAPH</code> and <code>SERVICE</code> blocks join the group of their source, filters and other blocks follow the triples, and the rest of the query is laid out like Format query. Before it replaces the text it checks that the new query holds exactly the same triples and operators; if not, or if the query has a shape it cannot rewrite safely, it leaves the text alone and says why. One Ctrl+Z restores the original. Running it again on an organized query changes nothing.</p>
             <p>In the mappings pane, a &#10024; appears on a mapping's <code>TO {</code> and <code>WHERE {</code> lines when that section can be tidied: one subject per statement and one predicate per line under TO, one <code>BIND</code> per line under WHERE. It rewrites that section's text in place. The &#10024; on <code>FROM SQL {</code> is different: it only changes how the SQL is displayed, not the mapping text.</p>`
         },
@@ -39590,6 +39784,16 @@ acme:temperature rdfs:range xsd:string .`
         return structural || rules || "";
       }
 
+      // What the plan pane holds, for the Snapshot panel and the files it writes: a profile (results of
+      // running the query with profiling) or a plain plan; and whether a profile is also held on its own.
+      function snapshotPlanKind() {
+        const planText = String(state.artifacts.queryPlan?.working || "");
+        const shownIsProfile = Boolean(planText.trim()) && (Boolean(state.ui.lastPlanWasProfile) || /^Profiling results:/m.test(planText));
+        const separateProfile = !shownIsProfile && Boolean(String(state.artifacts.queryProfile?.working || "").trim());
+        const label = shownIsProfile ? "Query Profile" : separateProfile ? (planText.trim() ? "Query Plan and Query Profile" : "Query Profile") : "Query Plan";
+        return { shownIsProfile, separateProfile, label };
+      }
+
       function snapshotChecked(artifact) {
         const el = document.querySelector(`.snapshot-artifact-check[data-artifact="${artifact}"]`);
         return el ? el.checked : true;
@@ -39616,8 +39820,13 @@ acme:temperature rdfs:range xsd:string .`
         const entries = [];
         if (snapshotChecked("query"))
           entries.push({ name: "query.rq", bytes: toBytes(queryText) });
-        if (snapshotChecked("plan"))
-          entries.push({ name: "query_plan.txt", bytes: toBytes(String(state.artifacts.queryPlan?.working || "")) });
+        if (snapshotChecked("plan")) {
+          // A profile run puts its results in the plan pane: it is saved as the query profile, a plan as the
+          // query plan. A profile held on its own (not shown in the plan pane) is saved too.
+          const planKind = snapshotPlanKind();
+          entries.push({ name: planKind.shownIsProfile ? "query_profile.txt" : "query_plan.txt", bytes: toBytes(String(state.artifacts.queryPlan?.working || "")) });
+          if (planKind.separateProfile) entries.push({ name: "query_profile.txt", bytes: toBytes(String(state.artifacts.queryProfile?.working || "")) });
+        }
         if (snapshotChecked("mappings")) {
           if (mappingEntries.length) entries.push(...mappingEntries);
           else entries.push({ name: "sms2_mappings.sms", bytes: toBytes(String(state.artifacts.sms2Mappings?.working || "")) });
@@ -52830,6 +53039,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         const hasContexts = Array.from(new Set((state.ui.selectedContexts || []).map((item) => String(item || "").trim()).filter(Boolean))).length > 0;
         $("snapshotContextWrap")?.classList.toggle("hidden", !hasContexts);
         if ($("snapshotIncludeContexts")) $("snapshotIncludeContexts").checked = hasContexts ? true : false;
+        if ($("snapshotPlanLabel")) $("snapshotPlanLabel").textContent = snapshotPlanKind().label;
         if (opening) {
           if (!$("snapshotNameInput")?.value.trim()) setValue("snapshotNameInput", "query plan debugging");
           if (!applyStoredPanelPosition("snapshotPanel")) positionPanelNearCenter("snapshotPanel", "toggleSnapshotBtn");
@@ -65970,7 +66180,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           goToTourStep, tourGoto, tourKeepPanelLeftOfBubble, tourSamplePermissionResponder, endTour, // tour step placement and sample permissions
           detectDisconnectedPatterns, // GRAPH ?g alone is not a disconnected variable
           detectUnboundSelectVars, detectInvalidDatatypeOperations, // computed SELECT columns: inputs must be bound and numeric
-          attributePlanElement, refetchPlanForRefresh, testConnection, updateConnectionUi, detectPushdownMisses, parseOntologyForGraph, _qsmParsePlan, _qsmBuildNativeScene, buildQuerySourceMap, qfKeepCaretOutOfFolds, qfRemapFolds, setGutterShrinkHoldMs: (ms) => { GUTTER_SHRINK_HOLD_MS = ms; }, _qsmRenderNative, _qsmServiceInfo, _qsmDataSourceFor, associatedVirtualGraphsForQuery, planReadsVgWithoutSql, // Why? on stored-data plans, refresh refetches, connect feedback, mixed-source map
+          attributePlanElement, refetchPlanForRefresh, testConnection, updateConnectionUi, detectPushdownMisses, parseOntologyForGraph, _qsmParsePlan, _qsmBuildNativeScene, buildQuerySourceMap, snapshotPlanKind, buildSnapshotEntries, qfKeepCaretOutOfFolds, qfWordAt, qfDrawCaret, qfRemapFolds, setGutterShrinkHoldMs: (ms) => { GUTTER_SHRINK_HOLD_MS = ms; }, _qsmRenderNative, _qsmServiceInfo, _qsmDataSourceFor, associatedVirtualGraphsForQuery, planReadsVgWithoutSql, // Why? on stored-data plans, refresh refetches, connect feedback, mixed-source map
           seState, seSetMode, qpideAccess, qpideLocalLevel, qpideKeepLocalStep, qpideSaveLocalSnapshot, qpideLoadSnapshotBlob, qpideContentHash, qpideFillLocalTimeline, seOpenNotePanel, seSetStepNote, seStepNoteInfo, seDraftNote, keySetsFitForSpace, readZipEntries, createZipBlob, qpideLocalBytes, qpideLocalSteps, seRenderEditMenu, seTimelineHtml, seAfterChange, seOpenDrawer, sePaneFormOfQuery, seTargetsFor, seGoToLine, seMoveDrawerPane, sePaneLineLabels, seOpenModeChooser, seTimelineVerdicts, seTimelineMissingText, seTimelineBest, seRegistryCleanable, seDefaultDrawerSides, seToggleTimeline, qpideKeepLocalStep, seCompareOn, seStepDiffHtml, fetchProfile, evaluateProfileFindings, ensureAppDb, qpideDbKnown, qpideDbForget, qpideNeverCreate, qpideSetNeverCreate, getQpideDb: () => QPIDE_DB, // history database approval gate; mode state (off-by-default check, manual smoke tests), compare drawer jump / reorder / numbering
           runSqlQuery, stopSqlQuery, // SQL Query panel: Run turns into Stop while running
           renderArtifactFlowView, renderQueryFlowView, resyncGutterRowHeights, expandArtifactPane, gutterNeededWidth, seProgressBanner, // gutter rebuild race / hidden-pane re-level / margin width / popup checks
