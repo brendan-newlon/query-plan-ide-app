@@ -2284,6 +2284,40 @@
     #ontologyGraphPanel .workspace-window-body { display:flex; flex-direction:column; overflow:hidden; }
     #ontologyGraphPanel:has(.workspace-window-body.hidden) { height:auto !important; }
     .og-canvas-wrap { position:relative; flex:1 1 auto; min-height:0; background:#0a0e14; }
+    /* ── Query Log panel ── */
+    #queryLogPanel { width:min(1180px,94vw,calc(100vw - 16px)); height:min(780px,86vh,calc(100vh - 56px)); display:flex; flex-direction:column; }
+    #queryLogPanel .workspace-window-body { overflow:hidden; display:flex; flex-direction:column; flex:1 1 auto; min-height:0; }
+    .ql-body { padding:10px 12px; display:flex; flex-direction:column; gap:8px; flex:1 1 auto; min-height:0; }
+    .ql-filters { display:flex; flex-wrap:wrap; gap:8px 12px; align-items:flex-end; }
+    .ql-filters label { display:flex; flex-direction:column; gap:2px; font-size:0.74rem; opacity:0.92; }
+    .ql-filters label.hidden { display:none; }
+    .ql-filters select, .ql-filters input { font-size:0.82rem; padding:3px 6px; min-height:26px; max-width:170px; }
+    .ql-filters select { padding-right:24px; }
+    .ql-filters input[type="number"] { width:84px; }
+    .ql-filters input[type="datetime-local"] { max-width:190px; }
+    .ql-filters #qlText { width:170px; }
+    .ql-note { font-size:0.8rem; opacity:0.85; min-height:1.2em; }
+    .ql-note.is-error { color:#ff9a9a; opacity:1; }
+    .ql-split { display:flex; flex-direction:column; flex:1 1 auto; min-height:0; }
+    .ql-results { flex:1 1 0; min-height:90px; overflow:auto; }
+    .ql-table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+    .ql-table th { position:sticky; top:0; z-index:1; background:var(--panel-bg, #1b2332); text-align:left; padding:4px 6px; white-space:nowrap; border-bottom:1px solid rgba(223,232,248,0.22); user-select:none; }
+    .ql-table th[data-ql-sort] { cursor:pointer; }
+    .ql-table th[data-ql-sort]:hover { background:rgba(94,143,255,0.14); }
+    .ql-table td { padding:3px 6px; border-bottom:1px solid rgba(223,232,248,0.08); white-space:nowrap; vertical-align:top; }
+    .ql-table td.ql-q { white-space:nowrap; max-width:420px; overflow:hidden; text-overflow:ellipsis; font-family:var(--mono, ui-monospace, Consolas, monospace); font-size:0.76rem; opacity:0.9; }
+    .ql-table td.ql-num { text-align:right; font-variant-numeric:tabular-nums; }
+    .ql-table tbody tr { cursor:pointer; }
+    .ql-table tbody tr:hover { background:rgba(94,143,255,0.10); }
+    .ql-table tbody tr.selected { background:rgba(94,143,255,0.24); }
+    .ql-table .ql-st-bad { color:#ff9a9a; }
+    .ql-table .ql-slow { color:#ffcf6e; font-weight:600; }
+    .ql-detail { flex:0 0 36%; min-height:110px; overflow:auto; margin-top:8px; padding:8px 10px; border-top:2px solid rgba(94,143,255,0.55); background:rgba(255,255,255,0.03); }
+    .ql-detail.hidden { display:none; }
+    .ql-detail pre { margin:6px 0 0; white-space:pre-wrap; word-break:break-word; font-size:0.78rem; }
+    .ql-detail-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+    .ql-detail-meta { font-size:0.78rem; opacity:0.85; }
+    .ql-picked { font-size:0.8rem; opacity:0.9; }
     /* ── Parse Logs panel ── */
     #parseLogsPanel { width:min(1100px,92vw,calc(100vw - 16px)); height:min(820px,88vh,calc(100vh - 56px)); display:flex; flex-direction:column; }
     #parseLogsPanel .workspace-window-body { overflow:auto; }
@@ -2753,6 +2787,7 @@
               <button type="button" class="secondary dropdown-action" id="ontologyGraphMenuItem" title="Visualize the loaded ontology model as a class diagram graph">Ontology Visualization</button>
               <button type="button" class="secondary dropdown-action" id="schemaDriftMenuItem" title="Check that every table and column the loaded mappings expect still exists in the data source">Test Source for Schema Drift</button>
               <button type="button" class="secondary dropdown-action" id="parseLogsMenuItem" title="Fetch or upload stardog.log, then filter and export the parsed entries">Parse Logs</button>
+              <button type="button" class="secondary dropdown-action" id="queryLogMenuItem" title="Browse the server's query log with filters, and send past queries to the Compare bar to see how their timings changed">Query Log</button>
               <button type="button" class="secondary dropdown-action" id="designerExportMenuItem" title="Download the loaded model, rules, mappings and their data sources as a Stardog Designer project file">Export .stardogdesigner</button>
             </div>
           </div>
@@ -3333,6 +3368,50 @@
             </div>
             <div id="schemaDriftResults"><div class="sql-qry-info">Choose data sources above, then click "Check Now".</div></div>
             <div style="padding:0 10px;font-size:0.68rem;color:var(--text-dim);opacity:0.9;">Approach inspired by Corey Lanum's <a href="https://github.com/coreylanum/schemadriftdetector" target="_blank" rel="noopener noreferrer" style="color:var(--accent);text-decoration:underline;">schemadriftdetector</a>.</div>
+          </div>
+        </section>
+
+        <section class="panel floating-panel hidden" id="queryLogPanel">
+          <div class="panel-head">
+            <div class="panel-title-copy"><h2>Query Log</h2></div>
+          </div>
+          <div class="ql-body">
+            <div class="ql-filters" id="qlFilters">
+              <label>When
+                <select id="qlRange">
+                  <option value="3600000">Last hour</option>
+                  <option value="86400000" selected>Last 24 hours</option>
+                  <option value="604800000">Last 7 days</option>
+                  <option value="2592000000">Last 30 days</option>
+                  <option value="all">Whole log</option>
+                  <option value="custom">Custom dates…</option>
+                </select>
+              </label>
+              <label class="hidden" id="qlFromWrap">From<input type="datetime-local" id="qlFrom"></label>
+              <label class="hidden" id="qlToWrap">To<input type="datetime-local" id="qlTo"></label>
+              <label>User<select id="qlUser"><option value="">(any)</option></select></label>
+              <label>Database<select id="qlDb"><option value="">(any)</option></select></label>
+              <label>Type<select id="qlType"><option value="">(any)</option></select></label>
+              <label>Status<select id="qlStatusFilter"><option value="">(any)</option></select></label>
+              <label>Reasoning
+                <select id="qlReasoning">
+                  <option value="">(any)</option>
+                  <option value="with">With reasoning</option>
+                  <option value="without">Without</option>
+                </select>
+              </label>
+              <label title="Keeps only queries that ran at least this long. Applies to the rows fetched.">Slower than (ms)<input type="number" id="qlMinMs" min="0" step="100" placeholder="0"></label>
+              <label>Query contains<input type="text" id="qlText" placeholder="text in the query" autocomplete="off"></label>
+              <label>Rows<select id="qlLimit"><option>100</option><option selected>250</option><option>500</option><option>1000</option></select></label>
+              <label title="Name of the database that holds the query log on this server (the server setting query.log.database)">Log database<input type="text" id="qlLogDb" value="querylog" autocomplete="off" style="width:96px;"></label>
+              <button type="button" id="qlRefreshBtn">Refresh</button>
+              <button type="button" id="qlResetBtn" class="secondary">Reset filters</button>
+            </div>
+            <div class="ql-note" id="qlNote">Press Refresh to read the query log.</div>
+            <div class="ql-split">
+              <div class="ql-results" id="qlResults"></div>
+              <div class="ql-detail hidden" id="qlDetail"></div>
+            </div>
           </div>
         </section>
 
@@ -27418,8 +27497,12 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.52.0";
+      const APP_VERSION = "1.53.0";
       const RELEASE_NOTES = [
+        { version: "1.53.0", date: "2026-11-23", title: "Browse the server's query log", items: [
+          "[[Query Log|aa-tool-querylog]] in the ☰ menu lists the queries the server has run: who ran each, on which database, when, how long it took and its status. Filter by time range, user, database, type, status, reasoning, text in the query and minimum duration.",
+          "Tick past queries and send them to the Compare bar, either with the durations the log recorded or re-profiled now, to follow how a query's timing changed over weeks, test runs and configuration changes."
+        ] },
         { version: "1.52.0", date: "2026-11-23", title: "Check that a rewrite did not change the plan", items: [
           "With a server connected, {*Organize query by data source*} asks the server for the query's plan before and after the rewrite and says whether it is the same, has the same steps in a different order, or has changed. It names a step that differs and offers Ctrl+Z. It asks for plans and runs nothing.",
           "A banner shows each step of the rewrite with the seconds elapsed, and {*Cancel*} stops what is left to do."
@@ -27788,6 +27871,17 @@ ORDER BY ?table ?ordinal`;
             <p>Because the loaded log and its parsed entries live in the browser tab's memory, how much can be loaded at once is capped — the panel shows the current cap, estimated from the browser's reported available memory — and everything is cleared when the panel is closed, so download first if you'll need the same log again later. For just downloading the raw server logs (any combination of log types, no parsing) use <button type="button" class="aa-jump-link" data-aa-nav-target="aa-tool-api">the API Explorer's Server Logs preset</button> instead.</p>`
         },
         {
+          id: "aa-tool-querylog", group: "workbench",
+          label: "Query Log",
+          where: `<strong>Query Log</strong> in the ☰ menu (top-right).`,
+          loc: { kind: "hero", highlight: "menu", caption: "In the ☰ menu (top-right)" },
+          source: null,
+          body: `<p>Reads the server's own record of the queries it has run (the database named <code>querylog</code>, or whatever name you type in <strong>Log database</strong>) and lists the newest first, with who ran each one, on which database, when, how long it took, its status and whether reasoning was on.</p>
+            <p>Narrow the list with the drop-downs and boxes at the top: a time range or custom dates, user, database, query type, status, reasoning, text inside the query, and a minimum duration. Everything except the minimum duration is applied by the server, so <strong>Rows</strong> counts matching queries only. Click a row to read the whole query, copy it, or put it in the query pane.</p>
+            <p>Tick rows and use the panel's ☰ menu to send them to the Compare bar. <strong>Compare ticked queries: logged times</strong> adds each one to the timeline with the date and duration the log recorded. <strong>Profile ticked queries now and compare</strong> runs Profile on each one against the database it first ran on and adds the new timings beside the old ones, so a query's speed can be followed across weeks, test runs and configuration changes. Updates are never re-run.</p>
+            <p>The user must be allowed to read the query log database; an administrator grants that. Logging is on by default and keeps 30 days.</p>`
+        },
+        {
           id: "aa-tool-dbcontrols", group: "workbench",
           label: "DB Controls",
           where: `The <strong>gear</strong> beside each database in the database dropdown. Open the dropdown, and the database you are using is already in view.`,
@@ -28112,6 +28206,7 @@ ORDER BY ?table ?ordinal`;
         "aa-tool-auto": { sel: "#autoModeBtn", label: "Start Auto Revise", unavailable: "Auto Revise needs a query and a plan to be loaded." },
         "aa-tool-api": { sel: "#toggleApiBtn", label: "Open HTTP API Explorer", openEl: "#apiPanel" },
         "aa-tool-parselogs": { sel: "#parseLogsMenuItem", label: "Open Parse Logs" },
+        "aa-tool-querylog": { sel: "#queryLogMenuItem", label: "Open Query Log" },
         "aa-tool-remoteexplain": { sel: "#remoteExplainBtn", label: "Explain other-database calls", unavailable: "This needs a query with SERVICE calls and a live connection." },
         "aa-tool-sqlquery": { sel: "#sqlQueryMenuItem", label: "Open SQL Query" },
         "aa-tool-sparqlexec": { sel: "#executeSparqlQueryBtn", label: "Run the query", unavailable: "Running a query needs a connection and a loaded SPARQL query." },
@@ -40577,6 +40672,7 @@ acme:temperature rdfs:range xsd:string .`
           ["releaseNotesPanel", "Release notes"],
           ["ontologyGraphPanel", "Ontology Visualization"],
           ["parseLogsPanel", "Parse Logs"],
+          ["queryLogPanel", "Query Log"],
           ["querySourceMapPanel", "Query → Source Map"],
           ["sqlQueryPanel", "SQL Query"],
           ["dbControlsPanel", "DB Controls"],
@@ -40657,6 +40753,19 @@ acme:temperature rdfs:range xsd:string .`
                     <button type="button" class="secondary dropdown-action" id="effPermDiffToggle" disabled>Show Diff</button>
                     <button type="button" class="secondary dropdown-action" id="effPermUsersRolesCsv" title="Download every user and the roles each has, as CSV (one role per row)">Download CSV: users and roles</button>
                     <button type="button" class="secondary dropdown-action" id="effPermRolesPermsCsv" title="Download every role and its permissions, as CSV (one permission per row)">Download CSV: roles and permissions</button>
+                  </div>
+                </div>`;
+            } else if (panelId === "queryLogPanel") {
+              extraControls = `
+                <span class="ql-picked" id="qlPicked"></span>
+                <div class="dropdown eff-perm-menu-wrap">
+                  <button type="button" id="qlMenuBtn" class="secondary icon-btn" title="More options" aria-label="More options">&#9776;</button>
+                  <div id="qlMenu" class="dropdown-menu hidden">
+                    <button type="button" class="secondary dropdown-action" id="qlMenuCompareLogged" title="Adds each ticked query to the timeline in the Compare bar, dated and timed as the log recorded it">Compare ticked queries: logged times</button>
+                    <button type="button" class="secondary dropdown-action" id="qlMenuCompareNow" title="Runs Profile on each ticked query now, against the database it originally ran on, and adds the new timings to the timeline in the Compare bar">Profile ticked queries now and compare…</button>
+                    <button type="button" class="secondary dropdown-action" id="qlMenuTickAll">Tick all rows shown</button>
+                    <button type="button" class="secondary dropdown-action" id="qlMenuTickNone">Clear ticks</button>
+                    <button type="button" class="secondary dropdown-action" id="qlMenuCsv" title="Download the rows shown as CSV">Download rows as CSV</button>
                   </div>
                 </div>`;
             } else if (panelId === "publishPanel") {
@@ -55705,7 +55814,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         try {
           // No history database to read: the steps kept in this app are the timeline.
           const mine = qpideLocalSteps(pid);
-          if (mine.length && (st.mode === "off" || !qpideDbKnown() || qpideAccess().state === "none")) { qpideFillLocalTimeline(tl, mine, prevSel); st.timelineSteps = true; return; }
+          if (mine.length && (st.mode === "off" || !qpideDbKnown() || qpideAccess().state === "none" || mine.some((s) => s.fromLog))) { qpideFillLocalTimeline(tl, mine, prevSel); st.timelineSteps = true; return; }
           if (st.mode === "off") { tl.empty = "No Profile run has been kept for this query yet. Run Profile, edit the query, and run it again: each version is listed here with its time, what changed, and how it compares."; return; }
           if (!state.connection.baseUrl) { tl.empty = "Connect to Stardog to read the recorded steps."; return; }
           const list = await requestDetailed({ method: "GET", path: "/admin/databases", accept: "application/json, */*;q=0.8" });
@@ -58541,7 +58650,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       document.addEventListener("mousedown", (e) => { _ptrDownTarget = e.target; }, true);
 
       function closeDropdownMenus(exceptId = "") {
-        ["showPlanMenu", "planToolsMenu", "inferenceToolsMenu", "queryVarToolsMenu", "uploadMenu", "storedQueryMenu", "projectMenu", "queryDatabaseMenu", "queryContextsMenu", "connectionProfileMenu", "mappingVgMenu", "keyDataSourceMenu", "rulesModelMenu", "ontologyModelMenu", "ogDbMenu", "ogModelMenu", "valSqlMenu", "effPermUser1Menu", "effPermUser2Menu", "effPermMenu", "effPermFilterMenuA", "effPermFilterMenuB", "publishMenu", "schemaDriftVgMenu"].forEach((id) => {
+        ["showPlanMenu", "planToolsMenu", "inferenceToolsMenu", "queryVarToolsMenu", "uploadMenu", "storedQueryMenu", "projectMenu", "queryDatabaseMenu", "queryContextsMenu", "connectionProfileMenu", "mappingVgMenu", "keyDataSourceMenu", "rulesModelMenu", "ontologyModelMenu", "ogDbMenu", "ogModelMenu", "valSqlMenu", "effPermUser1Menu", "effPermUser2Menu", "effPermMenu", "qlMenu", "effPermFilterMenuA", "effPermFilterMenuB", "publishMenu", "schemaDriftVgMenu"].forEach((id) => {
           if (id === exceptId) return;
           const element = $(id);
           if (element) {
@@ -59506,6 +59615,300 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         const statusEl = $("parseLogsStatus");
         if (statusEl) statusEl.textContent = "No log loaded yet.";
         return true;
+      }
+
+      // ===== Query Log panel =====
+      // Reads the server's query log database (default name "querylog", predicates under tag:stardog:api:query:) with
+      // plain SPARQL, so no reasoning is needed. Every filter except "Slower than" is a FILTER in the query, so the
+      // server does the narrowing and the Rows limit applies to what matches. Ticked rows can be sent to the Compare
+      // bar as steps (qlAddCompareSteps), dated and timed as logged or re-profiled now. Grep: _QL, qlRefresh.
+      const _QL = { rows: [], byKey: new Map(), selected: new Set(), sort: { key: "start", dir: -1 }, openKey: null, busy: false, abort: null, wired: false, rangeFacetKey: "" };
+      const QL_PREFIX = "PREFIX : <tag:stardog:api:query:>\nPREFIX xsd: <http://www.w3.org/2001/XMLSchema#>\n";
+      const qlLit = (s) => '"' + String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\r?\n/g, "\\n").replace(/\r/g, "") + '"';
+      const qlLogDb = () => (($("qlLogDb")?.value || "").trim() || "querylog");
+      function qlNote(text, isError = false) { const el = $("qlNote"); if (el) { el.textContent = text; el.classList.toggle("is-error", Boolean(isError)); } }
+      function qlRangeBounds() {
+        const v = $("qlRange")?.value || "all";
+        if (v === "all") return { from: null, to: null };
+        if (v === "custom") {
+          const f = $("qlFrom")?.value, t = $("qlTo")?.value;
+          return { from: f && !Number.isNaN(Date.parse(f)) ? new Date(f).toISOString() : null, to: t && !Number.isNaN(Date.parse(t)) ? new Date(t).toISOString() : null };
+        }
+        return { from: new Date(Date.now() - Number(v)).toISOString(), to: null };
+      }
+      function qlRangeFilter() {
+        const { from, to } = qlRangeBounds();
+        let f = "";
+        if (from) f += `FILTER(xsd:dateTime(?start) >= ${qlLit(from)}^^xsd:dateTime)\n`;
+        if (to) f += `FILTER(xsd:dateTime(?start) <= ${qlLit(to)}^^xsd:dateTime)\n`;
+        return f;
+      }
+      // The SPARQL text for the facet lists (distinct users, databases, types, statuses in the chosen time range).
+      function qlFacetSparql() {
+        return QL_PREFIX + "SELECT ?user ?db ?type ?status (COUNT(*) AS ?n) WHERE {\n  ?q a :Query ; :user ?user ; :db ?db ; :type ?type ; :start ?start .\n  OPTIONAL { ?q :status ?status }\n  " + qlRangeFilter() + "} GROUP BY ?user ?db ?type ?status";
+      }
+      // The SPARQL text for the rows; reads the picked filters from the panel.
+      function qlRowsSparql() {
+        const val = (id) => ($(id)?.value || "").trim();
+        let f = qlRangeFilter();
+        if (val("qlUser")) f += `FILTER(STR(?user) = ${qlLit(val("qlUser"))})\n`;
+        if (val("qlDb")) f += `FILTER(STR(?db) = ${qlLit(val("qlDb"))})\n`;
+        if (val("qlType")) f += `FILTER(STR(?type) = ${qlLit(val("qlType"))})\n`;
+        if (val("qlStatusFilter")) f += `FILTER(BOUND(?status) && STR(?status) = ${qlLit(val("qlStatusFilter"))})\n`;
+        if (val("qlReasoning") === "with") f += `FILTER(BOUND(?reasoning) && STR(?reasoning) != "")\n`;
+        if (val("qlReasoning") === "without") f += `FILTER(!BOUND(?reasoning) || STR(?reasoning) = "")\n`;
+        if (val("qlText")) f += `FILTER(CONTAINS(LCASE(STR(?qs)), ${qlLit(val("qlText").toLowerCase())}))\n`;
+        const limit = Math.max(1, Math.min(5000, Number(val("qlLimit")) || 250));
+        return QL_PREFIX + "SELECT ?id ?user ?type ?db ?start ?end ?pre ?qs ?status ?reasoning ?ip WHERE {\n  ?q a :Query ; :user ?user ; :type ?type ; :db ?db ; :start ?start ; :query ?qs .\n  OPTIONAL { ?q :id ?id } OPTIONAL { ?q :end ?end } OPTIONAL { ?q :preExecutionTime ?pre } OPTIONAL { ?q :status ?status } OPTIONAL { ?q :reasoning ?reasoning } OPTIONAL { ?q :ip ?ip }\n  " + f + "} ORDER BY DESC(?start) LIMIT " + limit;
+      }
+      async function qlRunSparql(db, sparql, signal) {
+        const res = await requestDetailed({ method: "POST", path: "/" + encodeURIComponent(db) + "/query", body: { query: sparql }, contentType: "application/x-www-form-urlencoded", accept: "application/sparql-results+json, application/json;q=0.9, */*;q=0.8", abortSignal: signal });
+        if (!res.ok) { const e = new Error(String(res.text || "").slice(0, 300) || (res.status + " " + res.statusText)); e.status = res.status; throw e; }
+        try { return (JSON.parse(res.text).results || {}).bindings || []; } catch (e) { throw new Error("The server's answer was not SPARQL results."); }
+      }
+      function qlRowFromBinding(b, i) {
+        const g = (k) => (b[k] ? b[k].value : "");
+        const startMs = Date.parse(g("start")), endMs = g("end") ? Date.parse(g("end")) : NaN;
+        const ms = Number.isFinite(startMs) && Number.isFinite(endMs) && endMs >= startMs ? endMs - startMs : null;
+        const pre = g("pre") !== "" && Number.isFinite(Number(g("pre"))) ? Number(g("pre")) : null;
+        return { key: (g("id") || "row") + "|" + g("start") + "|" + i, id: g("id"), user: g("user"), type: g("type"), db: g("db"), start: g("start"), startMs: Number.isFinite(startMs) ? startMs : 0, ms, pre, q: g("qs"), status: g("status"), reasoning: g("reasoning"), ip: g("ip") };
+      }
+      function qlSetOptions(sel, values) {
+        if (!sel) return;
+        const cur = sel.value;
+        const list = Array.from(new Set(values.filter((v) => v !== ""))).sort((a, b) => a.localeCompare(b));
+        if (cur && !list.includes(cur)) list.unshift(cur);
+        sel.innerHTML = `<option value="">(any)</option>` + list.map((v) => `<option value="${esc(v)}">${esc(v)}</option>`).join("");
+        sel.value = cur;
+      }
+      async function qlLoadFacets(db, signal) {
+        const rows = await qlRunSparql(db, qlFacetSparql(), signal);
+        const col = (k) => rows.map((r) => (r[k] ? r[k].value : ""));
+        qlSetOptions($("qlUser"), col("user")); qlSetOptions($("qlDb"), col("db")); qlSetOptions($("qlType"), col("type")); qlSetOptions($("qlStatusFilter"), col("status"));
+      }
+      function qlSortedRows() {
+        const { key, dir } = _QL.sort;
+        const minMs = Number($("qlMinMs")?.value) || 0;
+        const get = (r) => key === "start" ? r.startMs : key === "ms" ? (r.ms == null ? -1 : r.ms) : key === "pre" ? (r.pre == null ? -1 : r.pre) : String(r[key] || "").toLowerCase();
+        return _QL.rows.filter((r) => !minMs || (r.ms != null && r.ms >= minMs)).slice().sort((a, b) => { const x = get(a), y = get(b); return (x < y ? -1 : x > y ? 1 : 0) * dir; });
+      }
+      const qlFmtMs = (n) => n == null ? "—" : n >= 10000 ? (n / 1000).toFixed(1) + " s" : n.toLocaleString() + " ms";
+      function qlRenderTable() {
+        const host = $("qlResults");
+        if (!host) return;
+        const rows = qlSortedRows();
+        _QL.shown = rows;
+        if (!_QL.rows.length) { host.innerHTML = ""; qlUpdatePicked(); return; }
+        const arrow = (k) => _QL.sort.key === k ? (_QL.sort.dir < 0 ? " ▼" : " ▲") : "";
+        const th = (k, label, cls = "") => `<th data-ql-sort="${k}" class="${cls}" title="Sort by ${esc(label)}">${esc(label)}${arrow(k)}</th>`;
+        const slowAt = (() => { const t = rows.map((r) => r.ms).filter((n) => n != null).sort((a, b) => a - b); return t.length > 8 ? t[Math.floor(t.length * 0.9)] : Infinity; })();
+        const body = rows.map((r) => {
+          const snippet = r.q.replace(/\s+/g, " ").trim();
+          const bad = r.status && r.status !== "Finished";
+          return `<tr data-ql-row="${esc(r.key)}" class="${_QL.openKey === r.key ? "selected" : ""}"><td><input type="checkbox" data-ql-tick="${esc(r.key)}" ${_QL.selected.has(r.key) ? "checked" : ""} aria-label="Tick for Compare"></td>`
+            + `<td>${esc(new Date(r.startMs).toLocaleString())}</td><td>${esc(r.user)}</td><td>${esc(r.db)}</td><td>${esc(r.type)}</td>`
+            + `<td class="${bad ? "ql-st-bad" : ""}">${esc(r.status || "")}</td><td class="ql-num ${r.ms != null && r.ms >= slowAt ? "ql-slow" : ""}">${esc(qlFmtMs(r.ms))}</td><td class="ql-num">${esc(qlFmtMs(r.pre))}</td>`
+            + `<td>${esc(r.reasoning || "")}</td><td class="ql-q" title="${esc(snippet.slice(0, 600))}">${esc(snippet.slice(0, 140))}</td></tr>`;
+        }).join("");
+        host.innerHTML = `<table class="ql-table"><thead><tr><th><input type="checkbox" id="qlTickAllBox" title="Tick or untick every row shown" aria-label="Tick every row shown"></th>${th("start", "Started")}${th("user", "User")}${th("db", "Database")}${th("type", "Type")}${th("status", "Status")}${th("ms", "Duration", "ql-num")}${th("pre", "Pre-execution", "ql-num")}<th>Reasoning</th><th>Query</th></tr></thead><tbody>${body}</tbody></table>`;
+        qlUpdatePicked();
+      }
+      function qlUpdatePicked() {
+        const n = _QL.rows.filter((r) => _QL.selected.has(r.key)).length;
+        const el = $("qlPicked"); if (el) el.textContent = n ? `${n} ticked` : "";
+        const box = $("qlTickAllBox");
+        if (box) { const shown = _QL.shown || []; box.checked = shown.length > 0 && shown.every((r) => _QL.selected.has(r.key)); }
+      }
+      function qlShowDetail(key) {
+        const r = _QL.byKey.get(key), host = $("qlDetail");
+        if (!host) return;
+        _QL.openKey = r ? key : null;
+        document.querySelectorAll("#qlResults tr[data-ql-row]").forEach((tr) => tr.classList.toggle("selected", tr.getAttribute("data-ql-row") === _QL.openKey));
+        if (!r) { host.classList.add("hidden"); return; }
+        host.classList.remove("hidden");
+        host.innerHTML = `<div class="ql-detail-meta"><strong>${esc(r.user)}</strong> on <strong>${esc(r.db)}</strong> · ${esc(r.type)} · started ${esc(new Date(r.startMs).toLocaleString())} · ${esc(qlFmtMs(r.ms))} · ${esc(r.status || "no status logged")}${r.reasoning ? " · reasoning " + esc(r.reasoning) : ""}${r.ip ? " · from " + esc(r.ip) : ""}${r.id ? " · query id " + esc(r.id) : ""}</div>`
+          + `<div class="ql-detail-actions"><button type="button" class="secondary" data-ql-detail="load" title="Puts this query text in the query pane">Load into the query pane</button><button type="button" class="secondary" data-ql-detail="copy">Copy query</button><button type="button" class="secondary" data-ql-detail="tick">${_QL.selected.has(key) ? "Untick for Compare" : "Tick for Compare"}</button></div><pre>${esc(r.q)}</pre>`;
+      }
+      function qlSetBusy(on) {
+        _QL.busy = on;
+        const b = $("qlRefreshBtn"); if (b) b.textContent = on ? "Cancel" : "Refresh";
+      }
+      async function qlRefresh({ facets = true } = {}) {
+        if (_QL.busy) { _QL.abort?.abort(); return; }
+        if (!state.connection.baseUrl) { qlNote("Connect to Stardog to read the query log.", true); return; }
+        const db = qlLogDb(), ctl = new AbortController();
+        _QL.abort = ctl; qlSetBusy(true);
+        const t0 = performance.now();
+        const spin = setTimeout(() => { if (_QL.busy) qlNote("Reading the query log… this can take a minute on a large log. Cancel stops it."); }, 300);
+        try {
+          if (facets) await qlLoadFacets(db, ctl.signal);
+          const bindings = await qlRunSparql(db, qlRowsSparql(), ctl.signal);
+          _QL.rows = bindings.map(qlRowFromBinding);
+          _QL.byKey = new Map(_QL.rows.map((r) => [r.key, r]));
+          _QL.selected = new Set(Array.from(_QL.selected).filter((k) => _QL.byKey.has(k)));
+          if (_QL.openKey && !_QL.byKey.has(_QL.openKey)) qlShowDetail(null);
+          qlRenderTable();
+          const shown = (_QL.shown || []).length, secs = ((performance.now() - t0) / 1000).toFixed(1);
+          const durs = (_QL.shown || []).map((r) => r.ms).filter((n) => n != null);
+          const avg = durs.length ? ` · average ${qlFmtMs(Math.round(durs.reduce((a, b) => a + b, 0) / durs.length))}` : "";
+          qlNote(!_QL.rows.length ? "No logged queries match these filters." : `${shown} quer${shown === 1 ? "y" : "ies"} shown${avg}${_QL.rows.length >= Number($("qlLimit")?.value || 250) ? " · the newest ones; narrow the filters or raise Rows to see more" : ""} (read in ${secs} s)`);
+          log("retrieve", "Query log read.", { database: db, rows: _QL.rows.length, seconds: secs });
+        } catch (e) {
+          if (e && e.name === "AbortError") qlNote("Stopped. The rows shown are from the last read.");
+          else if (e && e.status === 404) qlNote(`This server has no database named “${db}”. If the query log is turned off, or kept under another name, change Log database above.`, true);
+          else if (e && (e.status === 401 || e.status === 403)) qlNote(`The server did not let this user read “${db}”. An administrator has to grant read access to the query log database.`, true);
+          else qlNote("Could not read the query log: " + String((e && e.message) || e), true);
+        } finally { clearTimeout(spin); qlSetBusy(false); _QL.abort = null; }
+      }
+      function qlResetFilters() {
+        ["qlUser", "qlDb", "qlType", "qlStatusFilter", "qlReasoning", "qlMinMs", "qlText", "qlFrom", "qlTo"].forEach((id) => { const el = $(id); if (el) el.value = ""; });
+        if ($("qlRange")) $("qlRange").value = "86400000";
+        if ($("qlLimit")) $("qlLimit").value = "250";
+        qlSyncCustomDates();
+      }
+      function qlSyncCustomDates() { const c = $("qlRange")?.value === "custom"; $("qlFromWrap")?.classList.toggle("hidden", !c); $("qlToWrap")?.classList.toggle("hidden", !c); }
+      function qlCsv() {
+        const rows = _QL.shown || [];
+        const cell = (v) => { const s = String(v == null ? "" : v); return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+        const head = ["started", "user", "database", "type", "status", "duration_ms", "pre_execution_ms", "reasoning", "ip", "query_id", "query"];
+        const lines = [head.join(",")].concat(rows.map((r) => [r.start, r.user, r.db, r.type, r.status, r.ms, r.pre, r.reasoning, r.ip, r.id, r.q].map(cell).join(",")));
+        downloadBlob(new Blob([lines.join("\r\n")], { type: "text/csv" }), "query-log.csv");
+      }
+      // ---- Sending past queries to the Compare bar ----
+      // Each ticked query becomes one step of this query's timeline. "Logged" steps carry the date and the duration the
+      // log recorded; "now" steps are a fresh Profile of the same text on the database it first ran on.
+      function qlPicked() { return _QL.rows.filter((r) => _QL.selected.has(r.key)).sort((a, b) => a.startMs - b.startMs); }
+      async function qlAddCompareSteps(items) {
+        const st = seState(), h = st.localHistory;
+        const { pid, proj } = seTimelineProject();
+        let added = 0;
+        for (const it of items) {
+          if (it.logKey && h.steps.some((s) => s.pid === pid && s.logKey === it.logKey)) continue;
+          const texts = { sparqlQuery: it.query };
+          const hash = await qpideContentHash(texts);
+          h.seq += 1;
+          h.steps.push({ iri: "local:" + pid + ":" + Date.now() + "-" + h.seq, pid, proj, at: it.at, note: it.note, userNote: "", noteAt: 0, noteHash: "", diff: null, qt: it.qt, rc: it.rc, jc: it.jc, uc: null, shape: "", hash, shapeChanged: false, findings: 0, keys: ["sparqlQuery"], changedKeys: [], texts, file: null, runs: it.qt != null ? [it.qt] : [], fromLog: true, logKey: it.logKey || "" });
+          added += 1;
+        }
+        // Time order within this timeline, then what each logged step changed against the one before it.
+        const mine = h.steps.filter((s) => s.pid === pid).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+        h.steps = h.steps.filter((s) => s.pid !== pid).concat(mine);
+        mine.forEach((s, i) => {
+          if (!s.fromLog) return;
+          const p = mine[i - 1];
+          const ck = p && p.texts && (p.texts.sparqlQuery || "") !== (s.texts.sparqlQuery || "") ? ["sparqlQuery"] : [];
+          s.changedKeys = ck; s.diff = ck.length ? qpideStepDiff(p.texts, s.texts, ck) : null;
+        });
+        st.timelineSteps = true;
+        const open = st.drawer.view === "timeline" && st.drawer.size !== "collapsed";
+        if (open) { seApplyDrawerLayout(); seTimelineRefresh(); } else seToggleTimeline();
+        await qpideLocalCheck();
+        return added;
+      }
+      async function qlCompareLogged() {
+        const picked = qlPicked();
+        if (!picked.length) { showStatusToast("Tick one or more queries in the Query Log first.", "info"); return; }
+        const items = picked.map((r) => ({ at: new Date(r.startMs).toISOString(), query: r.q, qt: r.ms, rc: null, jc: null, logKey: r.id ? "id:" + r.id : "at:" + r.start + "|" + r.user + "|" + r.q.length, note: `From the query log: run by ${r.user} on ${r.db}${r.status ? " (" + r.status + ")" : ""}` }));
+        const n = await qlAddCompareSteps(items);
+        showStatusToast(n ? `${n} logged quer${n === 1 ? "y" : "ies"} added to the timeline in the Compare bar.` : "Those queries are already in the timeline.", "info");
+      }
+      async function qlProfileOnDb(db, body, signal) {
+        const params = clone(state.connection.params.profile) || { profile: "true" };
+        const req = (path) => ({ method: "POST", path, params, contentType: "application/x-www-form-urlencoded", body, abortSignal: signal, noTimeout: true });
+        const enc = encodeURIComponent(db);
+        let res = await requestDetailed(req("/" + enc + "/query"));
+        let split = res.ok ? splitProfileResponse(res.text, res.contentType, res.responseHeaders) : null;
+        if (res.ok && !(split && split.profile)) { res = await requestDetailed(req("/" + enc + "/explain")); split = res.ok ? splitProfileResponse(res.text, res.contentType, res.responseHeaders) : null; }
+        if (!res.ok) throw new Error(`HTTP ${res.status} ${String(res.text || "").slice(0, 160)}`);
+        if (!split || !split.profile) throw new Error("no profile in the answer");
+        return split.profile;
+      }
+      async function qlCompareNow() {
+        const picked = qlPicked();
+        if (!picked.length) { showStatusToast("Tick one or more queries in the Query Log first.", "info"); return; }
+        const runnable = picked.filter((r) => !/update|add|drop|clear|load|copy|move|create/i.test(r.type) && !/^\s*(?:PREFIX[^\n]*\n\s*)*(?:INSERT|DELETE|LOAD|CLEAR|DROP|CREATE|COPY|MOVE|ADD)\b/i.test(r.q));
+        const skipped = picked.length - runnable.length;
+        if (!runnable.length) { showStatusToast("Update queries are never re-run. Tick queries that only read.", "info"); return; }
+        const ok = await seModal({ title: `Profile ${runnable.length} quer${runnable.length === 1 ? "y" : "ies"} now?`, bodyHtml: `<p>Each ticked query is run on the server, one after another, against the database it first ran on, and its new timing is added to the timeline in the Compare bar next to the logged ones. Queries that took long when logged take long again.</p>${skipped ? `<p>${skipped} update quer${skipped === 1 ? "y is" : "ies are"} left out: updates are never re-run.</p>` : ""}<p>Press Cancel in the Query Log while it runs to stop after the current query.</p>`, buttons: [{ label: "Cancel", value: false }, { label: "Profile now", value: true }] });
+        if (!ok) return;
+        if (_QL.busy) { showStatusToast("The Query Log is busy. Try again in a moment.", "info"); return; }
+        const ctl = new AbortController(); _QL.abort = ctl; qlSetBusy(true);
+        const items = []; let failed = 0, i = 0;
+        try {
+          for (const r of runnable) {
+            i += 1;
+            qlNote(`Profiling ${i} of ${runnable.length} on ${r.db}… Cancel stops after this one.`);
+            try {
+              const body = { query: r.q, database: r.db, reasoning: r.reasoning ? "true" : "false" };
+              if (r.reasoning) body.schema = r.reasoning;
+              const text = await qlProfileOnDb(r.db, body, ctl.signal);
+              const prof = analyzeProfile(text) || {};
+              items.push({ at: new Date().toISOString(), query: r.q, qt: _numOr(prof.totalMs, null), rc: _numOr(prof.resultCount || prof.actualRows, null), jc: analyzePlan(text).joinCount, logKey: "", note: `Profiled now on ${r.db} (logged run: ${new Date(r.startMs).toLocaleString()}, ${qlFmtMs(r.ms)})` });
+            } catch (e) {
+              if (e && e.name === "AbortError") break;
+              failed += 1; log("retrieve", "Query Log: profile failed.", { database: r.db, error: String((e && e.message) || e) });
+            }
+          }
+        } finally { qlSetBusy(false); _QL.abort = null; }
+        if (items.length) await qlAddCompareSteps(items);
+        qlNote(`${items.length} profiled and added to the timeline${failed ? `; ${failed} could not be profiled (see the Log panel)` : ""}${ctl.signal.aborted ? "; stopped by you" : ""}.`, failed > 0 && !items.length);
+      }
+      function toggleQueryLogPanel() {
+        const panel = $("queryLogPanel");
+        if (!panel) return;
+        const opening = panel.classList.contains("hidden");
+        panel.classList.toggle("hidden");
+        if (opening) {
+          if (!applyStoredPanelPosition("queryLogPanel")) requestAnimationFrame(() => centerFloatingPanelInWindow("queryLogPanel"));
+          if (!_QL.rows.length && !_QL.busy && state.connection.baseUrl) qlRefresh();
+          else if (!state.connection.baseUrl) qlNote("Connect to Stardog to read the query log.", true);
+        }
+      }
+      function initQueryLogPanel() {
+        if (_QL.wired) return;
+        const panel = $("queryLogPanel");
+        if (!panel) return;
+        _QL.wired = true;
+        let timer = null;
+        const later = (ms, fn) => { clearTimeout(timer); timer = setTimeout(fn, ms); };
+        const reload = (facets) => { if (_QL.busy) _QL.abort?.abort(); later(0, () => qlRefresh({ facets })); };
+        $("qlRefreshBtn")?.addEventListener("click", () => qlRefresh());
+        $("qlResetBtn")?.addEventListener("click", () => { qlResetFilters(); reload(true); });
+        $("qlRange")?.addEventListener("change", () => { qlSyncCustomDates(); if ($("qlRange").value !== "custom") reload(true); });
+        ["qlFrom", "qlTo"].forEach((id) => $(id)?.addEventListener("change", () => reload(true)));
+        ["qlUser", "qlDb", "qlType", "qlStatusFilter", "qlReasoning", "qlLimit"].forEach((id) => $(id)?.addEventListener("change", () => reload(false)));
+        $("qlLogDb")?.addEventListener("change", () => reload(true));
+        $("qlText")?.addEventListener("input", () => later(600, () => { if (_QL.busy) _QL.abort?.abort(); later(0, () => qlRefresh({ facets: false })); }));
+        $("qlText")?.addEventListener("keydown", (e) => { if (e.key === "Enter") reload(false); });
+        $("qlMinMs")?.addEventListener("input", () => { qlRenderTable(); const n = (_QL.shown || []).length; if (_QL.rows.length) qlNote(`${n} of ${_QL.rows.length} fetched quer${_QL.rows.length === 1 ? "y" : "ies"} shown.`); });
+        $("qlResults")?.addEventListener("click", (e) => {
+          const t = e.target instanceof Element ? e.target : null;
+          if (!t) return;
+          const tick = t.closest("[data-ql-tick]");
+          if (tick) { const k = tick.getAttribute("data-ql-tick"); if (tick.checked) _QL.selected.add(k); else _QL.selected.delete(k); qlUpdatePicked(); return; }
+          if (t.closest("#qlTickAllBox")) { const on = t.closest("#qlTickAllBox").checked; (_QL.shown || []).forEach((r) => on ? _QL.selected.add(r.key) : _QL.selected.delete(r.key)); qlRenderTable(); return; }
+          const sort = t.closest("[data-ql-sort]");
+          if (sort) { const k = sort.getAttribute("data-ql-sort"); _QL.sort = { key: k, dir: _QL.sort.key === k ? -_QL.sort.dir : (k === "start" || k === "ms" || k === "pre" ? -1 : 1) }; qlRenderTable(); return; }
+          const row = t.closest("[data-ql-row]");
+          if (row) qlShowDetail(row.getAttribute("data-ql-row"));
+        });
+        $("qlDetail")?.addEventListener("click", (e) => {
+          const b = e.target instanceof Element ? e.target.closest("[data-ql-detail]") : null;
+          if (!b) return;
+          const r = _QL.byKey.get(_QL.openKey);
+          if (!r) return;
+          const act = b.getAttribute("data-ql-detail");
+          if (act === "load") { seSetEditorText("sparqlQuery", r.q); showStatusToast("Query loaded into the query pane.", "info"); }
+          else if (act === "copy") copyTextWithButtonFeedback(r.q, b, "Copied", "Copy failed");
+          else if (act === "tick") { if (_QL.selected.has(r.key)) _QL.selected.delete(r.key); else _QL.selected.add(r.key); qlRenderTable(); qlShowDetail(r.key); }
+        });
+        $("qlMenuBtn")?.addEventListener("click", () => { const menu = $("qlMenu"); const wasHidden = menu.classList.contains("hidden"); closeDropdownMenus(); if (wasHidden) menu.classList.remove("hidden"); });
+        const menuAct = (id, fn) => $(id)?.addEventListener("click", () => { $("qlMenu")?.classList.add("hidden"); Promise.resolve(fn()).catch(handleError); });
+        menuAct("qlMenuCompareLogged", qlCompareLogged);
+        menuAct("qlMenuCompareNow", qlCompareNow);
+        menuAct("qlMenuTickAll", () => { (_QL.shown || []).forEach((r) => _QL.selected.add(r.key)); qlRenderTable(); });
+        menuAct("qlMenuTickNone", () => { _QL.selected.clear(); qlRenderTable(); });
+        menuAct("qlMenuCsv", qlCsv);
       }
 
       function toggleParseLogsPanel() {
@@ -62561,6 +62964,9 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           if (!target.closest("#effPermMenuBtn, #effPermMenu")) {
             $("effPermMenu")?.classList.add("hidden");
           }
+          if (!target.closest("#qlMenuBtn, #qlMenu")) {
+            $("qlMenu")?.classList.add("hidden");
+          }
           if (!target.closest("#effPermFilterBtnA, #effPermFilterMenuA")) {
             $("effPermFilterMenuA")?.classList.add("hidden");
           }
@@ -63720,7 +64126,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
             event.preventDefault();
             return;
           }
-          const openMenuIds = ["showPlanMenu", "planToolsMenu", "inferenceToolsMenu", "queryVarToolsMenu", "uploadMenu", "storedQueryMenu", "queryDatabaseMenu", "queryContextsMenu", "connectionProfileMenu", "mappingVgMenu", "keyDataSourceMenu", "rulesModelMenu", "ontologyModelMenu", "ogDbMenu", "ogModelMenu", "valSqlMenu", "effPermUser1Menu", "effPermUser2Menu", "effPermMenu", "effPermFilterMenuA", "effPermFilterMenuB", "publishMenu", "schemaDriftVgMenu"];
+          const openMenuIds = ["showPlanMenu", "planToolsMenu", "inferenceToolsMenu", "queryVarToolsMenu", "uploadMenu", "storedQueryMenu", "queryDatabaseMenu", "queryContextsMenu", "connectionProfileMenu", "mappingVgMenu", "keyDataSourceMenu", "rulesModelMenu", "ontologyModelMenu", "ogDbMenu", "ogModelMenu", "valSqlMenu", "effPermUser1Menu", "effPermUser2Menu", "effPermMenu", "qlMenu", "effPermFilterMenuA", "effPermFilterMenuB", "publishMenu", "schemaDriftVgMenu"];
           const openMenu = openMenuIds.map($).find((el) => el && !el.classList.contains("hidden"))
             || Array.from(document.querySelectorAll("[id^='labPathVarMenu_']")).find((el) => !el.classList.contains("hidden"));
           if (openMenu) {
@@ -64705,6 +65111,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           if (wasHidden) menu.classList.remove("hidden");
         });
         on("effPermShowAllToggle", "click", () => _toggleEffPermShowAll());
+        initQueryLogPanel();
         on("effPermUsersRolesCsv", "click", () => { $("effPermMenu")?.classList.add("hidden"); downloadPermissionsCsv("usersRoles").catch(handleError); });
         on("effPermRolesPermsCsv", "click", () => { $("effPermMenu")?.classList.add("hidden"); downloadPermissionsCsv("rolesPermissions").catch(handleError); });
         on("effPermResults", "click", (e) => {
@@ -64811,6 +65218,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         on("erdMenuItem", "click", () => { closeDropdownMenus(); toggleErdPanel(); });
         on("ontologyGraphMenuItem", "click", () => { closeDropdownMenus(); toggleOntologyGraphPanel(); });
         on("parseLogsMenuItem", "click", () => { closeDropdownMenus(); toggleParseLogsPanel(); });
+        on("queryLogMenuItem", "click", () => { closeDropdownMenus(); toggleQueryLogPanel(); });
         on("schemaDriftMenuItem", "click", () => { closeDropdownMenus(); openSchemaDriftPanel(); });
         on("designerExportMenuItem", "click", () => { closeDropdownMenus(); exportDesignerProject(); });
         const parseLogsSelectSource = (source) => {
@@ -66350,6 +66758,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           renderSparqlExecError, // SPARQL query-panel error path must also write to state.logs (regression net)
           renderSchemaDriftResults, // Schema drift results renderer (regression net)
           buildParseLogsCsv,     // Parse Logs CSV builder (export columns follow the active view)
+          qlRowsSparql, qlRowFromBinding, qlLit, // Query Log: filter-to-SPARQL builder, row reader, string escaper (regression net)
           parseFullStardogLog,   // Parse Logs strict parser (regression net for the real server log format)
           parseRawLogEntries,    // Parse Logs "All log entries" fallback splitter (regression net)
           repairStringLiteralLineBreaks, // turns a short literal holding a raw line break into a long one (regression net)
