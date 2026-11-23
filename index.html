@@ -2556,6 +2556,9 @@
     .plan-wait-banner .plan-wait-title { font-size: 12.5px; font-weight: 600; color: rgba(213,139,49,0.95); margin-bottom: 5px; }
     .plan-wait-banner .plan-wait-body { font-size: 11.5px; color: var(--text-muted); margin-bottom: 10px; line-height: 1.45; }
     .plan-wait-banner .plan-wait-actions { display: flex; gap: 8px; }
+    .work-banner .work-bar { height: 4px; margin-top: 8px; border-radius: 2px; background: rgba(127,127,127,0.25); overflow: hidden; }
+    .work-banner .work-bar-fill { height: 100%; width: 0; background: rgba(213,139,49,0.95); transition: width 0.15s linear; }
+    .work-banner .work-long { margin-top: 8px; }
     .plan-wait-banner .plan-wait-actions button { flex: 1; font-size: 11.5px; padding: 4px 8px; }
     /* Stardog response-mismatch alerts (triggerStardogMismatchAlert) — top-right so they
        never overlap the bottom-right plan-wait-banner (a wait dialog and a mismatch alert
@@ -5222,6 +5225,53 @@
         toast.classList.remove("hidden");
         clearTimeout(state.ui.statusToastTimer);
         state.ui.statusToastTimer = setTimeout(() => toast.classList.add("hidden"), timeoutMs);
+      }
+
+      // A banner for work that can take a while on big input: what it is doing now, seconds elapsed, a bar, and
+      // Cancel. Cancel is honored between steps (the caller checks cancelled() after each await), so a cancelled
+      // job leaves everything as it was. Returns { update(text, fraction), cancelled(), elapsedMs(), close() }.
+      function showWorkBanner(title) {
+        document.querySelectorAll(".work-banner").forEach((el) => el.remove());
+        const el = document.createElement("div");
+        el.className = "plan-wait-banner work-banner";
+        el.setAttribute("role", "status");
+        el.innerHTML = `<div class="plan-wait-title"></div><div class="plan-wait-body"><span data-wb-text></span> <span data-wb-time></span><div class="work-bar"><div class="work-bar-fill" data-wb-fill></div></div><div data-wb-long class="work-long hidden">This is taking a while. Large queries and plans can need a minute. The page may pause briefly; nothing has been lost, and Cancel leaves the query as it was.</div></div><div class="plan-wait-actions"><button type="button" class="secondary" data-wb-cancel>Cancel</button></div>`;
+        el.querySelector(".plan-wait-title").textContent = title;
+        document.body.appendChild(el);
+        let isCancelled = false, closed = false;
+        const t0 = performance.now();
+        const tick = () => {
+          const sec = (performance.now() - t0) / 1000;
+          el.querySelector("[data-wb-time]").textContent = sec >= 1 ? `(${Math.floor(sec)} s)` : "";
+          if (sec >= 3) el.querySelector("[data-wb-long]").classList.remove("hidden");
+        };
+        const timer = setInterval(tick, 250);
+        el.querySelector("[data-wb-cancel]").addEventListener("click", () => {
+          isCancelled = true;
+          el.querySelector("[data-wb-cancel]").disabled = true;
+          el.querySelector("[data-wb-text]").textContent = "Cancelling…";
+        });
+        return {
+          update(text, fraction) {
+            if (closed) return;
+            el.querySelector("[data-wb-text]").textContent = text;
+            if (Number.isFinite(fraction)) el.querySelector("[data-wb-fill]").style.width = `${Math.max(0, Math.min(1, fraction)) * 100}%`;
+            tick();
+          },
+          cancelled: () => isCancelled,
+          elapsedMs: () => performance.now() - t0,
+          close() { closed = true; clearInterval(timer); el.remove(); }
+        };
+      }
+      // Lets the browser paint (a banner just shown, a bar just moved) before the next block of work starts.
+      // requestAnimationFrame is paused in a background tab, so a timer backs it up.
+      function nextPaint() {
+        return new Promise((resolve) => {
+          let done = false;
+          const fin = () => { if (!done) { done = true; resolve(); } };
+          requestAnimationFrame(() => setTimeout(fin, 0));
+          setTimeout(fin, 60);
+        });
       }
 
       function showLongWaitDialog(minutesElapsed, requestLabel) {
@@ -23886,7 +23936,8 @@ ORDER BY ?table ?ordinal`;
           return matchedKeys;
         },
 
-        runMappingAnalysis({ initiatedBy = "user" } = {}) {
+        runMappingAnalysis({ initiatedBy = "user", probe = true } = {}) {
+          const _runT0 = performance.now();
           const context = this.buildRunContext(initiatedBy);
           const { analysis, queryText, planText, reasoningEnabled, activeVgs } = context;
           analysis.runId += 1;
@@ -23955,8 +24006,11 @@ ORDER BY ?table ?ordinal`;
             analysis.active = false;
           }
           AnalysisPresentation.renderMappingAnalysis();
+          // how long the check itself took, so a rewrite that would repeat it can tell whether that is affordable
+          analysis.lastRunMs = performance.now() - _runT0;
           scheduleAutomaticPlanAnalysis("auto-after-mapping-analysis");
-          if (analysis.active && state.connection.baseUrl && selectedDatabase()) {
+          // probe === false: the caller only moved text around (same meaning), so the server is not asked again
+          if (probe && analysis.active && state.connection.baseUrl && selectedDatabase()) {
             const toProbe = (analysis.findings || []).filter(
               (finding) => finding.canProbe && !finding.probeCleared && !finding.suppressed && !analysis.probesRunning[finding.id]
             );
@@ -25003,6 +25057,7 @@ ORDER BY ?table ?ordinal`;
       // Puts a rewritten query text into the editor as one undoable edit (Ctrl+Z restores `raw`),
       // keeps the caret where it was, and re-runs the analysis against the new line layout.
       // Shared by the ✨ Format and "Organize query by data source".
+      const REWRITE_RECHECK_LIMIT_MS = 3000; // a findings check slower than this is not repeated automatically after a rewrite
       function _applyQueryEditorRewrite(editor, raw, pretty, wasFocused, selA, selB) {
         // Replace only the span that changed, so the caret and scroll position stay where they were.
         let p = 0;
@@ -25058,7 +25113,36 @@ ORDER BY ?table ?ordinal`;
         // findings against the reformatted text (mirrors the stale-banner Re-run
         // button and refreshMappingAnalysisAfterPlanChange's pattern), so pill/finding
         // line positions are correct again before the user can even navigate to one.
-        if (analysis?.active && analysis.status !== "running") runMappingAnalysis({ initiatedBy: "query-reformatted" });
+        if (analysis?.active && analysis.status !== "running") {
+          // A rewrite that only moves text keeps the meaning, so the findings are recomputed for the new
+          // line layout WITHOUT sending the server a fresh round of probe queries (each is a live EXPLAIN
+          // against the connected server, all at once). When the last check was itself slow, it is not
+          // repeated automatically at all: the findings are marked out of date and Re-run is one click away.
+          const lastMs = Number(analysis.lastRunMs) || 0;
+          if (lastMs > REWRITE_RECHECK_LIMIT_MS) {
+            markMappingAnalysisStale();
+            showStatusToast(`The last findings check took ${(lastMs / 1000).toFixed(1)} s, so it was not repeated for the new layout. Use Re-run when you want fresh findings.`, "info", 9000);
+          } else {
+            refreshFindingsAfterTextMove("query-reformatted");
+          }
+        }
+      }
+
+      // Recomputes the findings for text that was only moved around, without asking the server again. A finding
+      // a probe had already ruled out stays ruled out (matched by kind and root cause), so it does not come back
+      // as a recommendation just because the layout changed.
+      function refreshFindingsAfterTextMove(initiatedBy) {
+        const analysis = state.ui.mappingAnalysis;
+        const cleared = new Map();
+        (analysis.findings || []).forEach((f) => { if (f.probeCleared && f.rootCauseKey) cleared.set(`${f.kind}|${f.rootCauseKey}`, f.probeClearedReason || ""); });
+        runMappingAnalysis({ initiatedBy, probe: false });
+        if (!cleared.size) return;
+        let carried = 0;
+        (analysis.findings || []).forEach((f) => {
+          const k = `${f.kind}|${f.rootCauseKey}`;
+          if (f.rootCauseKey && cleared.has(k) && !f.probeCleared) { f.probeCleared = true; f.probeClearedReason = cleared.get(k); carried++; }
+        });
+        if (carried) renderMappingAnalysis();
       }
 
       function updateQueryFormatSparkleVisibility() {
@@ -25630,26 +25714,54 @@ ORDER BY ?table ?ordinal`;
         return { sources, tables: sources.map((src, i) => tablesOf(qps[i], src)) };
       }
 
-      function organizeQueryByDataSource() {
+      let _orgRunning = false;
+      async function organizeQueryByDataSource() {
         const editor = document.querySelector('[data-artifact-editor="sparqlQuery"]');
         if (!editor) return;
         const raw = editor.value;
         const say = (msg, tone = "info", ms = 5200) => showStatusToast(msg, tone, ms);
         if (!raw.trim()) { say("Write or load a query first.", "info", 2800); return; }
+        if (_orgRunning) { say("Still organizing the query. Wait for it to finish, or Cancel it.", "info", 3200); return; }
         if (splitSparqlQueries(raw).filter((s) => s.kind === "query" || s.kind === "update").length > 1) {
           say("This works on one query at a time, and the panel holds several. Keep just the query to organize (the plan belongs to one query anyway).", "info", 6500);
           return;
         }
-        let qps = [];
-        try { qps = parseScopedQueryPatterns(raw); } catch (e) { qps = []; }
-        if (!qps.length) { say("The query has no triple patterns to organize.", "info", 3200); return; }
-        const built = _orgBuildSources(raw, qps);
-        if (built.error) { say(built.error, "info", 6500); return; }
-        const res = organizeSparqlBySource(raw, built.sources, qps, built.tables);
-        if (res.error) { say(res.error, "error", 8000); return; }
-        if (!res.changed) { say("Already organized by data source.", "info", 2800); return; }
-        _applyQueryEditorRewrite(editor, raw, res.text, false, 0, 0);
-        say(`Organized by ${res.sourceCount} data source${res.sourceCount === 1 ? "" : "s"}. Ctrl+Z puts the query back.`, "success", 4200);
+        // Each step is shown on a banner and followed by a paint, so the page never looks frozen, and Cancel
+        // between steps leaves the query exactly as it was. Step times go to the debug log.
+        _orgRunning = true;
+        const wb = showWorkBanner("Organizing the query by data source");
+        const marks = [["start", performance.now()]];
+        const mark = (n) => marks.push([n, performance.now()]);
+        const stopped = () => wb.cancelled();
+        try {
+          wb.update("Reading the query…", 0.05); await nextPaint(); if (stopped()) return;
+          let qps = [];
+          try { qps = parseScopedQueryPatterns(raw); } catch (e) { qps = []; }
+          mark("read");
+          if (!qps.length) { say("The query has no triple patterns to organize.", "info", 3200); return; }
+          wb.update("Finding which source answers each triple, from the loaded plan…", 0.25); await nextPaint(); if (stopped()) return;
+          const built = _orgBuildSources(raw, qps);
+          mark("sources");
+          if (built.error) { say(built.error, "info", 6500); return; }
+          wb.update("Grouping the triples by source…", 0.5); await nextPaint(); if (stopped()) return;
+          const res = organizeSparqlBySource(raw, built.sources, qps, built.tables);
+          mark("rewrite");
+          if (res.error) { say(res.error, "error", 8000); return; }
+          if (!res.changed) { say("Already organized by data source.", "info", 2800); return; }
+          if (editor.value !== raw) { say("The query was edited while it was being organized, so nothing was changed. Try again.", "info", 6000); return; }
+          wb.update("Putting the new query into the editor…", 0.75); await nextPaint(); if (stopped()) return;
+          _applyQueryEditorRewrite(editor, raw, res.text, false, 0, 0);
+          mark("applied");
+          say(`Organized by ${res.sourceCount} data source${res.sourceCount === 1 ? "" : "s"}. Ctrl+Z puts the query back.`, "success", 4200);
+        } catch (e) {
+          log("error", "Organize query by data source failed: " + (e && e.message || e));
+          say("Organizing the query stopped on an unexpected problem; the query was left as it is. The debug log has the details.", "error", 8000);
+        } finally {
+          const t = (a, b) => { const x = marks.find((m) => m[0] === a), y = marks.find((m) => m[0] === b); return x && y ? Math.round(y[1] - x[1]) + " ms" : "-"; };
+          log("debug", `Organize by source: read ${t("start", "read")}, sources ${t("read", "sources")}, rewrite ${t("sources", "rewrite")}, apply ${t("rewrite", "applied")}, total ${Math.round(wb.elapsedMs())} ms${wb.cancelled() ? " (cancelled)" : ""}`);
+          wb.close();
+          _orgRunning = false;
+        }
       }
       // ── End Organize query by data source ──────────────────────────────────────────
 
@@ -27224,7 +27336,7 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.51.1";
+      const APP_VERSION = "1.51.2";
       const RELEASE_NOTES = [
         { version: "1.51.0", date: "2026-11-07", title: "Taxonomies drawn as trees, same layout everywhere", items: [
           "{*Tree*} in the [[Ontology Visualization|aa-tool-ontology]] layout list draws subclasses below their superclasses. Each class stands one level below its deepest superclass, and each level sits deep enough that no line from a class to its subclass runs through another class.",
@@ -30094,8 +30206,8 @@ ORDER BY ?table ?ordinal`;
         }
       };
 
-      function runMappingAnalysis({ initiatedBy = "user" } = {}) {
-        return AnalysisPipeline.runMappingAnalysis({ initiatedBy });
+      function runMappingAnalysis({ initiatedBy = "user", probe = true } = {}) {
+        return AnalysisPipeline.runMappingAnalysis({ initiatedBy, probe });
       }
 
       function renderMappingAnalysis() {
@@ -66109,7 +66221,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           splitLines,            // count lines exactly as renderSyntaxOverlay does
           formatSparqlPretty,    // SPARQL query format (comments, SERVICE blocks)
           sparqlFormatScoped, sparqlEnterInsertion, sparqlCloseBraceInsertion, // scoped ✨ and typing indentation
-          organizeSparqlBySource, parseScopedQueryPatterns, _orgCanon, _orgBuildSources, _orgMapsTerm, // Organize query by data source (pure rewrite, its equivalence check, source lookup)
+          organizeSparqlBySource, parseScopedQueryPatterns, refreshFindingsAfterTextMove, _orgCanon, _orgBuildSources, _orgMapsTerm, // Organize query by data source (pure rewrite, its equivalence check, source lookup)
           rewriteWriteQueryAsSelect, rewriteSelectAsWriteQuery, writeRewriteKind, // INSERT ⇄ SELECT rewrite (pure text functions)
           _buildUsersRolesCsv, _buildRolesPermissionsCsv, // permissions CSV exports (pure builders)
           showProfileResultsInSparqlPanel, AA_TOOL_OPEN, FEATURE_DOCS, // profile results → SPARQL result panel; About app "open this tool" links
