@@ -12527,6 +12527,18 @@
             state.ui.collapsedPanes[key] = false; changed = true;
           }
         });
+        // Mappings the analysis folded away because none matched the query come back as soon as
+        // mappings that do apply are in the pane (new text, or blocks that match the query). A pane
+        // the user hid or opened by hand is left as they chose (state.ui._mappingsManuallyUncollapsed
+        // and the user-choice marks reset it).
+        const ma = state.ui.mappingAnalysis;
+        if (state.ui._mappingsAutoHidden && isPaneCollapsed("sms2Mappings") && !opened.sms2Mappings
+            && (state.ui.selectedArtifacts || []).includes("sms2Mappings") && !folded.sms2Mappings
+            && vgPaneHasContent("sms2Mappings") && !(ma && ma.active && ma.matchedBlockKeys && ma.matchedBlockKeys.size === 0 && ma.status === "done")) {
+          state.ui.collapsedPanes.sms2Mappings = false;
+          state.ui._mappingsAutoHidden = false;
+          changed = true;
+        }
         if (changed && apply) applyPaneVisibilitySurgical();
         return changed;
       }
@@ -27497,7 +27509,7 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.53.0";
+      const APP_VERSION = "1.53.1";
       const RELEASE_NOTES = [
         { version: "1.53.0", date: "2026-11-23", title: "Browse the server's query log", items: [
           "[[Query Log|aa-tool-querylog]] in the ☰ menu lists the queries the server has run: who ran each, on which database, when, how long it took and its status. Filter by time range, user, database, type, status, reasoning, text in the query and minimum duration.",
@@ -39533,12 +39545,15 @@ acme:temperature rdfs:range xsd:string .`
         if (fkTexts.length) {
           const fkCombined = fkTexts.join("\n\n");
           setArtifact("foreignKeySets", fkCombined, "foreign-key-sets.txt", false, fkTexts.every(isFkValueHidden) ? "foreign.key.sets is present but values are hidden by Stardog." : "Loaded foreign.key.sets for associated virtual graphs.");
-          if (fkTexts.every(isFkValueHidden)) state.ui.collapsedPanes["foreignKeySets"] = true;
+          // Readable key sets open the pane again if an earlier query left it folded for lack of any.
+          state.ui.collapsedPanes["foreignKeySets"] = fkTexts.every(isFkValueHidden);
         } else {
           state.ui.collapsedPanes["foreignKeySets"] = true;
         }
-        if (fdTexts.length) setArtifact("functionalDependencySets", fdTexts.join("\n\n"), "functional-dependency-sets.txt", false, "Loaded functional.dependency.sets for associated virtual graphs.");
-        else state.ui.collapsedPanes["functionalDependencySets"] = true;
+        if (fdTexts.length) {
+          setArtifact("functionalDependencySets", fdTexts.join("\n\n"), "functional-dependency-sets.txt", false, "Loaded functional.dependency.sets for associated virtual graphs.");
+          state.ui.collapsedPanes["functionalDependencySets"] = false;
+        } else state.ui.collapsedPanes["functionalDependencySets"] = true;
         const schemaName = $("reasoningSchemaSelect")?.value || "";
         const schemaGraph = schemaName
           ? resolveReasoningSchemaIri(schemaName)
