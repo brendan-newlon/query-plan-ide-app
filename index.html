@@ -5235,10 +5235,10 @@
         const el = document.createElement("div");
         el.className = "plan-wait-banner work-banner";
         el.setAttribute("role", "status");
-        el.innerHTML = `<div class="plan-wait-title"></div><div class="plan-wait-body"><span data-wb-text></span> <span data-wb-time></span><div class="work-bar"><div class="work-bar-fill" data-wb-fill></div></div><div data-wb-long class="work-long hidden">This is taking a while. Large queries and plans can need a minute. The page may pause briefly; nothing has been lost, and Cancel leaves the query as it was.</div></div><div class="plan-wait-actions"><button type="button" class="secondary" data-wb-cancel>Cancel</button></div>`;
+        el.innerHTML = `<div class="plan-wait-title"></div><div class="plan-wait-body"><span data-wb-text></span> <span data-wb-time></span><div class="work-bar"><div class="work-bar-fill" data-wb-fill></div></div><div data-wb-long class="work-long hidden">This is taking a while. Large queries and plans can need a minute. The page may pause briefly; nothing has been lost. Cancel stops what is left to do; if the query was already changed, Ctrl+Z puts it back.</div></div><div class="plan-wait-actions"><button type="button" class="secondary" data-wb-cancel>Cancel</button></div>`;
         el.querySelector(".plan-wait-title").textContent = title;
         document.body.appendChild(el);
-        let isCancelled = false, closed = false;
+        let isCancelled = false, closed = false, cancelHandler = null;
         const t0 = performance.now();
         const tick = () => {
           const sec = (performance.now() - t0) / 1000;
@@ -5250,10 +5250,12 @@
           isCancelled = true;
           el.querySelector("[data-wb-cancel]").disabled = true;
           el.querySelector("[data-wb-text]").textContent = "Cancelling…";
+          if (cancelHandler) cancelHandler();
         });
         return {
-          update(text, fraction) {
+          update(text, fraction, onCancel) {
             if (closed) return;
+            cancelHandler = onCancel || null;
             el.querySelector("[data-wb-text]").textContent = text;
             if (Number.isFinite(fraction)) el.querySelector("[data-wb-fill]").style.width = `${Math.max(0, Math.min(1, fraction)) * 100}%`;
             tick();
@@ -9287,11 +9289,11 @@
         ];
       }
 
-      async function fetchExplainPlanTextForQuery(query) {
+      async function fetchExplainPlanTextForQuery(query, abortSignal = null) {
         const variants = buildExplainRequestVariants(query);
         const attempts = [];
         for (const variant of variants) {
-          const response = await requestDetailed(variant.request);
+          const response = await requestDetailed(abortSignal ? { ...variant.request, abortSignal } : variant.request);
           attempts.push({
             name: variant.name,
             path: response.url,
@@ -25714,6 +25716,68 @@ ORDER BY ?table ?ordinal`;
         return { sources, tables: sources.map((src, i) => tablesOf(qps[i], src)) };
       }
 
+      // ── Is the plan the same after a rewrite that only moved text? ─────────────────────
+      // Plan text with what varies between runs taken out (row estimates, profile figures, timing lines, the
+      // numbering of generated variables), one entry per line.
+      function normalizePlanForCompare(text) {
+        const gen = new Map();
+        // The tree drawing in front of a line (+─, `─, │) is kept only as its width, the line's depth: which
+        // child comes last changes the drawing, not the plan.
+        return String(text || "").split(/\r\n|\r|\n/)
+          .map((l) => {
+            const depth = /^[ +`|│├└─]*/.exec(l)[0].length;
+            const body = l.slice(depth)
+              .replace(/\[#\d+(?:\.\d+)?[KMB]?\]/g, "")
+              .replace(/,?\s*results:.*$/i, "")
+              .replace(/\?_+[A-Za-z]*\d+\b/g, (v) => { if (!gen.has(v)) gen.set(v, "?_g" + gen.size); return gen.get(v); })
+              .replace(/\s+/g, " ").trim();
+            return body && !/^(Query (planned|executed)|Planning time|Execution time)\b/i.test(body) ? depth + ":" + body : "";
+          })
+          .filter(Boolean);
+      }
+      // { kind: "same" | "reordered" | "different", onlyBefore, onlyAfter, before, after, lines }
+      function comparePlanTexts(beforeText, afterText) {
+        const a = normalizePlanForCompare(beforeText), b = normalizePlanForCompare(afterText);
+        if (a.join("\n") === b.join("\n")) return { kind: "same", lines: a.length, onlyBefore: 0, onlyAfter: 0 };
+        const count = (arr) => { const m = new Map(); arr.forEach((l) => m.set(l, (m.get(l) || 0) + 1)); return m; };
+        const ca = count(a), cb = count(b);
+        const onlyBefore = [], onlyAfter = [];
+        ca.forEach((n, l) => { const d = n - (cb.get(l) || 0); for (let i = 0; i < d; i++) onlyBefore.push(l); });
+        cb.forEach((n, l) => { const d = n - (ca.get(l) || 0); for (let i = 0; i < d; i++) onlyAfter.push(l); });
+        const clip = (t) => { const x = t.replace(/^\d+:/, ""); return x.length > 150 ? x.slice(0, 150) + "…" : x; };
+        let first = 0;
+        while (first < a.length && first < b.length && a[first] === b[first]) first++;
+        return {
+          kind: onlyBefore.length || onlyAfter.length ? "different" : "reordered",
+          lines: Math.max(a.length, b.length),
+          onlyBefore: onlyBefore.length, onlyAfter: onlyAfter.length,
+          before: clip((onlyBefore[0] || a[first] || "")), after: clip((onlyAfter[0] || b[first] || ""))
+        };
+      }
+      // Asks the server for the plan of the query as it was and as it is now (EXPLAIN only, one request at a time;
+      // nothing is run) and compares them. Returns { kind: "same"|"reordered"|"different", ... } or
+      // { kind: "cancelled" } or { kind: "failed", message }. fetchPlan is a parameter so the checks can stand one in;
+      // knownBeforePlan is a plan already fetched for exactly beforeText, which saves one request.
+      async function planCheckAfterRewrite(beforeText, afterText, signal, fetchPlan = fetchExplainPlanTextForQuery, knownBeforePlan = null) {
+        try {
+          const before = knownBeforePlan || await fetchPlan(sparqlTextForServer(beforeText).trim(), signal);
+          if (signal && signal.aborted) return { kind: "cancelled" };
+          const after = await fetchPlan(sparqlTextForServer(afterText).trim(), signal);
+          if (signal && signal.aborted) return { kind: "cancelled" };
+          return comparePlanTexts(before, after);
+        } catch (e) {
+          if ((signal && signal.aborted) || (e && e.name === "AbortError")) return { kind: "cancelled" };
+          return { kind: "failed", message: String((e && e.message) || e) };
+        }
+      }
+      function planCheckMessage(r) {
+        if (r.kind === "same") return { tone: "success", ms: 6000, text: "The plan is the same as before the rewrite, so the query still runs the way it did." };
+        if (r.kind === "reordered") return { tone: "info", ms: 14000, text: "The plan has the same steps as before, but in a different order, so the query may run differently now. Ctrl+Z puts the query back." };
+        if (r.kind === "different") return { tone: "error", ms: 20000, text: `The plan changed after the rewrite: ${r.onlyBefore} step${r.onlyBefore === 1 ? "" : "s"} gone and ${r.onlyAfter} new. Before: "${r.before}". After: "${r.after}". The query may not run the way it did. Ctrl+Z puts it back.` };
+        if (r.kind === "failed") return { tone: "info", ms: 9000, text: "The plan could not be compared after the rewrite: " + r.message };
+        return null;
+      }
+
       let _orgRunning = false;
       async function organizeQueryByDataSource() {
         const editor = document.querySelector('[data-artifact-editor="sparqlQuery"]');
@@ -25752,13 +25816,31 @@ ORDER BY ?table ?ordinal`;
           wb.update("Putting the new query into the editor…", 0.75); await nextPaint(); if (stopped()) return;
           _applyQueryEditorRewrite(editor, raw, res.text, false, 0, 0);
           mark("applied");
-          say(`Organized by ${res.sourceCount} data source${res.sourceCount === 1 ? "" : "s"}. Ctrl+Z puts the query back.`, "success", 4200);
+          const organized = `Organized by ${res.sourceCount} data source${res.sourceCount === 1 ? "" : "s"}. Ctrl+Z puts the query back.`;
+          if (state.connection.baseUrl && selectedDatabase()) {
+            // The rewrite should not change the plan; ask the server (EXPLAIN only) and say so if it did.
+            say(organized + " Checking that the plan is unchanged…", "success", 6000);
+            const ctl = new AbortController();
+            wb.update("Checking that the server's plan is unchanged (this only asks for plans, nothing is run)…", 0.9, () => ctl.abort());
+            await nextPaint();
+            // the loaded plan stands in for the "before" request when it was fetched for exactly this query text
+            const info = state.ui.planSourceInfo, loaded = state.artifacts.queryPlan?.original || "";
+            const known = info && info.serverText === sparqlTextForServer(raw).trim() && info.reasoning === inferenceReasoningEnabled() && loaded.trim() && !/^Profiling results:/m.test(loaded) ? loaded : null;
+            const r = await planCheckAfterRewrite(raw, res.text, ctl.signal, undefined, known);
+            mark("plan");
+            const m = planCheckMessage(r);
+            if (m) say(m.text, m.tone, m.ms);
+            else say(organized + " The plan check was cancelled.", "info", 6000);
+            log("debug", `Organize by source: plan check ${r.kind}${known ? " (loaded plan used as the before plan)" : ""}${r.kind === "different" || r.kind === "reordered" ? ` (before ${r.onlyBefore}, after ${r.onlyAfter})` : ""}${r.message ? " " + r.message : ""}`);
+          } else {
+            say(organized + " The plan was not compared because no server is connected.", "success", 6500);
+          }
         } catch (e) {
           log("error", "Organize query by data source failed: " + (e && e.message || e));
           say("Organizing the query stopped on an unexpected problem; the query was left as it is. The debug log has the details.", "error", 8000);
         } finally {
           const t = (a, b) => { const x = marks.find((m) => m[0] === a), y = marks.find((m) => m[0] === b); return x && y ? Math.round(y[1] - x[1]) + " ms" : "-"; };
-          log("debug", `Organize by source: read ${t("start", "read")}, sources ${t("read", "sources")}, rewrite ${t("sources", "rewrite")}, apply ${t("rewrite", "applied")}, total ${Math.round(wb.elapsedMs())} ms${wb.cancelled() ? " (cancelled)" : ""}`);
+          log("debug", `Organize by source: read ${t("start", "read")}, sources ${t("read", "sources")}, rewrite ${t("sources", "rewrite")}, apply ${t("rewrite", "applied")}, plan check ${t("applied", "plan")}, total ${Math.round(wb.elapsedMs())} ms${wb.cancelled() ? " (cancelled)" : ""}`);
           wb.close();
           _orgRunning = false;
         }
@@ -27336,8 +27418,12 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.51.2";
+      const APP_VERSION = "1.52.0";
       const RELEASE_NOTES = [
+        { version: "1.52.0", date: "2026-11-23", title: "Check that a rewrite did not change the plan", items: [
+          "With a server connected, {*Organize query by data source*} asks the server for the query's plan before and after the rewrite and says whether it is the same, has the same steps in a different order, or has changed. It names a step that differs and offers Ctrl+Z. It asks for plans and runs nothing.",
+          "A banner shows each step of the rewrite with the seconds elapsed, and {*Cancel*} stops what is left to do."
+        ] },
         { version: "1.51.0", date: "2026-11-07", title: "Taxonomies drawn as trees, same layout everywhere", items: [
           "{*Tree*} in the [[Ontology Visualization|aa-tool-ontology]] layout list draws subclasses below their superclasses. Each class stands one level below its deepest superclass, and each level sits deep enough that no line from a class to its subclass runs through another class.",
           "When most links of a model are subclass links, {*Best Read*} also draws it as a tree and keeps the tree whenever it has no crossed link and no link through a class and is not much larger.",
@@ -27734,6 +27820,7 @@ ORDER BY ?table ?ordinal`;
           body: `<p>The &#9776; menu beside the query's search box holds <strong>Show original vars</strong>, which switches between the readable variable names the workbench gives autogenerated variables and the names as originally written. Show original vars is greyed out until the query has variables to rename. The &#10024; in the editor's corner formats the query. Comments in the query are kept when it is formatted; a comment in the middle of a statement, or inside a FILTER, stops formatting rather than risk moving it. The &#10024; shows while the pointer is over the query or the cursor is in it. With the cursor in a query it formats just that query, or only the selected text when some is selected; click away from the text first and it formats every query in the panel, tidying what it can read and leaving the rest alone. A query that is still unfinished is only re-indented. While you type, Enter keeps the layout (one tab deeper inside each pair of braces, one more for lines that continue a statement) and a closing <code>}</code> steps back out.</p>
             <p><strong>Organize query by data source</strong>, also in the &#9776; menu, rewrites the query so the triples answered by the same source sit together under a comment line naming it (<code># ── data source: virtual graph mix_erp ──</code>). Stored named graphs come first, then virtual graphs, then <code>SERVICE</code> calls, then any triple the plan cannot place. Which source answers a triple comes from the loaded query plan: a stored graph by the index scans that read the triple, a virtual graph by its <code>GRAPH</code> block or by the SQL that binds the triple's variables, a <code>SERVICE</code> call by its endpoint. A triple the plan cannot tell apart (two virtual graphs map the same data) is grouped under their names together. A sub-query keeps its own scope and is organized on its own level, inside its braces. Comments around the query and inside a <code>FILTER</code> stay where they are; a blank-node <code>[ ]</code> bracket stops the rewrite, and the message says on which line.</p>
             <p>Triples move only inside their own <code>{ }</code> group, and never across an <code>OPTIONAL</code>, <code>MINUS</code> or <code>BIND</code>, so each stretch between those is organized on its own. When one subject uses predicates from several sources (written with <code>;</code> or <code>,</code>), the subject is repeated in each group, and a trailing comment (<code># ↔ ?cust also appears in: virtual graph mix_erp</code>) on every triple whose subject or variable is also used in another group says where the join is. Inside a virtual graph the triples are grouped by the table of its SQL that binds their variables (<code># ── table: orders ──</code>, lighter than the heavy banner of the graph), and a triple that needs two tables carries a note naming both. <code>GRAPH</code> and <code>SERVICE</code> blocks join the group of their source, filters and other blocks follow the triples, and the rest of the query is laid out like Format query. Before it replaces the text it checks that the new query holds exactly the same triples and operators; if not, or if the query has a shape it cannot rewrite safely, it leaves the text alone and says why. One Ctrl+Z restores the original. Running it again on an organized query changes nothing.</p>
+            <p>With a server connected, after the rewrite the app asks the server for the query's plan as it was and as it is now (plans only, nothing is run) and says whether the plan is the same, has the same steps in another order, or has changed, naming a step that differs. A reorganized query should keep its plan, but the server may order equally cheap steps by their position in the query, so the check confirms it. Without a connection the plan is not compared. A banner shows each step with the seconds elapsed, and <strong>Cancel</strong> stops what is left to do.</p>
             <p>In the mappings pane, a &#10024; appears on a mapping's <code>TO {</code> and <code>WHERE {</code> lines when that section can be tidied: one subject per statement and one predicate per line under TO, one <code>BIND</code> per line under WHERE. It rewrites that section's text in place. The &#10024; on <code>FROM SQL {</code> is different: it only changes how the SQL is displayed, not the mapping text.</p>`
         },
         {
@@ -66221,7 +66308,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           splitLines,            // count lines exactly as renderSyntaxOverlay does
           formatSparqlPretty,    // SPARQL query format (comments, SERVICE blocks)
           sparqlFormatScoped, sparqlEnterInsertion, sparqlCloseBraceInsertion, // scoped ✨ and typing indentation
-          organizeSparqlBySource, parseScopedQueryPatterns, refreshFindingsAfterTextMove, _orgCanon, _orgBuildSources, _orgMapsTerm, // Organize query by data source (pure rewrite, its equivalence check, source lookup)
+          organizeSparqlBySource, parseScopedQueryPatterns, refreshFindingsAfterTextMove, normalizePlanForCompare, comparePlanTexts, planCheckAfterRewrite, planCheckMessage, _orgCanon, _orgBuildSources, _orgMapsTerm, // Organize query by data source (pure rewrite, its equivalence check, source lookup)
           rewriteWriteQueryAsSelect, rewriteSelectAsWriteQuery, writeRewriteKind, // INSERT ⇄ SELECT rewrite (pure text functions)
           _buildUsersRolesCsv, _buildRolesPermissionsCsv, // permissions CSV exports (pure builders)
           showProfileResultsInSparqlPanel, AA_TOOL_OPEN, FEATURE_DOCS, // profile results → SPARQL result panel; About app "open this tool" links
