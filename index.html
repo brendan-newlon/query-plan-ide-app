@@ -18635,7 +18635,7 @@ return OntologyLayouts;
         // pattern with `?x` as subject and the operator as predicate.
         let exprSkipDepth = (options.state && options.state.exprSkipDepth) || 0;
         lines.forEach((line, lineIdx) => {
-          const rawTokens = tokenizePatternBlock(line);
+          let rawTokens = tokenizePatternBlock(line);
           if (!rawTokens.length) return;
           if (exprSkipDepth > 0) {
             rawTokens.forEach((token) => {
@@ -18644,7 +18644,18 @@ return OntologyLayouts;
             });
             return;
           }
-          const firstToken = String(rawTokens[0] || "").toUpperCase();
+          let firstToken = String(rawTokens[0] || "").toUpperCase();
+          // A clause head and the start of the body can share a line (`SELECT * WHERE { ?s ?p ?o }`,
+          // `WHERE { ?x :p ?o .`). Skipping the whole line dropped every triple on it, so a query
+          // written compactly had no patterns at all. Read what follows the body's opening brace.
+          if (!subject && lineSkip.has(firstToken) && (firstToken === "SELECT" || firstToken === "WHERE" || firstToken === "ASK")) {
+            const bodyOpen = rawTokens.indexOf("{");
+            if (bodyOpen !== -1) {
+              rawTokens = rawTokens.slice(bodyOpen + 1);
+              if (!rawTokens.length) return;
+              firstToken = String(rawTokens[0] || "").toUpperCase();
+            }
+          }
           if (!subject && lineSkip.has(firstToken)) {
             let depth = 0;
             rawTokens.forEach((token) => {
@@ -30185,7 +30196,7 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.54.0";
+      const APP_VERSION = "1.54.1";
       const RELEASE_NOTES = [
         { version: "1.54.0", date: "2026-11-23", title: "Tidy Mycelium layout, classes with their attributes", items: [
           "{*Tidy Mycelium*} lays out the [[Ontology Visualization|aa-tool-ontology]] diagram by placing the closely linked core of the model first, in groups with room round each class that has many links, then setting the parts that hang off the core into the open space round it. It is the first choice in the layout list and the one a diagram opens with.",
