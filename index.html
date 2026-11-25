@@ -30279,7 +30279,7 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.55.0";
+      const APP_VERSION = "1.55.1";
       const RELEASE_NOTES = [
         { version: "1.55.0", date: "2026-11-25", title: "Several queries in one pane", items: [
           "When the query pane holds several queries, the {*Contexts*} list, the virtual graphs offered as relevant to the query, the findings and the [[Query → Source Map|aa-tool-qsm]] all follow the query your cursor is in, the one that would run.",
@@ -49337,6 +49337,20 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         return parts.length>0 && !parts.some(pt=>plan.planSqlNorm.includes(pt));
       }
       function _qsmFilterVal(scene,alias,col){ const f=(scene.filters||[]).find(x=>x.alias===alias&&x.col===col); return f?f.val:""; }
+      // Geometry of a join between two scan columns. Columns in different lanes: a straight line
+      // from the left one's right edge to the right one's left edge. Columns in the SAME lane
+      // (a self-join, or a union arm joined to its sibling): a short loop that leaves the left
+      // edge of both cards and bulges outward, so it never cuts diagonally across the cards.
+      // Returns { p1, p2, d } where d is an SVG path for the line.
+      function _qsmJoinGeom(Aa,Bb){
+        if(Math.abs(Aa.xl-Bb.xl)<1){
+          const top=Aa.y<=Bb.y?Aa:Bb, bot=top===Aa?Bb:Aa, bulge=Math.min(26, 12+Math.abs(Bb.y-Aa.y)*0.04);
+          const p1={x:top.xl,y:top.y}, p2={x:bot.xl,y:bot.y};
+          return { p1, p2, d:`M${p1.x},${p1.y} C ${p1.x-bulge},${p1.y} ${p2.x-bulge},${p2.y} ${p2.x},${p2.y}` };
+        }
+        const leftIsA=Aa.xr<=Bb.xl, p1=leftIsA?{x:Aa.xr,y:Aa.y}:{x:Bb.xr,y:Bb.y}, p2=leftIsA?{x:Bb.xl,y:Bb.y}:{x:Aa.xl,y:Aa.y};
+        return { p1, p2, d:`M${p1.x},${p1.y} L${p2.x},${p2.y}` };
+      }
       function _qsmIsSelfJoin(scene,j){ const a=scene.scanByAlias[j.a.alias], b=scene.scanByAlias[j.b.alias]; return a&&b&&j.a.alias!==j.b.alias&&a.table===b.table; }
       // unique-key sets per table from the uniqueKeySets artifact → { table: [[cols],[cols]] }
       function _qsmParseUks(){
@@ -49503,7 +49517,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         { const pd=_QSM._profileData; const po=_QSM.profOverlay;
           const maxRc=pd&&po.arrows?Math.max(1,...pd.blocks.map(b=>b.resultCount||0)):1;
           scene.joins.forEach(j=>{ const Aa=A[j.a.alias+"."+j.a.col], Bb=A[j.b.alias+"."+j.b.col]; if(!Aa||!Bb)return;
-            const self=_qsmIsSelfJoin(scene,j), leftIsA=Aa.xr<=Bb.xl, p1=leftIsA?{x:Aa.xr,y:Aa.y}:{x:Bb.xr,y:Bb.y}, p2=leftIsA?{x:Bb.xl,y:Bb.y}:{x:Aa.xl,y:Aa.y};
+            const self=_qsmIsSelfJoin(scene,j), geom=_qsmJoinGeom(Aa,Bb), p1=geom.p1, p2=geom.p2;
             const col=self?C.warn:"rgba(140,160,180,.6)";
             let jw=1;
             if(pd&&po.arrows){ const scA=scene.scanByAlias&&scene.scanByAlias[j.a.alias]; const scB=scene.scanByAlias&&scene.scanByAlias[j.b.alias];
@@ -49511,7 +49525,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
               const rcB=(pd.blocks.find(b=>b.vg===(scB&&scB.vg))||{}).resultCount||0;
               jw=Math.max(1,Math.min(4,1+3*(Math.max(rcA,rcB)/maxRc))); }
             s+=`<g ${_qsmFA('', null, [j.a.alias,j.b.alias])}>`;
-            s+=`<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${col}" stroke-width="${jw.toFixed(2)}" opacity="${self?0.85:0.55}" ${self?'stroke-dasharray="4 3"':''}/>`;
+            s+=`<path d="${geom.d}" fill="none" stroke="${col}" stroke-width="${jw.toFixed(2)}" opacity="${self?0.85:0.55}" ${self?'stroke-dasharray="4 3"':''}/>`;
             s+=`<circle cx="${p1.x}" cy="${p1.y}" r="2.4" fill="${col}"/><circle cx="${p2.x}" cy="${p2.y}" r="2.4" fill="${col}"/></g>`; }); }
         // ── SQL band (optional): the actual SQL the plan pushed to the source. Two labeled tiers —
         //    the FROM/JOIN clauses are PER SOURCE TABLE (each box column-aligned over the scan it
@@ -50298,14 +50312,14 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         { const pd=_QSM._profileData; const po=_QSM.profOverlay;
           const maxRc=pd&&po.arrows?Math.max(1,...pd.blocks.map(b=>b.resultCount||0)):1;
           (plan.joins||[]).forEach(j=>{ const Aa=A[j.a.alias+"."+j.a.col], Bb=A[j.b.alias+"."+j.b.col]; if(!Aa||!Bb)return;
-            const self=_qsmIsSelfJoin(plan,j), leftIsA=Aa.xr<=Bb.xl, p1=leftIsA?{x:Aa.xr,y:Aa.y}:{x:Bb.xr,y:Bb.y}, p2=leftIsA?{x:Bb.xl,y:Bb.y}:{x:Aa.xl,y:Aa.y};
+            const self=_qsmIsSelfJoin(plan,j), geom=_qsmJoinGeom(Aa,Bb);
             const jc=self?C.warn:"rgba(140,160,180,.5)";
             let jw=1;
             if(pd&&po.arrows){ const scA=plan.scanByAlias&&plan.scanByAlias[j.a.alias]; const scB=plan.scanByAlias&&plan.scanByAlias[j.b.alias];
               const rcA=(pd.blocks.find(b=>b.vg===(scA&&scA.vg))||{}).resultCount||0;
               const rcB=(pd.blocks.find(b=>b.vg===(scB&&scB.vg))||{}).resultCount||0;
               jw=Math.max(1,Math.min(4,1+3*(Math.max(rcA,rcB)/maxRc))); }
-            s+=`<line x1="${p1.x}" y1="${p1.y}" x2="${p2.x}" y2="${p2.y}" stroke="${jc}" stroke-width="${jw.toFixed(2)}" opacity="${self?.8:.5}" ${self?'stroke-dasharray="4 3"':''}/>`; }); }
+            s+=`<path d="${geom.d}" fill="none" stroke="${jc}" stroke-width="${jw.toFixed(2)}" opacity="${self?.8:.5}" ${self?'stroke-dasharray="4 3"':''}/>`; }); }
         const bandW=Math.max(LANE_W, laneX(lanes.length-1)+LANE_W-PAD);
         const sqlMc=Math.floor((bandW-16)/charW);
         let bottom=maxBottom, bandTop=maxBottom;
