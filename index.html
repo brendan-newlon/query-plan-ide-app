@@ -680,6 +680,8 @@
        Same visual language as VS Code / GitHub editors. */
     .code-editor-gutter-row.sq-g-active { background-color:rgba(55,198,163,0.10); color:rgba(223,232,248,0.85); }
     .code-editor-gutter-row.sq-g-active::before { content:""; position:absolute; left:0; top:0; bottom:0; width:2px; background:var(--accent); pointer-events:none; }
+    .code-editor-gutter-row.sq-g-arts { box-shadow:inset -2px 0 0 rgba(159,180,214,0.55); }
+    .code-editor-gutter-row.sq-g-arts.sq-g-start { box-shadow:inset -2px 0 0 rgba(159,180,214,0.55), inset 0 1px 0 rgba(153,167,188,0.35); }
     .code-editor-gutter-row.sq-g-start { border-top:0; box-shadow:inset 0 1px 0 rgba(153,167,188,0.35); }
     .code-editor-gutter-row.se-g-add::after, .code-editor-gutter-row.se-g-mod::after, .code-editor-gutter-row.se-g-del::after,
     .code-editor-gutter-row.se-g-del-top::after { content:""; position:absolute; top:0; bottom:0; right:-6px; width:5px; pointer-events:none; background-repeat:no-repeat; }
@@ -3730,6 +3732,7 @@
                   <button id="executeSparqlQueryBtn" class="secondary icon-btn" title="Execute Query — run the SPARQL query as shown and preview the results" aria-label="Execute Query"><svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" stroke-linecap="round"><path d="M3.2 2.2v7.6L9.6 6 3.2 2.2z"/></svg></button>
                   <button type="button" class="secondary icon-btn se-save-btn hidden" data-se-save="sparqlQuery" aria-label="Save to Stardog"></button>
                   <span id="inferenceRulesBadge" class="inference-rules-badge hidden"></span>
+                  <span id="artifactsQueryLabel" class="plan-target-label hidden"></span>
                   <span id="mappingCostDriversHost" class="pill-strip-host"></span>
                 </div>
                 <div class="pane-search-cluster">
@@ -9192,8 +9195,8 @@ return OntologyLayouts;
       }
 
       function availableContextOptions() {
-        const special = ["tag:stardog:api:context:all", "tag:stardog:api:context:default", "tag:stardog:api:context:named", "tag:stardog:api:context:virtual"];
-        const query = state.artifacts.sparqlQuery.working || "";
+        const special = ["tag:stardog:api:context:all", "tag:stardog:api:context:local", "tag:stardog:api:context:default", "tag:stardog:api:context:named", "tag:stardog:api:context:virtual"];
+        const query = paneQueryTextForScope();
         const graphs = Array.from(query.matchAll(/FROM(?:\s+NAMED)?\s+<([^>]+)>/gi)).map((match) => match[1]);
         const currentDb = selectedDatabase();
         const virtualGraphs = (state.ui.virtualGraphInventory || [])
@@ -9250,7 +9253,7 @@ return OntologyLayouts;
         clearTimeout(_contextSyncTimer);
         _contextSyncTimer = setTimeout(() => {
           const editor = document.querySelector('[data-artifact-editor="sparqlQuery"]');
-          const queryText = (editor instanceof HTMLTextAreaElement ? editor.value : null) ?? state.artifacts.sparqlQuery?.working ?? "";
+          const queryText = paneQueryTextForScope();
           syncContextsWithQuery(queryText);
           const lockedIriSet = new Set((state.ui.fromLockedContexts || []).map((f) => f.iri));
           const realSelected = (state.ui.selectedContexts || []).filter((c) => c !== "(Pasted SMS)");
@@ -9977,8 +9980,57 @@ return OntologyLayouts;
           .filter(Boolean)));
       }
 
+      // The text everything that reads "the query" should see. A pane holding several queries runs the
+      // one holding the cursor, so the others are blanked here (spaces; line breaks and the shared
+      // PREFIX/BASE lines kept, so line numbers and prefixes stay the same). One query, or a selection
+      // that spans two: the text unchanged.
+      function queryTextForActiveScope(fullText) {
+        const text = String(fullText ?? "");
+        let a;
+        try { a = activeSparqlSegment(text); } catch (e) { return text; }
+        if (!a.multi || !a.seg) return text;
+        let out = "", pos = 0;
+        a.segs.forEach((sg) => {
+          if (sg === a.seg) return;
+          out += text.slice(pos, sg.start);
+          out += text.slice(sg.start, sg.end).split("\n").map((l) => (/^\s*(?:PREFIX|BASE)\b/i.test(l) ? l : l.replace(/[^\r]/g, " "))).join("\n");
+          pos = sg.end;
+        });
+        return out + text.slice(pos);
+      }
+      function paneQueryTextForScope() {
+        const ed = document.querySelector('[data-artifact-editor="sparqlQuery"]');
+        return queryTextForActiveScope((ed instanceof HTMLTextAreaElement ? ed.value : null) ?? state.artifacts.sparqlQuery?.working ?? "");
+      }
+      // Remembers which query the loaded mappings, keys and findings were gathered for.
+      function noteArtifactsQuery() {
+        try {
+          const a = activeSparqlSegment();
+          state.ui.artifactsQuery = a.multi && a.seg ? { key: _sqCollapsed(a.text.slice(a.seg.start, a.seg.end)) } : null;
+        } catch (e) { state.ui.artifactsQuery = null; }
+        updateArtifactsQueryLabel();
+      }
+      function updateArtifactsQueryLabel() {
+        const el = $("artifactsQueryLabel");
+        const rows = paneGutterLineRows("sparqlQuery");
+        let a = null; try { a = activeSparqlSegment(); } catch (e) { a = null; }
+        const info = state.ui.artifactsQuery;
+        const own = a && a.multi && info ? a.segs.find((sg) => _sqCollapsed(a.text.slice(sg.start, sg.end)) === info.key) : null;
+        rows.forEach(({ row, line }) => row.classList.toggle("sq-g-arts", Boolean(own && line >= own.startLine && line <= own.endLine)));
+        if (!el) return;
+        let text = "", title = "", other = false;
+        if (a && a.multi && info) {
+          if (!own) { text = "artifacts: query edited ↻"; other = true; title = "The mappings, keys and findings shown were loaded for a version of a query that is no longer in the pane. Click ↻ to load them for the query holding the cursor."; }
+          else if (a.seg && a.seg !== own) { text = `artifacts: line ${own.formLine + 1} · cursor elsewhere ↻`; other = true; title = `The mappings, keys and findings shown belong to the query starting at line ${own.formLine + 1} (marked at the right edge of the line numbers). The cursor is in the query starting at line ${a.seg.formLine + 1}; click ↻ to load them for that one.`; }
+          else { text = `artifacts: line ${own.formLine + 1}`; title = `The mappings, keys and findings shown belong to the query starting at line ${own.formLine + 1}.`; }
+        }
+        el.textContent = text; el.title = title;
+        el.classList.toggle("is-other", other);
+        el.classList.toggle("hidden", !text);
+      }
+
       function effectiveQueryText() {
-        return injectSelectedContextsIntoQuery(state.artifacts.sparqlQuery?.working || "");
+        return injectSelectedContextsIntoQuery(paneQueryTextForScope());
       }
 
       function scopedVirtualGraphsFromPlan() {
@@ -9990,7 +10042,21 @@ return OntologyLayouts;
         return Array.from(new Set(relevant.length ? relevant : [...queryVgs, ...planVgs]));
       }
 
+      // The plan-derived "relevant" lists describe the query the plan was fetched for. When the cursor
+      // is in another query of the pane, that query's own virtual graphs are the relevant ones.
+      function relevantVgsForOtherActiveQuery() {
+        try {
+          const a = activeSparqlSegment();
+          const src = state.ui.planSourceInfo;
+          if (!a.multi || !a.seg || !src) return null;
+          if (_sqCollapsed(src.serverText) === _sqCollapsed(sparqlSegmentServerText(a.text, a.segs, a.seg))) return null;
+          return Array.from(new Set(extractVirtualGraphsFromText(effectiveQueryText()).map(normalizeVirtualGraphName).filter(Boolean)));
+        } catch (e) { return null; }
+      }
+
       function effectiveRelevantMappingVgs() {
+        const other = relevantVgsForOtherActiveQuery();
+        if (other) return other;
         const cached = Array.from(new Set((state.ui.virtualContextRelevantVgs || []).map(normalizeVirtualGraphName).filter(Boolean)));
         if (cached.length) return cached;
         return Array.from(new Set((state.ui.relevantMappingVgs || []).map(normalizeVirtualGraphName).filter(Boolean)));
@@ -10860,8 +10926,7 @@ return OntologyLayouts;
         const buttonLabel = $("queryContextsBtnLabel");
         if (!menu) return;
         // Sync locked contexts from the live query before rendering
-        const _qEd = document.querySelector('[data-artifact-editor="sparqlQuery"]');
-        const _qt = (_qEd instanceof HTMLTextAreaElement ? _qEd.value : null) ?? state.artifacts.sparqlQuery?.working ?? "";
+        const _qt = paneQueryTextForScope();
         syncContextsWithQuery(_qt);
         const filter = (state.ui.contextFilter || "").trim().toLowerCase();
         const lockedByFrom = state.ui.fromLockedContexts || [];
@@ -10877,23 +10942,34 @@ return OntologyLayouts;
         const extraImplicit = implicitDefault && !contexts.includes(DEFAULT_CTX) ? [DEFAULT_CTX] : [];
         const allContexts = [...new Set([...extraImplicit, ...extraLocked, ...contexts])];
         const filtered = allContexts.filter((item) => !filter || item.toLowerCase().includes(filter));
+        // context:local is the default graph plus every named graph; context:named is the named graphs
+        // only (the default graph is not part of it). Choosing local covers those two, so they show as
+        // included; choosing named covers nothing else.
+        const LOCAL_CTX = "tag:stardog:api:context:local";
+        const localOn = lockedIriSet.has(LOCAL_CTX) || realSelected.includes(LOCAL_CTX);
+        const coveredByLocal = (item) => localOn && (item === DEFAULT_CTX || item === "tag:stardog:api:context:named");
         menu.innerHTML = `
           <input id="queryContextsFilter" class="dropdown-search" type="text" placeholder="Filter contexts" value="${esc(state.ui.contextFilter || "")}">
           ${filtered.map((item) => {
             const isFromLocked = lockedIriSet.has(item);
             const isImplicitDefault = implicitDefault && item === DEFAULT_CTX;
-            const isLocked = isFromLocked || isImplicitDefault;
+            const isCovered = !isFromLocked && !isImplicitDefault && coveredByLocal(item);
+            const isLocked = isFromLocked || isImplicitDefault || isCovered;
             const isChecked = isLocked || state.ui.selectedContexts.includes(item);
             const lineNum = lockedLineMap[item];
             const tooltip = isFromLocked
               ? `title="FROM on line ${lineNum} — comment it out to disable this context"`
               : isImplicitDefault
               ? `title="Stardog evaluates this query against the default context when no FROM clauses or other contexts are specified"`
+              : isCovered
+              ? `title="Included in context:local (the default graph plus all named graphs)"`
               : "";
             const hint = isFromLocked
               ? `<span class="context-from-locked-hint">(line ${lineNum})</span>`
               : isImplicitDefault
               ? `<span class="context-from-locked-hint">(implicit)</span>`
+              : isCovered
+              ? `<span class="context-from-locked-hint">(in local)</span>`
               : "";
             return `<label class="dropdown-item${isLocked ? " context-from-locked" : ""}" ${tooltip}>
               <input type="checkbox" data-context-choice="${esc(item)}" ${isChecked ? "checked" : ""} ${isLocked ? "disabled" : ""}>
@@ -12065,7 +12141,8 @@ return OntologyLayouts;
       }
 
       async function syncRelevantVirtualGraphsFromVirtualContextExplain() {
-        const query = state.artifacts.sparqlQuery?.working || "";
+        let query = state.artifacts.sparqlQuery?.working || "";
+        try { query = sparqlTextForServer(query); } catch (e) { /* a selection spanning two queries: use the whole pane */ }
         if (!query.trim() || !selectedDatabase()) return;
         const contexts = Array.from(new Set([
           ...(state.ui.selectedContexts || []).map((item) => String(item || "").trim()).filter(Boolean),
@@ -18669,8 +18746,13 @@ return OntologyLayouts;
           const tokens = (!subject && wrapperSkip.has(firstToken))
             ? (openBraceIndex === -1 ? [] : rawTokens.slice(openBraceIndex + 1))
             : rawTokens;
+          // A sub-select opened on this line (`{ SELECT ?x WHERE { ?x :p ?o } }`): its projection is not
+          // a triple, so skip to the brace that opens its body.
+          let inProjection = false;
           tokens.forEach((token) => {
             const upper = String(token || "").toUpperCase();
+            if (inProjection) { if (token === "{") inProjection = false; return; }
+            if (!subject && lineSkip.size && (upper === "SELECT" || upper === "ASK")) { inProjection = true; return; }
             if (!subject && wrapperSkip.has(upper)) return;
             if (!token || token === "{" || token === "}" || token === "(" || token === ")") return;
             if (token === ".") {
@@ -25265,7 +25347,7 @@ ORDER BY ?table ?ordinal`;
       function detectInvalidFromContexts(queryText) {
         const SPECIAL = new Set([
           "tag:stardog:api:context:all", "tag:stardog:api:context:default",
-          "tag:stardog:api:context:named", "tag:stardog:api:context:virtual",
+          "tag:stardog:api:context:named", "tag:stardog:api:context:virtual", "tag:stardog:api:context:local",
           "stardog:context:all", "stardog:context:default",
         ]);
         const currentDb = selectedDatabase();
@@ -28874,7 +28956,8 @@ ORDER BY ?table ?ordinal`;
         state.ui.dismissedRulesAnnotations = false;
         state.ui.hiddenRulesAnnotations = false;
         renderMappingAnalysisControls();
-        const queryText = state.artifacts.sparqlQuery?.working || "";
+        const queryText = queryTextForActiveScope(state.artifacts.sparqlQuery?.working || "");
+        noteArtifactsQuery();
         const planText = state.artifacts.queryPlan?.working || "";
         const reasoningEnabled = inferenceReasoningEnabled();
         const activeVgs = Object.keys(state.ui.mappingTextsByVg || {});
@@ -30196,8 +30279,14 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.54.1";
+      const APP_VERSION = "1.55.0";
       const RELEASE_NOTES = [
+        { version: "1.55.0", date: "2026-11-25", title: "Several queries in one pane", items: [
+          "When the query pane holds several queries, the {*Contexts*} list, the virtual graphs offered as relevant to the query, the findings and the [[Query → Source Map|aa-tool-qsm]] all follow the query your cursor is in, the one that would run.",
+          "A tag beside {*SPARQL Query*} and a mark at the right edge of the line numbers show which query the loaded mappings, keys and findings belong to, and say when the cursor is in another one. The ↻ button loads them for the query the cursor is in.",
+          "{*Contexts*} lists {{tag:stardog:api:context:local}}, the default graph plus every named graph. Choosing it shows those two as included; {{tag:stardog:api:context:named}} covers the named graphs only.",
+          "An endpoint typed without {{https://}} still connects: {*Connect*} tries it once with {{https://}} in front, says it was added and corrects the endpoint field. If that fails too, the endpoint stays as typed."
+        ] },
         { version: "1.54.0", date: "2026-11-23", title: "Tidy Mycelium layout, classes with their attributes", items: [
           "{*Tidy Mycelium*} lays out the [[Ontology Visualization|aa-tool-ontology]] diagram by placing the closely linked core of the model first, in groups with room round each class that has many links, then setting the parts that hang off the core into the open space round it. It is the first choice in the layout list and the one a diagram opens with.",
           "Each link in the diagram bends round the classes in its way, a link and its reverse are drawn side by side, and where many links meet one class their ends spread along its edge. Drag a class and its links are drawn round the other classes again when you let go.",
@@ -33987,7 +34076,7 @@ ORDER BY ?table ?ordinal`;
       }
 
       function buildProvenance() {
-        const queryPatterns = extractQueryPatterns(state.artifacts.sparqlQuery.working);
+        const queryPatterns = extractQueryPatterns(queryTextForActiveScope(state.artifacts.sparqlQuery.working));
         const mappingBlocks = extractMappingBlocks(state.artifacts.sms2Mappings.working);
         const ruleClauses = extractRuleClauses(state.artifacts.inferenceRules.working);
         const planNodes = extractPlanNodes(state.artifacts.queryPlan.working);
@@ -42166,6 +42255,7 @@ acme:temperature rdfs:range xsd:string .`
         // one inside SERVICE <db://other> that belongs to the other database (its mappings and
         // data source are read through the same admin API). Only FROM used to count, so a query
         // naming its virtual graphs with GRAPH loaded no mappings or key sets at all.
+        noteArtifactsQuery();
         const virtualGraphs = associatedVirtualGraphsForQuery(effectiveQueryText()).map((name) => "virtual://" + name);
         const mappingTexts = [];
         const mappingTextsByVg = {};
@@ -42342,7 +42432,22 @@ acme:temperature rdfs:range xsd:string .`
           }
           state.ui.connectionRetryReady = false;
           updateConnectionUi();
-          const databases = await fetchAvailableDatabases(true);
+          // An endpoint typed without its scheme ("myhost.example.com:5820") cannot connect as written.
+          // Try it once with https:// in front; on success the panel's endpoint is corrected, on failure
+          // the first attempt's error is reported as usual and the typed endpoint is left alone.
+          let databases, addedHttps = false;
+          try { databases = await fetchAvailableDatabases(true); }
+          catch (firstError) {
+            const typed = state.connection.baseUrl || "";
+            if (!typed || /^[a-z][a-z0-9+.-]*:\/\//i.test(typed) || state.ui.activeConnectionProfile) throw firstError;
+            // Every request re-reads the endpoint field, so the field itself carries the retry.
+            const field = $("baseUrlInput"), typedField = field ? field.value : "";
+            const withScheme = "https://" + typed.replace(/^\/+/, "");
+            if (field) field.value = withScheme;
+            state.connection.baseUrl = withScheme;
+            try { databases = await fetchAvailableDatabases(true); addedHttps = true; }
+            catch (_) { if (field) field.value = typedField; state.connection.baseUrl = typed; throw firstError; }
+          }
           state.connection.isConnected = true;
           // A new connection means a new admin identity — the effective-permissions
           // user/role list and any loaded results belong to whatever was connected
@@ -42360,7 +42465,7 @@ acme:temperature rdfs:range xsd:string .`
           log("connection", "Connection test succeeded.", { databaseCount: databases.length, storedQueryCount: storedQueries, partialFailures: rejected.length });
           state.ui.connecting = false;
           updateConnectionUi();
-          showStatusToast(message, tone, 3600);
+          showStatusToast(addedHttps ? `https:// was added to the endpoint. ${message}` : message, tone, addedHttps ? 5200 : 3600);
           $("connection").classList.add("hidden");
         } catch (error) {
           state.ui.connecting = false;
@@ -46636,6 +46741,10 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         const runBtn = $("executeSparqlQueryBtn");
         if (runBtn && !runBtn.classList.contains("warning")) _setSparqlExecBtnRunning(false);
         updatePlanTargetLabel();
+        updateArtifactsQueryLabel();
+        // The contexts shown follow the query holding the cursor.
+        const segKey = a.multi && a.seg ? a.seg.start + ":" + a.seg.end : "";
+        if (segKey !== state.ui.lastCtxSegKey) { state.ui.lastCtxSegKey = segKey; scheduleContextSync(); }
       }
 
       // "for line N" next to the plan title when the pane holds several queries, plus a stale
@@ -48543,7 +48652,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
 
       // ---- data adapter: live analysis state → scene model ----
       function _qsmBuildScene(){
-        const queryText = (document.querySelector('[data-artifact-editor="sparqlQuery"]')?.value) || state.artifacts?.sparqlQuery?.working || "";
+        const queryText = queryTextForActiveScope((document.querySelector('[data-artifact-editor="sparqlQuery"]')?.value) || state.artifacts?.sparqlQuery?.working || "");
         const ma = state.ui.mappingAnalysis || {};
         // blocks: prefer analysis cache, else parse the live mappings editor.
         // NOTE: parseAllRichMappingBlocks() reads state (connection-populated mappingTextsByVg /
@@ -48589,7 +48698,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         // group query triples by subject var (main + optional; skip non-var subjects)
         const order=[]; const byVar={};
         patterns.forEach(t=>{
-          if (!t.subject || t.subject.kind!=="var") return;
+          if (!t.subject || !t.subject.raw) return;   // a constant IRI or a blank node can be the subject too
           const id=t.subject.raw;
           if(!byVar[id]){ byVar[id]={ id, triples:[], optional:false }; order.push(id); }
           byVar[id].triples.push(t);
@@ -49493,7 +49602,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         (plan.rels||[]).forEach(r=>{ if(r.inference) r.inference._bridges=null; });
         const subs=(base.subjects||[]).slice();                  // query order
         // patterns grouped by subject (COMPLETE — no 5-triple cap)
-        const patsBySub={}; (base._patterns||[]).forEach(p=>{ if(p.subject&&p.subject.kind==="var"){ (patsBySub[p.subject.raw]=patsBySub[p.subject.raw]||[]).push(p); } });
+        const patsBySub={}; (base._patterns||[]).forEach(p=>{ if(p.subject&&p.subject.raw){ (patsBySub[p.subject.raw]=patsBySub[p.subject.raw]||[]).push(p); } });
         const lanes=subs.map(su=>{
           const owned=new Set(); const colPred={};               // colName -> predicate localName
           // ownership = EVERY mapping block matched by any of this subject's triples (so UNION arms
@@ -50830,7 +50939,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         // fallback when the layered view fails.
         let nscene=null;
         try { const planText=(typeof displayedPlanText==="function" ? displayedPlanText() : "")||(document.querySelector('[data-artifact-editor="queryPlan"]')?.value)||"";
-              nscene=_qsmBuildNativeScene(planText, state.artifacts.sparqlQuery?.working||""); } catch(e){ log("debug","[QSM] stored-data scene: "+e.message); nscene=null; }
+              nscene=_qsmBuildNativeScene(planText, queryTextForActiveScope(state.artifacts.sparqlQuery?.working||"")); } catch(e){ log("debug","[QSM] stored-data scene: "+e.message); nscene=null; }
         _QSM._nativeExtra = nscene && (nscene.scans.length || (nscene.vgScans||[]).length) ? nscene : null;
         const storedFallback=()=>{
           if(!nscene || !nscene.scans.length) return false;
@@ -50840,7 +50949,14 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
           try { _qsmRenderNative(); _qsmFit(); _qsmRenderProfBar(); return true; } catch(e){ log("debug","[QSM] stored-data render: "+e.message); _QSM.nativeMode=false; _qsmNativeToolbar(false); return false; }
         };
         let scene; try { scene=_qsmBuildScene(); } catch(e){ log("debug","[QSM] build error: "+e.message); scene=null; }
-        if(!scene || !scene.subjects.length){ if(storedFallback()) return; if(empty) empty.style.display="flex"; svg.innerHTML=""; return; }
+        if(!scene || !scene.subjects.length){ if(storedFallback()) return;
+          // Say what is missing: with a query in the pane, "load a query" would be wrong.
+          if(empty){ const msg=empty.querySelector("span"), hasQuery=Boolean(paneQueryTextForScope().trim());
+            if(msg){ if(!msg.dataset.initial) msg.dataset.initial=msg.textContent;
+              msg.textContent=hasQuery ? "No triple patterns could be read from the query in the pane, so there is nothing to map. If the query has one, the debug log says why." : msg.dataset.initial; }
+            empty.style.display="flex"; }
+          if(scene===null || (scene&&!scene.subjects.length)) log("debug","[QSM] empty map: scene "+(scene?"has no subjects":"could not be built")+"; patterns "+(scene&&scene._patterns?scene._patterns.length:"n/a"));
+          svg.innerHTML=""; return; }
         if(empty) empty.style.display="none";
         _qsmSetupInteractions();
         // Prefer the plan-driven (scan-centric) view when a query plan is loaded — it shows the
@@ -63830,7 +63946,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       function _traceNativeScene(ctx) {
         if (ctx._nativeScene !== undefined) return ctx._nativeScene;
         let sc = null;
-        try { sc = _qsmBuildNativeScene(displayedPlanText(), state.artifacts.sparqlQuery?.working || ""); } catch (e) { sc = null; }
+        try { sc = _qsmBuildNativeScene(displayedPlanText(), queryTextForActiveScope(state.artifacts.sparqlQuery?.working || "")); } catch (e) { sc = null; }
         ctx._nativeScene = sc;
         return sc;
       }
@@ -66362,6 +66478,10 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
             state.ui.selectedContexts = Array.from(document.querySelectorAll("[data-context-choice]:checked"))
               .filter((input) => !input.disabled)
               .map((input) => input.getAttribute("data-context-choice"));
+            // The implicit default and what local covers depend on the selection: draw the list again.
+            { const m = $("queryContextsMenu"), top = m ? m.scrollTop : 0;
+              renderContextMenu(Array.from(new Set([...availableContextOptions(), ...state.ui.selectedContexts])));
+              if (m) m.scrollTop = top; }
             updateHoverCopyButtons();
             maybeRetestFromControls();
           }
@@ -66424,7 +66544,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
             const menuScrollTop = $("mappingVgMenu")?.scrollTop ?? 0;
             const filterText = state.ui.selectorFilters.mappingVgMenu || "";
             if (target.checked) {
-              state.ui.selectedMappingVgs = Array.from(new Set((state.ui.relevantMappingVgs || []).map(normalizeVirtualGraphName).filter(Boolean)));
+              state.ui.selectedMappingVgs = relevantVgsForOtherActiveQuery() || Array.from(new Set((state.ui.relevantMappingVgs || []).map(normalizeVirtualGraphName).filter(Boolean)));
               $("mappingVgSelect").value = mappingSelectionLabel();
               guardMappingMenuClose();
               state.ui.mappingMenuPinnedOpen = true;
@@ -68495,7 +68615,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           goToTourStep, tourGoto, tourKeepPanelLeftOfBubble, tourSamplePermissionResponder, endTour, // tour step placement and sample permissions
           detectDisconnectedPatterns, // GRAPH ?g alone is not a disconnected variable
           detectUnboundSelectVars, detectInvalidDatatypeOperations, // computed SELECT columns: inputs must be bound and numeric
-          attributePlanElement, refetchPlanForRefresh, testConnection, updateConnectionUi, detectPushdownMisses, parseOntologyForGraph, _qsmParsePlan, _qsmBuildNativeScene, buildQuerySourceMap, snapshotPlanKind, buildSnapshotEntries, qfKeepCaretOutOfFolds, qfWordAt, qfDrawCaret, qfRemapFolds, setGutterShrinkHoldMs: (ms) => { GUTTER_SHRINK_HOLD_MS = ms; }, _qsmRenderNative, _qsmServiceInfo, _qsmDataSourceFor, associatedVirtualGraphsForQuery, planReadsVgWithoutSql, // Why? on stored-data plans, refresh refetches, connect feedback, mixed-source map
+          attributePlanElement, queryTextForActiveScope, noteArtifactsQuery, updateArtifactsQueryLabel, relevantVgsForOtherActiveQuery, effectiveRelevantMappingVgs, renderContextMenu, availableContextOptions, extractActiveFromStatements, refetchPlanForRefresh, testConnection, updateConnectionUi, detectPushdownMisses, parseOntologyForGraph, _qsmParsePlan, _qsmBuildNativeScene, buildQuerySourceMap, snapshotPlanKind, buildSnapshotEntries, qfKeepCaretOutOfFolds, qfWordAt, qfDrawCaret, qfRemapFolds, setGutterShrinkHoldMs: (ms) => { GUTTER_SHRINK_HOLD_MS = ms; }, _qsmRenderNative, _qsmServiceInfo, _qsmDataSourceFor, associatedVirtualGraphsForQuery, planReadsVgWithoutSql, // Why? on stored-data plans, refresh refetches, connect feedback, mixed-source map
           seState, seSetMode, qpideAccess, qpideLocalLevel, qpideKeepLocalStep, qpideSaveLocalSnapshot, qpideLoadSnapshotBlob, qpideContentHash, qpideFillLocalTimeline, seOpenNotePanel, seSetStepNote, seStepNoteInfo, seDraftNote, keySetsFitForSpace, readZipEntries, createZipBlob, qpideLocalBytes, qpideLocalSteps, seRenderEditMenu, seTimelineHtml, seAfterChange, seOpenDrawer, sePaneFormOfQuery, seTargetsFor, seGoToLine, seMoveDrawerPane, sePaneLineLabels, seOpenModeChooser, seTimelineVerdicts, seTimelineMissingText, seTimelineBest, seRegistryCleanable, seDefaultDrawerSides, seToggleTimeline, qpideKeepLocalStep, seCompareOn, seStepDiffHtml, fetchProfile, evaluateProfileFindings, ensureAppDb, qpideDbKnown, qpideDbForget, qpideNeverCreate, qpideSetNeverCreate, getQpideDb: () => QPIDE_DB, // history database approval gate; mode state (off-by-default check, manual smoke tests), compare drawer jump / reorder / numbering
           runSqlQuery, stopSqlQuery, // SQL Query panel: Run turns into Stop while running
           renderArtifactFlowView, renderQueryFlowView, resyncGutterRowHeights, expandArtifactPane, gutterNeededWidth, seProgressBanner, // gutter rebuild race / hidden-pane re-level / margin width / popup checks
