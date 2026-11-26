@@ -2021,6 +2021,14 @@
     .sql-qry-ds-inline .ds-select-btn { max-width:150px; }
     #sqlQryInput { width:100%; min-height:72px; max-height:200px; resize:vertical; font-family:var(--mono); font-size:12.5px; background:rgba(255,255,255,0.03); border:1px solid rgba(159,177,204,0.14); border-radius:4px; padding:6px 8px; color:#dfe8f8; outline:none; box-sizing:border-box; }
     #sqlQryInput:focus { border-color:rgba(159,177,204,0.3); }
+    .sql-qry-tabs { display:flex; flex-wrap:nowrap; gap:2px; overflow-x:auto; overflow-y:hidden; position:relative; border-bottom:1px solid rgba(159,177,204,0.16); scrollbar-width:thin; min-height:26px; }
+    .sql-qry-tabs.hidden { display:none; }
+    .sql-qry-tab { flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; max-width:240px; min-height:0; height:24px; padding:0 6px 0 9px; font-size:0.74rem; color:var(--text-dim); background:transparent; border:1px solid transparent; border-bottom:none; border-radius:5px 5px 0 0; cursor:pointer; white-space:nowrap; }
+    .sql-qry-tab:hover { color:#dfe8f8; background:rgba(255,255,255,0.035); }
+    .sql-qry-tab.is-on { color:#dfe8f8; background:rgba(255,255,255,0.06); border-color:rgba(159,177,204,0.22); }
+    .sql-qry-tab-nm { overflow:hidden; text-overflow:ellipsis; }
+    .sql-qry-tab-x { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:3px; font-size:0.9rem; line-height:1; color:var(--text-dim); }
+    .sql-qry-tab-x:hover { background:rgba(255,255,255,0.1); color:#dfe8f8; }
     .sql-qry-table { width:100%; border-collapse:collapse; font-size:0.79rem; }
     .sql-qry-table th { background:#131a22; padding:4px 8px; text-align:left; border-bottom:1px solid rgba(159,177,204,0.14); white-space:nowrap; color:rgba(223,232,248,0.75); font-weight:600; position:sticky; top:0; z-index:1; }
     .sql-qry-table td { padding:3px 8px; border-bottom:1px solid rgba(159,177,204,0.07); color:#dfe8f8; vertical-align:top; max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
@@ -3342,7 +3350,7 @@
                     <button id="erdSearchNext" class="secondary pane-search-nav" title="Next match (Enter)">&#8595;</button>
                     <span id="erdSearchCount" class="api-search-count"></span>
                   </div>
-                  <button id="kdRefreshBtn" class="secondary" title="Read the columns again from the data source for the tables whose columns were read, and the table lists already opened" style="padding:3px 7px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7a5 5 0 1 1-1.5-3.6"/><path d="M12 1.5v3h-3"/></svg></button>
+                  <button id="kdRefreshBtn" class="secondary" title="Read the columns again from the data source for the tables whose columns were read, and have Stardog re-read the table lists already opened" style="padding:3px 7px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7a5 5 0 1 1-1.5-3.6"/><path d="M12 1.5v3h-3"/></svg></button>
                   <div class="plan-tools-hamburger-wrap">
                     <button id="kdArrangeBtn" class="secondary" title="Arrange the tables" style="padding:3px 7px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="1.5" width="5" height="4" rx="0.8"/><rect x="8" y="1.5" width="5" height="4" rx="0.8"/><rect x="1" y="8.5" width="5" height="4" rx="0.8"/><rect x="8" y="8.5" width="5" height="4" rx="0.8"/></svg> &#9662;</button>
                     <div id="kdLayoutMenu" class="showplan-menu plan-tools-menu hidden">
@@ -3431,6 +3439,7 @@
             </div>
           </div>
           <div class="grid" style="gap:6px;">
+            <div id="sqlQryTabs" class="sql-qry-tabs hidden" role="tablist" aria-label="Result tabs"></div>
             <textarea id="sqlQryInput" placeholder="SELECT * FROM my_table WHERE …" spellcheck="false" autocomplete="off"></textarea>
             <div id="sqlQryResults"><div class="sql-qry-info">Enter a SQL query above and click Run.</div></div>
           </div>
@@ -9118,6 +9127,7 @@ return OntologyLayouts;
         state.ui.sqlQryLastResult = null;
         state.ui.sqlQryLastError = null;
         stopSqlQuery("reset");   // a run in flight belongs to the old connection
+        sqlTabsReset();          // so do table previews and their saved rows
         const _sqlQryResultsEl = $("sqlQryResults");
         if (_sqlQryResultsEl) _sqlQryResultsEl.innerHTML = '<div class="sql-qry-info">Enter a SQL query above and click Run.</div>';
         // Clear Execute Query (SPARQL) results — abort any in-flight run first
@@ -30488,8 +30498,13 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.56.0";
+      const APP_VERSION = "1.57.0";
       const RELEASE_NOTES = [
+        { version: "1.57.0", date: "2026-11-25", title: "Preview a table's rows from the ER Diagram", items: [
+          "{*View preview*} in a table's {*⋯*} menu on the [[ER Diagram|aa-tool-erd]] shows its first 25 rows, every column in the table's own order, in the [[SQL Query|aa-tool-sqlquery]] panel.",
+          "Each preview opens in a tab of its own, named after the table, beside the tab with your own SQL. Switch between tables, close a tab with its ×, and scroll a long row of tabs sideways. A table previewed again shows the rows already read without querying the database again.",
+          "The ER Diagram's {*Mappings*} list groups virtual graphs under their database, and refreshing has Stardog re-read the schema of each data source whose table list is open, so tables added or dropped since then appear."
+        ] },
         { version: "1.56.0", date: "2026-11-25", title: "Explore and edit keys on the ER Diagram", items: [
           "The [[ER Diagram|aa-tool-erd]] draws each source table as a card with its columns: unique keys as {{K1}}, {{K2}} chips, functional dependencies as {{D1}} (determines) and {{d1}} (determined), and foreign keys as lines ending in a circle at the exact column on both tables. Joins the mappings imply without a declared foreign key are drawn dashed; one click declares them.",
           "Right-click a table to add a unique key or a functional dependency: the table moves to the front and you tick its columns. To add a foreign key, click a column's circle and then a column on another table, or drag between them. Each change is written into the key set panes at once, and typing in those panes redraws the diagram.",
@@ -30936,6 +30951,7 @@ ORDER BY ?table ?ordinal`;
           source: null,
           body: `<p>Runs ad-hoc SQL directly against a connected data source — the relational database behind your mappings. The data source dropdown, search, copy, and CSV download live in the panel's own header row (next to Run); results come back as a table below. While a query is running, Run turns into <strong>Stop</strong>; pressing it ends the wait and cancels the request. The panel can be maximized to fill the window via the header's maximize button.</p>
             <p>Handy for checking what is actually in a source table while you debug a mapping — row counts, sample values, whether a column is really unique.</p>
+            <p><strong>Table previews.</strong> <strong>View preview</strong> in a table's <strong>⋯</strong> menu on the ER Diagram opens that table's first 25 rows in a tab of its own, named after the table; the first tab keeps the SQL you typed. Preview several tables and switch between them; a row of many tabs scrolls sideways (the mouse wheel scrolls it too), and a tab closes with its <strong>×</strong> or a middle click. Each tab has its own SQL and data source, and <strong>Run</strong> runs the tab you are on. A table previewed again shows the rows already read, without asking the database again, until Run reads them anew; when the saved rows grow large, the ones used least recently are let go and read again if needed.</p>
             <p>The data source defaults to the first data source backing a virtual graph actually in scope for the current query (declared via <code>FROM</code>/<code>GRAPH</code> or the Contexts dropdown) — left blank if none is in scope, for you to pick manually.</p>`
         },
         {
@@ -30993,7 +31009,7 @@ ORDER BY ?table ?ordinal`;
             <p>Right-click a table (or use its <strong>⋯</strong> button) to add a unique key or a functional dependency, or to edit, test or remove one. The table moves to the front, the rest of the diagram fades, and you tick the columns: for a dependency, first the determining columns, then the ones they determine. <strong>Test</strong> runs the same SQL check the SQL validation tool uses against the table's data source and shows the result before you save; <strong>Save anyway</strong> keeps a key that failed. To add a foreign key, click the circle beside a column and then a column on another table (or drag from one to the other); press Esc or click empty space to drop the line. Click or right-click a foreign key's line to test it, add another column pair to it, or remove it.</p>
             <p>Every change is written into the Unique Keys, Foreign Keys or Functional Dependencies pane, as if typed there, so undo, saving to Stardog and the findings work as usual; under several data sources, a new key goes under its table's data source heading. Typing in those panes redraws the diagram. The <strong>Key set text</strong> drawer under the diagram shows the text of each key set; click an entry to find its table. The ☰ menu in each key set pane's header opens this diagram.</p>
             <h5>Tables and columns</h5>
-            <p>The list on the left has two tabs. <strong>Data source</strong> lists the data sources in use (and the others, on request); opening one reads its list of tables from Stardog, and <strong>+</strong> adds a table to the diagram and reads its columns. <strong>Mappings</strong> lists each virtual graph's tables, marking with <strong>SQL</strong> a table named only inside a SQL query; untick a virtual graph to show only the others' tables. Columns are those the mappings and keys name until you choose <strong>Read all columns</strong> on a table, which reads them from its data source (a query that returns no rows); a column the mappings or keys name that the data source does not have is struck through. The refresh button reads again only what was read before; it shows progress and can be stopped. The diagram is laid out automatically with <strong>Tidy Mycelium</strong>, the layout of the Ontology Visualization, and a table you add goes at the end. Drag a table by its header to move it: its lines follow, and their ends switch to the side of the table that faces the other one. The <strong>Arrange the tables</strong> menu in the toolbar lays everything out again, with <strong>Tidy Mycelium</strong> or as a <strong>Grid</strong> (rows and columns, joined tables next to each other); the one you choose is used from then on. A large diagram takes a moment to lay out, with progress and a stop button. How the tables are placed is not part of the Mermaid text. As in the Ontology Visualization, the mouse wheel, a two-finger touchpad scroll or a pinch zooms about the pointer, and dragging an empty part of the diagram moves it; the buttons zoom too. <strong>Read all columns</strong> appears only on tables whose data source is known.</p>
+            <p>The list on the left has two tabs. <strong>Data source</strong> lists the data sources in use (and the others, on request); opening one reads its list of tables from Stardog, and <strong>+</strong> adds a table to the diagram and reads its columns. <strong>Mappings</strong> lists each database, its virtual graphs and their tables, marking with <strong>SQL</strong> a table named only inside a SQL query; untick a virtual graph to show only the others' tables. Columns are those the mappings and keys name until you choose <strong>Read all columns</strong> on a table, which reads them from its data source (a query that returns no rows); a column the mappings or keys name that the data source does not have is struck through. The refresh button reads again only what was read before, and has Stardog re-read the schema of each data source whose table list is open, so tables added or dropped since show up; it shows progress and can be stopped. <strong>View preview</strong> in a table's <strong>⋯</strong> menu shows its first 25 rows, every column in the table's own order, in a tab of the SQL Query panel. The diagram is laid out automatically with <strong>Tidy Mycelium</strong>, the layout of the Ontology Visualization, and a table you add goes at the end. Drag a table by its header to move it: its lines follow, and their ends switch to the side of the table that faces the other one. The <strong>Arrange the tables</strong> menu in the toolbar lays everything out again, with <strong>Tidy Mycelium</strong> or as a <strong>Grid</strong> (rows and columns, joined tables next to each other); the one you choose is used from then on. A large diagram takes a moment to lay out, with progress and a stop button. How the tables are placed is not part of the Mermaid text. As in the Ontology Visualization, the mouse wheel, a two-finger touchpad scroll or a pinch zooms about the pointer, and dragging an empty part of the diagram moves it; the buttons zoom too. <strong>Read all columns</strong> appears only on tables whose data source is known.</p>
             <h5>Mermaid</h5>
             <p>The <strong>Mermaid</strong> tab shows the same diagram as Mermaid text, with search. Copy it, or download it as Mermaid text (.mmd) or as a picture drawn by Mermaid (.svg).</p>`
         },
@@ -46009,8 +46025,14 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         _sqlQryAbort = ctl;
         _setSqlQryBtnRunning(true);
         const resultsEl = $("sqlQryResults");
-        state.ui.sqlQryLastResult = null; state.ui.sqlQryLastError = null;
+        const tab = sqlTab(_sqlTabs.active);
+        if (tab && tab.preview && dsName !== tab.ds) { tab.ds = dsName; tab.key = sqlPreviewKey(dsName, tab.title); }
+        _sqlTabs.running = tab ? tab.id : null;
+        if (tab) { tab.result = null; tab.error = null; tab.stopped = false; tab.note = ""; tab.limit = limitApplied; }
+        const here = () => !tab || _sqlTabs.active === tab.id;
+        state.ui.sqlQryLastResult = null; state.ui.sqlQryLastError = null; _sqlQryMetaNote = "";
         if (resultsEl) resultsEl.innerHTML = `<div class="sql-qry-info">Running…</div>`;
+        let reset = false;
 
         try {
           const startedAt = performance.now();
@@ -46018,21 +46040,29 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
             dataSourceRequestPaths(dsName, "/query"),
             { method: "POST", contentType: "text/plain", body: sql, accept: "application/json", abortSignal: ctl.signal }
           );
-          state.ui.sqlQryLastMs = performance.now() - startedAt;
+          const ms = performance.now() - startedAt;
           let parsed;
           try { parsed = JSON.parse(responseText); }
-          catch { renderSqlQueryError("Server returned non-JSON response:\n" + String(responseText || "").slice(0, 400), { dataSource: dsName, sql }); return; }
-          renderSqlQueryResults(parsed);
+          catch { sqlTabError(tab, "Server returned non-JSON response:\n" + String(responseText || "").slice(0, 400), { dataSource: dsName, sql }); return; }
+          if (tab) { tab.result = parsed; tab.ms = ms; }
+          sqlPreviewRemember(tab, rawSql, dsName, parsed, ms);
+          if (here()) { state.ui.sqlQryLastMs = ms; renderSqlQueryResults(parsed); }
         } catch (e) {
           if (e?.name === "AbortError") {
             // Stopped by the user (or the connection was reset): say so, and don't log it as an error.
-            if (_sqlQryAbortReason !== "reset" && resultsEl) resultsEl.innerHTML = `<div class="sql-qry-info">Query stopped.</div>`;
-          } else renderSqlQueryError(e.message || String(e), { dataSource: dsName, sql });
+            reset = _sqlQryAbortReason === "reset";
+            if (tab) tab.stopped = true;
+            if (!reset && here() && resultsEl) resultsEl.innerHTML = `<div class="sql-qry-info">Query stopped.</div>`;
+          } else sqlTabError(tab, e.message || String(e), { dataSource: dsName, sql });
         } finally {
           _sqlQryRunning = false;
           _sqlQryAbort = null;
           _sqlQryAbortReason = null;
+          _sqlTabs.running = null;
           _setSqlQryBtnRunning(false);
+          // A preview opened while this query ran is waiting for its turn.
+          const waiting = sqlTab(_sqlTabs.active);
+          if (!reset && waiting && waiting.preview && !waiting.result && !waiting.error && !waiting.stopped) setTimeout(() => runSqlQuery().catch(handleError), 0);
         }
       }
       // While a run is going the Run button becomes Stop, like the SPARQL pane's execute button.
@@ -46083,7 +46113,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         ).join("");
         const count = rowEntries.length;
         el.innerHTML = `
-          <div style="padding:4px 8px 4px;font-size:0.72rem;color:var(--text-dim);">${count} row${count !== 1 ? "s" : ""}${Number.isFinite(state.ui.sqlQryLastMs) ? ` · ${formatSqlQryElapsed(state.ui.sqlQryLastMs)}` : ""}</div>
+          <div style="padding:4px 8px 4px;font-size:0.72rem;color:var(--text-dim);">${count} row${count !== 1 ? "s" : ""}${Number.isFinite(state.ui.sqlQryLastMs) ? ` · ${formatSqlQryElapsed(state.ui.sqlQryLastMs)}` : ""}${_sqlQryMetaNote ? ` · ${esc(_sqlQryMetaNote)}` : ""}</div>
           <div style="overflow:auto;max-height:40vh;">
             <table class="sql-qry-table"><thead><tr>${header}</tr></thead><tbody>${body}</tbody></table>
           </div>`;
@@ -46105,6 +46135,151 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         const el = $("sqlQryResults");
         if (!el) return;
         el.innerHTML = `<div class="sql-qry-info" style="color:#e06b8a;white-space:pre-wrap;">${esc(msg)}</div>`;
+      }
+
+      // ── SQL Query panel: result tabs and table previews ─────────────────────────
+      // Tab "q" is the query typed in the panel. A table preview (ER Diagram, a table's ⋯ menu → View preview) opens its own
+      // tab with its own SQL, data source and rows, so several tables can be compared. The panel's text box, data source,
+      // LIMIT note and results always show the active tab; switching tabs saves them back into the tab first. Run runs the
+      // active tab's SQL into that tab. The tab row appears once there is more than one tab and scrolls sideways.
+      // Previews are kept by data source and table, so going back and forth between tables does not query the source again.
+      // Past the budget (characters of cell text) the least recently used previews are dropped; a dropped preview whose
+      // tab is not showing gives up its rows too, and reads them again when it is shown.
+      const SQL_PREVIEW_ROWS = 25;
+      const _sqlTabs = { list: [{ id: "q", title: "Query", sql: "", ds: "", result: null, error: null, ms: null, limit: false, note: "" }], active: "q", seq: 0, running: null };
+      const _sqlPreviewCache = { map: new Map(), budget: 4000000, tick: 0 };
+      let _sqlQryMetaNote = "";
+      function sqlTab(id) { return _sqlTabs.list.find((t) => t.id === id) || null; }
+      function sqlPreviewKey(ds, table) { return `${ds}\u0000${String(table).toLowerCase()}`; }
+      function sqlTabSave() {
+        const t = sqlTab(_sqlTabs.active);
+        if (!t) return;
+        t.sql = $("sqlQryInput")?.value || "";
+        t.ds = state.ui.sqlQryDs || "";
+        if (_sqlTabs.running !== t.id) { t.result = state.ui.sqlQryLastResult; t.error = state.ui.sqlQryLastError; t.ms = state.ui.sqlQryLastMs; }
+        t.limit = !($("sqlQryLimitNote")?.classList.contains("hidden") ?? true);
+      }
+      // An error belongs to the tab its query ran in; it is shown only if that tab is showing.
+      function sqlTabError(tab, msg, detail) {
+        if (!tab || _sqlTabs.active === tab.id) { renderSqlQueryError(msg, detail); if (tab) tab.error = state.ui.sqlQryLastError; return; }
+        msg = decodeServerErrorEscapes(msg);
+        log("error", msg, detail);
+        tab.error = { message: String(msg), database: detail.dataSource || "", query: detail.sql || "", at: new Date() };
+      }
+      function sqlTabShow(id) {
+        const t = sqlTab(id);
+        if (!t) return;
+        sqlTabSave();   // also when re-showing the same tab, so SQL typed since is kept
+        _sqlTabs.active = id;
+        const input = $("sqlQryInput");
+        if (input) input.value = t.sql;
+        if (t.ds) state.ui.sqlQryDs = t.ds;
+        renderSqlQueryPanelDsMenu();
+        $("sqlQryLimitNote")?.classList.toggle("hidden", !t.limit);
+        state.ui.sqlQryLastMs = t.ms;
+        state.ui.sqlQryLastResult = null; state.ui.sqlQryLastError = null;
+        _sqlQryMetaNote = t.note || "";
+        const el = $("sqlQryResults");
+        const search = ($("sqlQrySearch")?.value || "").trim();
+        _sqlQryLastSearch = search; _sqlQrySearchIndex = 0;
+        if (t.preview && !t.result && !t.error) {
+          // a dropped preview reads its rows again; so does one whose turn came while another query ran
+          const hit = _sqlPreviewCache.map.get(t.key);
+          if (hit && t.sql === t.previewSql) { hit.used = ++_sqlPreviewCache.tick; t.result = hit.result; t.ms = hit.ms; t.note = t.note || "saved preview"; _sqlQryMetaNote = t.note; state.ui.sqlQryLastMs = t.ms; }
+        }
+        if (t.result) renderSqlQueryResults(t.result, search);
+        else if (t.error) {
+          state.ui.sqlQryLastError = t.error;
+          if (el) el.innerHTML = `<div class="sql-qry-info" style="color:#e06b8a;white-space:pre-wrap;">${esc(t.error.message)}</div>`;
+        } else if (_sqlTabs.running === t.id) { if (el) el.innerHTML = `<div class="sql-qry-info">Running…</div>`; }
+        else if (t.preview && !t.stopped) {
+          if (el) el.innerHTML = `<div class="sql-qry-info">${_sqlQryRunning ? "Waiting for the query that is running…" : "Running…"}</div>`;
+          if (!_sqlQryRunning) setTimeout(() => { if (_sqlTabs.active === t.id && !t.result && !t.error) runSqlQuery().catch(handleError); }, 0);
+        } else if (el) el.innerHTML = `<div class="sql-qry-info">${t.stopped ? "Query stopped." : "Enter a SQL query above and click Run."}</div>`;
+        $("sqlQrySearchCount") && ($("sqlQrySearchCount").textContent = "");
+        sqlTabsRender();
+      }
+      function sqlTabClose(id) {
+        const i = _sqlTabs.list.findIndex((t) => t.id === id);
+        if (i <= 0) return;   // the Query tab stays
+        if (_sqlTabs.running === id) stopSqlQuery();
+        const wasActive = _sqlTabs.active === id;
+        _sqlTabs.list.splice(i, 1);
+        if (wasActive) { _sqlTabs.active = null; sqlTabShow(_sqlTabs.list[Math.min(i, _sqlTabs.list.length - 1)].id); }
+        else sqlTabsRender();
+      }
+      function sqlTabsRender() {
+        const bar = $("sqlQryTabs");
+        if (!bar) return;
+        const show = _sqlTabs.list.length > 1;
+        bar.classList.toggle("hidden", !show);
+        if (!show) { bar.innerHTML = ""; return; }
+        bar.innerHTML = _sqlTabs.list.map((t) => {
+          const on = t.id === _sqlTabs.active;
+          const tip = t.preview ? `First ${SQL_PREVIEW_ROWS} rows of ${t.title}${t.ds ? ` on ${t.ds}` : ""}` : "The query typed in this panel";
+          return `<div class="sql-qry-tab${on ? " is-on" : ""}" role="tab" aria-selected="${on}" data-sql-tab="${esc(t.id)}" title="${esc(tip)}"><span class="sql-qry-tab-nm">${esc(t.title)}</span>${t.id === "q" ? "" : `<span class="sql-qry-tab-x" role="button" aria-label="Close ${esc(t.title)}" data-sql-tab-close="${esc(t.id)}" title="Close this tab">&times;</span>`}</div>`;
+        }).join("");
+        const on = bar.querySelector(".sql-qry-tab.is-on");
+        if (on) {
+          const l = on.offsetLeft, r = l + on.offsetWidth;
+          if (l < bar.scrollLeft) bar.scrollLeft = l;
+          else if (r > bar.scrollLeft + bar.clientWidth) bar.scrollLeft = r - bar.clientWidth;
+        }
+      }
+      // Keep a preview's rows for the next time that table is previewed (only the preview's own SQL, not an edited one).
+      function sqlPreviewRemember(tab, ranSql, ds, result, ms) {
+        if (!tab || !tab.preview || ranSql.trim() !== tab.previewSql.trim() || ds !== tab.ds) return;
+        let size = 0;
+        Object.values(result.mColumns || {}).forEach((c) => { size += String(c.mName || "").length + 8; });
+        Object.values(result.mRows || {}).forEach((row) => Object.values(row || {}).forEach((v) => { size += String(v ?? "").length + 4; }));
+        _sqlPreviewCache.map.set(tab.key, { result, ms, size, used: ++_sqlPreviewCache.tick });
+        sqlPreviewTrim(tab.key);
+      }
+      function sqlPreviewTrim(keepKey) {
+        const C = _sqlPreviewCache;
+        let total = 0;
+        C.map.forEach((v) => { total += v.size; });
+        while (total > C.budget) {
+          let oldest = null;
+          C.map.forEach((v, k) => { if (k !== keepKey && (!oldest || v.used < oldest[1].used)) oldest = [k, v]; });
+          if (!oldest) break;
+          C.map.delete(oldest[0]);
+          total -= oldest[1].size;
+          _sqlTabs.list.forEach((t) => { if (t.key === oldest[0] && t.id !== _sqlTabs.active && t.result === oldest[1].result) { t.result = null; t.note = ""; } });
+        }
+      }
+      // ER Diagram → View preview: the first rows of a table, every column in the table's own order.
+      function sqlPreviewTable(ds, table) {
+        if (!state.connection?.baseUrl) { showStatusToast("Connect to Stardog to preview a table.", "info", 3000); return; }
+        if (!ds) { showStatusToast("This table's data source is not known, so it cannot be previewed.", "info", 3500); return; }
+        const panel = $("sqlQueryPanel");
+        if (panel?.classList.contains("hidden")) toggleSqlQueryPanel();
+        const key = sqlPreviewKey(ds, table);
+        let t = _sqlTabs.list.find((x) => x.key === key);
+        if (!t) {
+          const previewSql = `SELECT * FROM ${_sqlQTable(table)}\nLIMIT ${SQL_PREVIEW_ROWS}`;
+          t = { id: "p" + (++_sqlTabs.seq), key, preview: true, title: table, ds, sql: previewSql, previewSql, result: null, error: null, ms: null, limit: false, note: "", stopped: false };
+          _sqlTabs.list.push(t);
+          const hit = _sqlPreviewCache.map.get(key);
+          if (hit) { hit.used = ++_sqlPreviewCache.tick; t.result = hit.result; t.ms = hit.ms; t.note = "saved preview, Run reads it again"; }
+        }
+        t.stopped = false;
+        sqlTabShow(t.id);
+      }
+      function sqlTabsReset() {
+        const wasQuery = _sqlTabs.active === "q";
+        _sqlTabs.list = _sqlTabs.list.filter((t) => t.id === "q");
+        _sqlTabs.active = "q"; _sqlTabs.running = null; _sqlQryMetaNote = "";
+        const q = _sqlTabs.list[0]; q.result = null; q.error = null; q.ms = null;
+        // a preview was showing: the text box goes back to the SQL typed in the Query tab
+        if (!wasQuery) {
+          const input = $("sqlQryInput");
+          if (input) input.value = q.sql;
+          if (q.ds) state.ui.sqlQryDs = q.ds;
+          $("sqlQryLimitNote")?.classList.toggle("hidden", !q.limit);
+        }
+        _sqlPreviewCache.map.clear();
+        sqlTabsRender();
       }
 
       let _sqlQrySearchIndex = 0;
@@ -53540,6 +53715,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
             if (!open) return out;
             if (!st || st.status === "loading") return out + `<div class="kd-note">Reading the table list…</div>`;
             if (st.status === "error") return out + `<div class="kd-note">${esc(st.error)}</div>`;
+            if (st.metaErr) out += `<div class="kd-note" title="${esc(st.metaErr)}">Stardog could not re-read this source's schema, so this is its last saved table list.</div>`;
             const groups = new Map();
             st.list.forEach((x) => { const g = [x.catalog, x.schema].filter(Boolean).join(" › ") || ""; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(x); });
             const many = groups.size > 1;
@@ -53569,14 +53745,23 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         } else {
           const vgs = Object.keys(M.vgTables);
           if (!vgs.length) h = `<div class="kd-note">No mappings are loaded.</div>`;
-          vgs.forEach((vg) => {
-            const rec = M.vgTables[vg], key = "vg:" + vg, open = _kd.open.has(key) || Boolean(f);
-            const names = [...new Set([...rec.tables])].map((l) => M.T(l)?.name || l);
-            const sqlNames = [...rec.sql].filter((l) => !rec.tables.has(l)).map((l) => M.T(l)?.name || l);
-            h += kdTreeNode(key, 0, `<input type="checkbox" data-kd-vg="${esc(vg)}"${_kd.vgOff.has(vg) ? "" : " checked"} title="Show this virtual graph's tables on the diagram"><span class="kd-nm" title="${esc(vg)}${rec.ds ? " · " + esc(rec.ds) : ""}">${esc(vg)}</span><span class="kd-ct">${names.length + sqlNames.length}</span>`, open);
-            if (!open) return;
-            h += names.filter((n) => !f || n.toLowerCase().includes(f)).map((n) => kdTableRow(M, n, rec.ds, 1, false)).join("");
-            h += sqlNames.filter((n) => !f || n.toLowerCase().includes(f)).map((n) => kdTableRow(M, n, rec.ds, 1, true)).join("");
+          // database > virtual graph > tables. A database group starts open; its key in _kd.open means the user closed it.
+          const byDs = new Map();
+          vgs.forEach((vg) => { const ds = M.vgTables[vg].ds || ""; if (!byDs.has(ds)) byDs.set(ds, []); byDs.get(ds).push(vg); });
+          const dsKeys = [...byDs.keys()].sort((a, b) => (a ? 0 : 1) - (b ? 0 : 1) || a.localeCompare(b));
+          dsKeys.forEach((ds) => {
+            const gKey = "mds:" + ds, gOpen = !_kd.open.has(gKey) || Boolean(f), list = byDs.get(ds);
+            h += kdTreeNode(gKey, 0, `<span class="kd-nm">${ds ? esc(ds) : "Unknown data source"}</span><span class="kd-ct">${list.length} virtual graph${list.length === 1 ? "" : "s"}</span>`, gOpen, " kd-ds-group");
+            if (!gOpen) return;
+            list.forEach((vg) => {
+              const rec = M.vgTables[vg], key = "vg:" + vg, open = _kd.open.has(key) || Boolean(f);
+              const names = [...new Set([...rec.tables])].map((l) => M.T(l)?.name || l);
+              const sqlNames = [...rec.sql].filter((l) => !rec.tables.has(l)).map((l) => M.T(l)?.name || l);
+              h += kdTreeNode(key, 1, `<input type="checkbox" data-kd-vg="${esc(vg)}"${_kd.vgOff.has(vg) ? "" : " checked"} title="Show this virtual graph's tables on the diagram"><span class="kd-nm" title="${esc(vg)}${rec.ds ? " · " + esc(rec.ds) : ""}">${esc(vg)}</span><span class="kd-ct">${names.length + sqlNames.length}</span>`, open);
+              if (!open) return;
+              h += names.filter((n) => !f || n.toLowerCase().includes(f)).map((n) => kdTableRow(M, n, rec.ds, 2, false)).join("");
+              h += sqlNames.filter((n) => !f || n.toLowerCase().includes(f)).map((n) => kdTableRow(M, n, rec.ds, 2, true)).join("");
+            });
           });
         }
         host.innerHTML = h;
@@ -53626,13 +53811,21 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         _kd.dsTables[ds] = { status: "loading" };
         kdRenderTree();
         try {
+          // The table list is Stardog's cached copy of the source's metadata. A refresh first asks Stardog to read the
+          // source's schema again, so tables added or dropped since show up. If that is refused (permissions, an old
+          // server), the cached list is still shown.
+          let metaErr = "";
+          if (force) {
+            try { await requestWithPathFallback(dataSourceRequestPaths(ds, "/refresh_metadata"), { method: "POST", contentType: "application/json", body: "{}", abortSignal: signal }); }
+            catch (e) { if (e?.name === "AbortError" || signal?.aborted) throw e; metaErr = summarizeSchemaDriftError(e.message || String(e)); }
+          }
           const text = await requestWithPathFallback(dataSourceRequestPaths(ds, "/tables"), { method: "GET", accept: "application/json", abortSignal: signal });
           const raw = JSON.parse(text);
           const arr = Array.isArray(raw) ? raw : (raw.tables || []);
           const list = arr.map((x) => ({ catalog: x.catalog || "", schema: x.schema || "", table: x.table_name || x.name || "", type: String(x.table_type || "TABLE").toUpperCase() }))
             .filter((x) => x.table && !/INDEX|SEQUENCE/.test(x.type))
             .sort((a, b) => (a.schema + "." + a.table).localeCompare(b.schema + "." + b.table));
-          _kd.dsTables[ds] = { status: "ok", list };
+          _kd.dsTables[ds] = { status: "ok", list, metaErr };
         } catch (e) {
           // stopped: keep what was there before
           _kd.dsTables[ds] = (e?.name === "AbortError" || signal?.aborted) && prev ? prev : { status: "error", error: summarizeSchemaDriftError(e.message || String(e)) };
@@ -53669,7 +53862,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
       function kdStopJob() { if (_kd.job) _kd.job.ctl.abort(); }
       function kdJobUi() {
         const btn = $("kdRefreshBtn");
-        if (btn) { btn.classList.toggle("is-stop", Boolean(_kd.job)); btn.title = _kd.job ? "Stop reading from the data source" : "Read the columns again from the data source for the tables whose columns were read, and the table lists already opened"; }
+        if (btn) { btn.classList.toggle("is-stop", Boolean(_kd.job)); btn.title = _kd.job ? "Stop reading from the data source" : "Read the columns again from the data source for the tables whose columns were read, and have Stardog re-read the table lists already opened"; }
         kdUpdateBadge();
       }
       function kdColumnStep(id) {
@@ -53739,6 +53932,10 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         if (t.uks.length) h += `<div class="kd-sec">Unique keys</div>` + t.uks.map((e, n) => `<div class="kd-ex"><span class="kd-chip" style="background:${KD_KEY_COLORS[n % 3]}">K${n + 1}</span><span class="kd-d">${esc(e.cols.join(", "))}</span><button type="button" data-kd-act="testuk" data-kd-id="${esc(id)}" data-kd-n="${n}" data-kd-raw="${esc(e.raw)}">Test</button>${e.readOnly ? "" : `<button type="button" data-kd-act="edituk" data-kd-id="${esc(id)}" data-kd-n="${n}" data-kd-raw="${esc(e.raw)}">Edit</button><button type="button" data-kd-act="rmuk" data-kd-id="${esc(id)}" data-kd-n="${n}" data-kd-raw="${esc(e.raw)}">Remove</button>`}</div><div class="kd-res" data-kd-res="uk:${n}"></div>`).join("");
         if (t.fds.length) h += `<div class="kd-sec">Functional dependencies</div>` + t.fds.map((e, n) => `<div class="kd-ex"><span class="kd-chip is-d">D${n + 1}</span><span class="kd-d">${esc(e.det.join(", "))} → ${esc(e.dep.join(", "))}</span><button type="button" data-kd-act="testfd" data-kd-id="${esc(id)}" data-kd-n="${n}" data-kd-raw="${esc(e.raw)}">Test</button>${e.readOnly ? "" : `<button type="button" data-kd-act="editfd" data-kd-id="${esc(id)}" data-kd-n="${n}" data-kd-raw="${esc(e.raw)}">Edit</button><button type="button" data-kd-act="rmfd" data-kd-id="${esc(id)}" data-kd-n="${n}" data-kd-raw="${esc(e.raw)}">Remove</button>`}</div><div class="kd-res" data-kd-res="fd:${n}"></div>`).join("");
         h += `<div class="kd-sec"></div>`;
+        if (!query && t.dsName) {
+          const pwhy = !kdConnected() ? "Connect to Stardog to preview the table" : "";
+          h += `<button type="button" class="kd-it" data-kd-act="preview" data-kd-id="${esc(id)}"${pwhy ? ` disabled title="${esc(pwhy)}"` : ` title="Show the first ${SQL_PREVIEW_ROWS} rows in the SQL Query panel"`}><span class="kd-dot" style="background:var(--accent)"></span>View preview</button>`;
+        }
         if (!query && t.dsName) {
           const why = !kdConnected() ? "Connect to Stardog to read the columns" : "";
           h += `<button type="button" class="kd-it" data-kd-act="fetch" data-kd-id="${esc(id)}"${why ? ` disabled title="${esc(why)}"` : ""}><span class="kd-dot"></span>${_kd.fetched[id] ? "Read the columns again" : "Read all columns from the data source"}</button>`;
@@ -54219,6 +54416,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         else if (a === "rmfk") { const f = M.fks[n]; if (f) kdEditEntry("foreignKeySets", f.e, ""); }
         else if (a === "hide" && t) { _kd.removed.add(id); _kd.added = _kd.added.filter((x) => M.T(x.name)?.id !== id); kdRender(); }
         else if (a === "fetch" && t) kdFetchColumns([id]).catch(handleError);
+        else if (a === "preview" && t) sqlPreviewTable(t.dsName, t.name);
         else if (a === "close") { /* menu already hidden */ }
         else if (a === "pair") { _kd.pairFk = n; const f = M.fks[n]; showStatusToast(`Click the next column's circle on ${f.e.table}, then its match on ${f.e.tgt}.`, "info", 4000); }
         else if (a === "declare") {
@@ -68559,6 +68757,20 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         });
         on("schemaDriftRunBtn", "click", () => runSchemaDriftCheck().catch(handleError));
         on("sqlQryRunBtn", "click", () => { if (_sqlQryRunning) stopSqlQuery(); else runSqlQuery().catch(handleError); });
+        on("sqlQryTabs", "click", (e) => {
+          const x = e.target.closest("[data-sql-tab-close]");
+          if (x) { e.stopPropagation(); sqlTabClose(x.getAttribute("data-sql-tab-close")); return; }
+          const tb = e.target.closest("[data-sql-tab]");
+          if (tb && tb.getAttribute("data-sql-tab") !== _sqlTabs.active) sqlTabShow(tb.getAttribute("data-sql-tab"));
+        });
+        on("sqlQryTabs", "auxclick", (e) => { const tb = e.target.closest("[data-sql-tab]"); if (e.button === 1 && tb) { e.preventDefault(); sqlTabClose(tb.getAttribute("data-sql-tab")); } });
+        // A plain mouse wheel scrolls the tab row sideways when it is wider than the panel.
+        on("sqlQryTabs", "wheel", (e) => {
+          const bar = e.currentTarget;
+          if (bar.scrollWidth <= bar.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+          e.preventDefault();
+          bar.scrollLeft += e.deltaMode === 2 ? e.deltaY * bar.clientWidth : e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY;
+        });
         on("sqlQrySearch", "input", () => _doSqlQrySearch(0));
         on("sqlQrySearch", "keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); _doSqlQrySearch(e.shiftKey ? -1 : 1); } });
         on("sqlQrySearchClear", "click", () => { const inp = $("sqlQrySearch"); if (inp) { inp.value = ""; inp.focus(); } _doSqlQrySearch(0); });
@@ -70135,6 +70347,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       if (/[?&]selftest\b/.test(location.search)) {
         window.__APP_TESTHOOKS__ = {
           state,
+          sqlPreviewTable, sqlTabShow, sqlTabClose, sqlTabsReset, _sqlTabs, _sqlPreviewCache, kdTableMenu,   // SQL Query panel: result tabs and table previews
           kdModel, kdRender, kdParseArtifact, kdBuildText, kdEditEntry, kdEntryRaw, kdLayoutOrder, kdAddTable, kdArrange, kdJumpToSource, kdImpliedMenu, openKeysDiagram, runGenerateErd, toggleErdPanel, _kd, keySetsTitleHtml,   // ER Diagram key editing
           typeahead: TA_API,     // typeahead engine (suggestions for a caret position)                 // read analysis findings (state.ui.mappingAnalysis)
           DEMO_SCENARIOS,        // fixture corpus to iterate
