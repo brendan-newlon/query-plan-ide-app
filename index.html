@@ -2248,6 +2248,147 @@
     .erd-zoom-btn { width:28px; height:28px; border-radius:4px; border:1px solid rgba(223,232,248,0.22); background:rgba(16,22,32,0.84); color:rgba(223,232,248,0.8); font-size:18px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; transition:background 0.12s, opacity 0.12s; }
     .erd-zoom-btn:hover:not(:disabled) { background:rgba(38,54,78,0.92); color:rgba(223,232,248,1); }
     .erd-zoom-btn:disabled { opacity:0.28; cursor:default; }
+    /* ER Diagram, Diagram tab: tables as cards, keys as chips, foreign keys as lines (kd* = keys diagram) */
+    #erdOutput.hidden, .kd-view.hidden { display:none !important; }
+    .kd-view { flex:1; min-height:0; display:flex; border:1px solid var(--border); border-radius:6px; overflow:hidden; background:var(--bg); }
+    .kd-side { width:220px; flex:none; display:flex; flex-direction:column; min-height:0; border-right:1px solid var(--border); background:rgba(255,255,255,0.012); }
+    .kd-side-tabs, .kd-drawer-tabs { display:inline-flex; gap:2px; padding:2px; border-radius:7px; background:rgba(255,255,255,0.03); border:1px solid rgba(159,177,204,0.12); }
+    .kd-side-tabs { margin:6px 8px 2px; align-self:flex-start; }
+    .kd-seg { border:0; background:transparent; color:var(--muted); padding:1px 9px; border-radius:5px; cursor:pointer; font-size:0.78rem; }
+    .kd-seg.is-on { background:rgba(255,255,255,0.1); color:var(--ink); }
+    .kd-filter { margin:4px 8px 6px; padding:3px 8px; border-radius:6px; border:1px solid var(--border); background:rgba(0,0,0,0.2); color:var(--ink); font-size:0.8rem; }
+    .kd-tree { flex:1; min-height:0; overflow:auto; padding-bottom:10px; font-size:0.8rem; }
+    .kd-tn { display:flex; align-items:center; gap:5px; padding:2px 8px; cursor:pointer; white-space:nowrap; }
+    .kd-tn:hover { background:rgba(255,255,255,0.04); }
+    .kd-tn .kd-tw { width:11px; flex:none; color:var(--muted); font-size:0.7rem; text-align:center; }
+    .kd-tn .kd-nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+    .kd-tn .kd-ct { color:var(--muted); font-size:0.72rem; }
+    .kd-tn.kd-group { color:var(--muted); font-size:0.7rem; text-transform:uppercase; letter-spacing:0.04em; cursor:default; }
+    .kd-tn.kd-tbl { font-family:var(--mono); font-size:0.76rem; color:#80deea; cursor:default; }
+    .kd-tn.kd-tbl.is-on { cursor:pointer; }
+    .kd-add { flex:none; width:18px; height:18px; padding:0; line-height:14px; border-radius:5px; border:1px solid rgba(55,198,163,0.45); background:none; color:var(--accent); cursor:pointer; }
+    .kd-add:hover { background:var(--accent-soft); }
+    .kd-on { flex:none; width:18px; text-align:center; color:var(--accent); font-size:0.72rem; }
+    .kd-sqltag { font:600 0.6rem var(--sans); color:#f0b25a; border:1px solid rgba(240,178,90,0.5); border-radius:3px; padding:0 3px; }
+    .kd-tn input[type=checkbox] { margin:0; accent-color:var(--accent); flex:none; width:auto; min-width:0; }
+    .kd-ch { cursor:grab; }
+    .kd-ch:active { cursor:grabbing; }
+    .kd-menu .kd-src-it.is-current { background:rgba(128,222,234,0.12); }
+    .kd-menu .kd-src-nav .kd-d { text-align:center; }
+    .erd-head-tabs { display:flex; align-items:flex-end; gap:10px; min-width:0; }
+    .erd-head-tabs .val-sql-tabs { border-bottom:none; }
+    .erd-status { color:var(--muted); font-size:0.74rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+    #kdRefreshBtn.is-stop svg { display:none; }
+    #kdRefreshBtn.is-stop::before { content:"A0"; font-size:0.8rem; line-height:14px; }
+    .kd-note { padding:3px 10px; color:var(--muted); font-size:0.76rem; font-style:italic; white-space:normal; }
+    .kd-more-rows { margin:2px 8px 2px 30px; font-size:0.74rem; padding:1px 8px; }
+    .kd-stage { position:relative; flex:1; min-width:0; display:flex; flex-direction:column; }
+    .kd-filterbar { display:flex; gap:8px; align-items:center; padding:3px 10px; border-bottom:1px solid var(--border); background:var(--accent-soft); font-size:0.78rem; }
+    .kd-vp { position:relative; flex:1; min-height:0; overflow:auto; background:radial-gradient(circle, rgba(159,177,204,0.07) 1px, transparent 1.2px) 0 0 / 18px 18px; }
+    .kd-vp.is-panning, .kd-vp.is-panning * { cursor:grabbing !important; }
+    .kd-sizer { position:relative; overflow:hidden; box-sizing:content-box; }
+    .kd-cv { position:relative; transform-origin:0 0; }
+    .kd-empty { padding:24px; color:var(--muted); font-size:0.86rem; max-width:520px; }
+    .kd-view .erd-zoom-controls { bottom:12px; right:12px; }
+    .kd-fit-btn { width:auto !important; padding:0 7px !important; font-size:0.72rem !important; }
+    svg.kd-lines { position:absolute; left:0; top:0; overflow:visible; pointer-events:none; transition:opacity .2s; }
+    svg.kd-lines .kd-fk { fill:none; stroke:#b39ddb; stroke-width:1.6; opacity:0.8; }
+    svg.kd-lines .kd-fk.is-fail { stroke:#e8a040; } svg.kd-lines .kd-fk.is-pass { stroke:#4aad7a; }
+    svg.kd-lines .kd-implied { fill:none; stroke:rgba(159,177,204,0.55); stroke-width:1.3; stroke-dasharray:4 4; }
+    svg.kd-lines .kd-implied.is-fail { stroke:#e8a040; } svg.kd-lines .kd-implied.is-pass { stroke:#4aad7a; }
+    svg.kd-lines .kd-hit { fill:none; stroke:transparent; stroke-width:12; cursor:pointer; pointer-events:stroke; }
+    svg.kd-lines g.is-hot .kd-fk, svg.kd-lines g.is-hot .kd-implied { opacity:1; stroke-width:2.6; }
+    svg.kd-lines .kd-link-line { fill:none; stroke:#b39ddb; stroke-width:1.8; stroke-dasharray:5 4; }
+    .kd-card { position:absolute; min-width:170px; max-width:320px; background:#16202b; border:1px solid rgba(159,177,204,0.25); border-radius:9px; transform-origin:0 0; user-select:none; transition:transform .28s ease, opacity .25s, box-shadow .25s; }
+    .kd-card.is-query { border-style:dashed; }
+    .kd-card.is-new { animation:kdPop .45s ease; }
+    @keyframes kdPop { from { opacity:0; } }
+    @keyframes kdFlash { 0%,100% { box-shadow:0 0 0 0 rgba(55,198,163,0); } 30% { box-shadow:0 0 0 4px rgba(55,198,163,0.7); } }
+    .kd-card.is-flash { animation:kdFlash .9s ease 2; }
+    .kd-ch { display:flex; align-items:center; gap:6px; min-height:25px; padding:0 4px 0 9px; border-radius:9px 9px 0 0; background:rgba(128,222,234,0.08); font:600 0.78rem var(--mono); color:#80deea; cursor:context-menu; }
+    .kd-ch .kd-nm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .kd-ch .kd-ds { font:400 0.66rem var(--sans); color:var(--muted); white-space:nowrap; }
+    .kd-more { border:0; background:none; color:var(--muted); cursor:pointer; padding:0 5px; border-radius:4px; font-size:0.95rem; line-height:1.2; }
+    .kd-more:hover { background:rgba(255,255,255,0.08); color:var(--ink); }
+    .kd-row { position:relative; display:flex; align-items:center; gap:5px; min-height:20px; padding:0 8px 0 10px; font:0.72rem var(--mono); color:#dfe8f8; }
+    .kd-row:last-child { border-radius:0 0 9px 9px; padding-bottom:2px; }
+    .kd-row .kd-cn { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .kd-row .kd-ty { color:rgba(153,167,188,0.6); font-size:0.66rem; white-space:nowrap; }
+    .kd-row.is-missing .kd-cn { color:#e05c5c; text-decoration:line-through; }
+    .kd-row.is-hl { background:rgba(55,198,163,0.13); } .kd-row.is-hl-d { background:rgba(240,178,90,0.13); } .kd-row.is-hl-f { background:rgba(179,157,219,0.15); }
+    .kd-card-foot { padding:3px 8px 5px; }
+    .kd-card-foot button { font-size:0.68rem; padding:1px 7px; }
+    .kd-card-foot .kd-err { color:#e05c5c; font-size:0.68rem; white-space:normal; }
+    .kd-port { position:absolute; top:50%; width:9px; height:9px; margin-top:-4.5px; border-radius:50%; background:#16202b; border:1.5px solid rgba(179,157,219,0.28); cursor:crosshair; z-index:3; transition:transform .12s, border-color .12s; }
+    .kd-port.is-L { left:-5px; } .kd-port.is-R { right:-5px; }
+    .kd-card:hover .kd-port { border-color:rgba(179,157,219,0.65); }
+    .kd-port:hover { transform:scale(1.45); border-color:#b39ddb !important; }
+    .kd-port.is-on { background:#b39ddb; border-color:#b39ddb; }
+    .kd-port.is-on-implied:not(.is-on) { background:rgba(159,177,204,0.55); border-color:rgba(159,177,204,0.7); }
+    .kd-view.is-linking .kd-row.is-target { cursor:pointer; }
+    .kd-view.is-linking .kd-row.is-target:hover { background:rgba(179,157,219,0.18); }
+    .kd-view.is-linking .kd-card.is-src { box-shadow:0 0 0 1.5px rgba(179,157,219,0.6); }
+    .kd-chips { position:relative; display:inline-flex; gap:3px; flex:none; }
+    .kd-chip { font:700 0.58rem/1 var(--sans); padding:2px 4px; border-radius:3px; color:#10151c; cursor:default; }
+    .kd-chip.is-d { background:#f0b25a; }
+    .kd-chip.is-dd { background:transparent; color:#f0b25a; box-shadow:inset 0 0 0 1.2px #f0b25a; font-weight:600; }
+    .kd-chip.is-f { background:#b39ddb; }
+    .kd-chip.is-u { background:transparent; color:#4a9de0; box-shadow:inset 0 0 0 1.2px #4a9de0; cursor:pointer; }
+    .kd-chip.is-fail { box-shadow:0 0 0 1.5px #e05c5c; } .kd-chip.is-pass { box-shadow:0 0 0 1.5px #4aad7a; }
+    .kd-chip.is-stack { background:rgba(159,177,204,0.25); color:var(--ink); }
+    .kd-chips .kd-pop { display:none; position:absolute; left:calc(100% + 12px); top:-5px; z-index:20; gap:4px; padding:4px 6px; border-radius:7px; background:#1c2734; border:1px solid var(--border); box-shadow:0 8px 20px rgba(0,0,0,0.4); white-space:nowrap; }
+    .kd-chips.is-crowd:hover .kd-pop { display:inline-flex; }
+    .kd-chips.is-crowd:hover > .kd-chip { opacity:0.35; }
+    .kd-cv.is-editing svg.kd-lines { opacity:0; }
+    .kd-cv.is-editing .kd-card { opacity:0.07; pointer-events:none; }
+    .kd-cv.is-editing .kd-card.is-focus { opacity:1; pointer-events:auto; z-index:10; box-shadow:0 20px 50px rgba(0,0,0,0.6), 0 0 0 1.5px rgba(55,198,163,0.55); }
+    .kd-cv.is-editing .kd-card.is-focus .kd-port, .kd-cv.is-editing .kd-card.is-focus .kd-chips, .kd-cv.is-editing .kd-card.is-focus .kd-card-foot { display:none; }
+    .kd-cb { display:none; width:12px; height:12px; border-radius:3px; border:1.5px solid rgba(159,177,204,0.55); flex:none; }
+    .kd-cv.is-editing .kd-card.is-focus .kd-cb { display:inline-block; }
+    .kd-cv.is-editing .kd-card.is-focus .kd-row { cursor:pointer; }
+    .kd-cv.is-editing .kd-card.is-focus .kd-row:hover { background:rgba(255,255,255,0.05); }
+    .kd-row.is-picked { background:rgba(55,198,163,0.12); }
+    .kd-row.is-picked .kd-cb { background:var(--accent); border-color:var(--accent); box-shadow:inset 0 0 0 2px #16202b; }
+    .kd-cv.is-fdmode .kd-row.is-picked { background:rgba(240,178,90,0.12); }
+    .kd-cv.is-fdmode .kd-row.is-picked .kd-cb { background:#f0b25a; border-color:#f0b25a; }
+    .kd-row.is-locked { cursor:default !important; }
+    .kd-row.is-locked .kd-cb { border-color:#f0b25a; }
+    .kd-row .kd-tag { display:none; font:700 0.6rem var(--sans); color:#f0b25a; }
+    .kd-row.is-locked .kd-tag { display:inline; }
+    .kd-banner { position:absolute; left:50%; transform:translateX(-50%); top:10px; z-index:30; width:min(580px, calc(100% - 20px)); display:flex; align-items:center; gap:8px; padding:7px 10px 7px 14px; border-radius:10px; background:#1c2734; border:1px solid rgba(55,198,163,0.4); box-shadow:0 10px 30px rgba(0,0,0,0.5); }
+    .kd-banner.is-fd { border-color:rgba(240,178,90,0.5); }
+    .kd-banner .kd-txt { flex:1; min-width:0; }
+    .kd-banner .kd-step { color:var(--muted); font-size:0.72rem; }
+    .kd-banner .kd-what { font-weight:600; font-size:0.84rem; }
+    .kd-banner .kd-preview, .kd-banner .kd-res { display:block; min-height:1.4em; font-size:0.74rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .kd-banner .kd-preview { font-family:var(--mono); color:#80deea; }
+    .kd-banner button { font-size:0.76rem; padding:2px 9px; white-space:nowrap; }
+    .kd-ok { color:#4aad7a; } .kd-bad { color:#f0a0ab; } .kd-busy { color:var(--muted); font-style:italic; }
+    .kd-save-warn { border-color:rgba(216,94,111,0.55) !important; color:#f0a0ab !important; }
+    .kd-menu { position:fixed; z-index:10050; min-width:240px; max-width:340px; background:#18212d; border:1px solid var(--border); border-radius:9px; box-shadow:0 12px 30px rgba(0,0,0,0.45); padding:4px; color:var(--ink); font-size:0.8rem; }
+    .kd-menu .kd-mh { padding:4px 8px 6px; font:600 0.76rem var(--mono); color:#80deea; border-bottom:1px solid var(--border); margin-bottom:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .kd-menu .kd-sec { padding:6px 8px 2px; color:var(--muted); font-size:0.68rem; text-transform:uppercase; letter-spacing:0.04em; }
+    .kd-menu button.kd-it { display:flex; width:100%; gap:8px; align-items:center; border:0; background:none; padding:5px 8px; border-radius:6px; cursor:pointer; text-align:left; color:var(--ink); font-size:0.8rem; }
+    .kd-menu button.kd-it:hover:not(:disabled) { background:rgba(255,255,255,0.07); }
+    .kd-menu button.kd-it:disabled { opacity:0.45; cursor:default; }
+    .kd-menu .kd-ex { display:flex; align-items:center; gap:6px; padding:3px 8px; font:0.72rem var(--mono); }
+    .kd-menu .kd-ex .kd-d { flex:1; min-width:0; color:#c5d3e8; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .kd-menu .kd-ex button { border:0; background:none; color:var(--muted); cursor:pointer; font:0.72rem var(--sans); padding:1px 5px; border-radius:4px; }
+    .kd-menu .kd-ex button:hover { background:rgba(255,255,255,0.08); color:var(--ink); }
+    .kd-menu .kd-fkd { padding:4px 8px 6px; font:0.72rem var(--mono); color:#c5d3e8; white-space:normal; word-break:break-word; }
+    .kd-menu .kd-res { padding:2px 8px 6px; font-size:0.76rem; }
+    .kd-dot { display:inline-block; width:8px; height:8px; border-radius:50%; flex:none; }
+    .kd-drawer { border:1px solid var(--border); border-radius:6px; background:rgba(0,0,0,0.18); flex:none; }
+    .kd-drawer-head { display:flex; align-items:center; gap:8px; padding:3px 10px; cursor:pointer; font-size:0.8rem; }
+    .kd-drawer .kd-tw { color:var(--muted); width:12px; }
+    .kd-hint { color:var(--muted); font-size:0.74rem; }
+    .kd-drawer.is-closed .kd-drawer-body, .kd-drawer.is-closed .kd-drawer-tabs { display:none; }
+    .kd-drawer-body { padding:2px 12px 8px; font:0.74rem/1.85 var(--mono); max-height:110px; overflow:auto; }
+    .kd-ent { padding:1px 4px; border-radius:4px; cursor:pointer; color:#c5d3e8; }
+    .kd-ent:hover { background:rgba(55,198,163,0.16); color:var(--ink); }
+    .ks-tools-wrap { position:relative; display:inline-flex; }
+    .ks-tools-menu { position:absolute; top:calc(100% + 4px); left:0; z-index:40; min-width:250px; }
+    .ks-tools-menu button { display:block; width:100%; text-align:left; }
     #inputsPane { display:none !important; }
     .floating-panel {
       position: fixed;
@@ -3182,8 +3323,12 @@
           </div>
           <div class="grid" style="gap:6px;position:relative;">
             <div class="api-status-row">
-              <div class="api-status-badges">
-                <span class="badge" id="erdStatusBadge">no diagram</span>
+              <div class="api-status-badges erd-head-tabs">
+                <div class="val-sql-tabs" id="erdTabs">
+                  <button class="val-sql-tab active" data-tab="diagram" title="The tables, their keys and how they join; edit keys here">Diagram</button>
+                  <button class="val-sql-tab" data-tab="mermaid" title="The same diagram as Mermaid syntax">Mermaid</button>
+                </div>
+                <span class="erd-status" id="erdStatusBadge">no diagram</span>
               </div>
               <div class="drag-handle" data-drag-handle="erdPanel" title="Drag window"></div>
               <div class="api-status-actions">
@@ -3197,21 +3342,47 @@
                     <button id="erdSearchNext" class="secondary pane-search-nav" title="Next match (Enter)">&#8595;</button>
                     <span id="erdSearchCount" class="api-search-count"></span>
                   </div>
+                  <button id="kdRefreshBtn" class="secondary" title="Read the columns again from the data source for the tables whose columns were read, and the table lists already opened" style="padding:3px 7px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 7a5 5 0 1 1-1.5-3.6"/><path d="M12 1.5v3h-3"/></svg></button>
+                  <div class="plan-tools-hamburger-wrap">
+                    <button id="kdArrangeBtn" class="secondary" title="Arrange the tables" style="padding:3px 7px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="1.5" width="5" height="4" rx="0.8"/><rect x="8" y="1.5" width="5" height="4" rx="0.8"/><rect x="1" y="8.5" width="5" height="4" rx="0.8"/><rect x="8" y="8.5" width="5" height="4" rx="0.8"/></svg> &#9662;</button>
+                    <div id="kdLayoutMenu" class="showplan-menu plan-tools-menu hidden">
+                      <button type="button" class="secondary" data-kd-layout="grid" title="Rows and columns, joined tables next to each other">Grid</button>
+                      <button type="button" class="secondary" data-kd-layout="tidy" title="The Tidy Mycelium layout of the Ontology Visualization: the closely joined tables first, the rest round them">Tidy Mycelium</button>
+                    </div>
+                  </div>
                   <button id="erdCopyBtn" class="secondary" title="Copy Mermaid syntax to clipboard" style="padding:3px 7px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="1" width="9" height="10" rx="1"/><path d="M4 3H2.5A1.5 1.5 0 0 0 1 4.5v7A1.5 1.5 0 0 0 2.5 13H9a1.5 1.5 0 0 0 1.5-1.5V10"/></svg></button>
-                  <button id="erdDownloadBtn" class="secondary" title="Download diagram or Mermaid syntax" style="padding:3px 7px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 1v8M4 6l3 3 3-3"/><path d="M1 11h12v2H1z"/></svg></button>
+                  <div class="plan-tools-hamburger-wrap">
+                    <button id="erdDownloadBtn" class="secondary" title="Download the diagram or its Mermaid syntax" style="padding:3px 7px;"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 1v8M4 6l3 3 3-3"/><path d="M1 11h12v2H1z"/></svg></button>
+                    <div id="erdDownloadMenu" class="showplan-menu plan-tools-menu hidden">
+                      <button type="button" class="secondary" data-erd-download="svg" title="The diagram drawn with Mermaid, as a picture">Diagram (.svg)</button>
+                      <button type="button" class="secondary" data-erd-download="mmd" title="The diagram as Mermaid text">Mermaid (.mmd)</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-            <div class="val-sql-tab-bar-wrap">
-              <div class="val-sql-tabs" id="erdTabs">
-                <button class="val-sql-tab active" data-tab="diagram" title="Visual ER diagram rendered from Mermaid syntax">Diagram</button>
-                <button class="val-sql-tab" data-tab="mermaid" title="Raw Mermaid ERD syntax">Mermaid</button>
+            <div id="erdOutput" class="api-response-view hidden" data-select-scope>Load SMS2 mappings, unique keys, or foreign keys to generate an ER diagram.</div>
+            <div id="kdView" class="kd-view">
+              <aside class="kd-side" id="kdSide">
+                <div class="kd-side-tabs" id="kdSideTabs"><button type="button" class="kd-seg is-on" data-kd-side="src" title="Tables in the data sources">Data source</button><button type="button" class="kd-seg" data-kd-side="map" title="Tables each virtual graph's mappings read">Mappings</button></div>
+                <input id="kdTreeFilter" class="kd-filter" type="text" placeholder="Filter tables" autocomplete="off">
+                <div class="kd-tree" id="kdTree"></div>
+              </aside>
+              <div class="kd-stage">
+                <div class="kd-filterbar hidden" id="kdFilterBar"></div>
+                <div class="kd-vp" id="kdVp"><div class="kd-sizer" id="kdSizer"><div class="kd-cv" id="kdCanvas"></div></div></div>
+                <div id="erdZoomControls" class="erd-zoom-controls">
+                  <button id="erdZoomIn" class="erd-zoom-btn" title="Zoom in">+</button>
+                  <button id="erdZoomOut" class="erd-zoom-btn" title="Zoom out">&#8722;</button>
+                  <button id="kdZoomFit" class="erd-zoom-btn kd-fit-btn" title="Fit the diagram in the window">Fit</button>
+                </div>
               </div>
             </div>
-            <div id="erdOutput" class="api-response-view" data-select-scope>Load SMS2 mappings, unique keys, or foreign keys to generate an ER diagram.</div>
-            <div id="erdZoomControls" class="erd-zoom-controls hidden">
-              <button id="erdZoomIn" class="erd-zoom-btn" title="Zoom in">+</button>
-              <button id="erdZoomOut" class="erd-zoom-btn" title="Zoom out">&#8722;</button>
+            <div class="kd-drawer is-closed" id="kdDrawer">
+              <div class="kd-drawer-head" id="kdDrawerHead"><span class="kd-tw" id="kdDrawerTw">&#9656;</span><span>Key set text</span>
+                <span class="kd-drawer-tabs" id="kdDrawerTabs"><button type="button" class="kd-seg is-on" data-kd-drawer="uniqueKeySets">Unique Keys</button><button type="button" class="kd-seg" data-kd-drawer="foreignKeySets">Foreign Keys</button><button type="button" class="kd-seg" data-kd-drawer="functionalDependencySets">Functional Dependencies</button></span>
+                <span class="kd-hint" id="kdDrawerSum"></span></div>
+              <div class="kd-drawer-body" id="kdDrawerBody"></div>
             </div>
           </div>
         </section>
@@ -10666,24 +10837,59 @@ return OntologyLayouts;
       const KS_ICON_TABS = _KS_SVG('<rect x="2" y="5.5" width="12" height="8" rx="1.5"/><path d="M2 5.5V4a1 1 0 0 1 1-1h3v2.5M6 3h3.5a1 1 0 0 1 1 1v1.5"/>');
       const KS_ICON_STACK = _KS_SVG('<rect x="2" y="2.5" width="12" height="4.5" rx="1"/><rect x="2" y="9" width="12" height="4.5" rx="1"/>');
       const KS_ICON_PULL = _KS_SVG('<path d="M9.5 2.5h4v4M13.5 2.5 8 8"/><path d="M6.5 3.5h-3a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-3"/>');
+      const KS_ICON_ERD = _KS_SVG('<rect x="1.5" y="2" width="5.5" height="5" rx="1"/><rect x="9" y="9" width="5.5" height="5" rx="1"/><path d="M7 4.5h2.5a1 1 0 0 1 1 1V9"/>');
+      // The layout controls (tabs, own pane, back in the tabs) and the ER Diagram link sit in one ☰ menu per
+      // visible key-set header, so the crowded header carries one button instead of three.
+      function keySetsMenuHtml(key, items) {
+        const all = [`<button type="button" class="secondary" data-ks-open-erd="${key}" title="Open the ER Diagram, where keys are drawn and edited on the tables themselves">${KS_ICON_ERD} Edit keys on the ER Diagram…</button>`, ...items];
+        return `<span class="ks-tools-wrap plan-tools-hamburger-wrap"><button type="button" class="secondary icon-btn plan-tools-hamburger-btn ks-ctl" data-ks-menu-btn="${key}" title="Key set options" aria-label="Key set options">&#9776;</button><span class="showplan-menu plan-tools-menu ks-tools-menu hidden" data-ks-menu="${key}">${all.join("")}</span></span>`;
+      }
       function keySetsTitleHtml(key) {
         const L = keySetsLayout();
         const label = `<span class="artifact-pane-label">${esc(META[key].label)}</span>`;
         let inner = label;
         if (!L.grouped) {
-          if (key === L.first) inner += `<button type="button" class="ks-ctl" data-ks-group="on" title="Combine the key sets into one pane with tabs" aria-label="Combine the key sets into one pane with tabs">${KS_ICON_TABS}</button>`;
+          inner += keySetsMenuHtml(key, key === L.first ? [`<button type="button" class="secondary" data-ks-group="on" title="Combine the key sets into one pane with tabs">${KS_ICON_TABS} Combine the key sets into tabs</button>`] : []);
         } else if (L.hidden.has(key)) {
           // behind another tab: not on screen, so it carries no controls
         } else if (L.tabs.some((g) => g.key === key)) {
           const tabs = L.tabs.map((g) => `<button type="button" role="tab" class="ks-tab${g.key === L.active ? " is-active" : ""}${g.key !== L.active && keySetAttention(g.key) ? " has-attention" : ""}" data-ks-tab="${g.key}" title="${esc(keySetTabTitle(g))}"${keySetTabCountAttr(g)} aria-selected="${g.key === L.active}">${esc(g.tab)}</button>`).join("");
+          const tabName = esc(KEYSET_GROUP.find((g) => g.key === key).tab);
           inner = `<span class="artifact-pane-label">Key sets</span><span class="ks-tabs" role="tablist">${tabs}</span>`
-            + (L.tabs.length > 1 ? `<button type="button" class="ks-ctl" data-ks-pull="${key}" title="Show ${esc(KEYSET_GROUP.find((g) => g.key === key).tab)} in its own pane" aria-label="Show this key set in its own pane">${KS_ICON_PULL}</button>` : "")
-            + `<button type="button" class="ks-ctl" data-ks-group="off" title="Show each key set in its own pane" aria-label="Show each key set in its own pane">${KS_ICON_STACK}</button>`;
+            + keySetsMenuHtml(key, [
+              ...(L.tabs.length > 1 ? [`<button type="button" class="secondary" data-ks-pull="${key}" title="Show ${tabName} in its own pane">${KS_ICON_PULL} Show ${tabName} in its own pane</button>`] : []),
+              `<button type="button" class="secondary" data-ks-group="off" title="Show each key set in its own pane">${KS_ICON_STACK} Show each key set in its own pane</button>`
+            ]);
         } else {
-          inner += `<button type="button" class="ks-ctl" data-ks-return="${key}" title="Put this key set back in the tabs" aria-label="Put this key set back in the tabs">${KS_ICON_TABS}</button>`;
+          inner += keySetsMenuHtml(key, [`<button type="button" class="secondary" data-ks-return="${key}" title="Put this key set back in the tabs">${KS_ICON_TABS} Put this key set back in the tabs</button>`]);
         }
         return `<span class="ks-title" data-ks-title="${key}">${inner}</span>`;
       }
+      function closeKeySetMenus(exceptKey) {
+        document.querySelectorAll("[data-ks-menu]").forEach((m) => { if (m.getAttribute("data-ks-menu") !== exceptKey) m.classList.add("hidden"); });
+      }
+      document.addEventListener("click", (e) => {
+        const t = e.target instanceof Element ? e.target : null;
+        if (!t) return;
+        const btn = t.closest("[data-ks-menu-btn]");
+        if (btn) {
+          e.preventDefault(); e.stopPropagation();
+          const key = btn.getAttribute("data-ks-menu-btn");
+          const menu = btn.parentElement.querySelector(`[data-ks-menu="${key}"]`);
+          const opening = Boolean(menu && menu.classList.contains("hidden"));
+          closeDropdownMenus(); closeKeySetMenus(key);
+          if (menu) menu.classList.toggle("hidden", !opening);
+          return;
+        }
+        const open = t.closest("[data-ks-open-erd]");
+        if (open) {
+          e.preventDefault(); e.stopPropagation();
+          closeKeySetMenus();
+          openKeysDiagram(open.getAttribute("data-ks-open-erd"));
+          return;
+        }
+        if (!t.closest("[data-ks-menu]")) closeKeySetMenus();
+      }, true);
       // The data source list sits in the header of the top key set pane (the visible tab when the key
       // sets are combined), so reordering the panes or switching tabs moves it with them.
       function keySetsDsHostKey() {
@@ -10772,6 +10978,7 @@ return OntologyLayouts;
         if (!t) return;
         e.preventDefault();
         e.stopPropagation();
+        closeKeySetMenus();
         const ks = state.ui.keySets;
         if (t.hasAttribute("data-ks-tab")) { keySetsSetActive(t.getAttribute("data-ks-tab")); return; }
         state.ui.keySetsUserLayout = true;   // the user's layout wins over the automatic tabs (syncVgPaneAutoFold)
@@ -17196,6 +17403,7 @@ return OntologyLayouts;
               renderKeySetSyntaxOverlay(key);
               const _ksArtifact = state.artifacts[key];
               if (_ksArtifact && !editor.readOnly) _ksArtifact.working = editor.value;
+              erdRefreshIfOpen();   // typing, undo and redo all pass here; the ER Diagram follows
             } else if (key === "sms2Mappings") {
               renderTurtleSyntaxOverlay(key);
             }
@@ -18226,6 +18434,7 @@ return OntologyLayouts;
         if (key === "sms2Mappings" || key === "uniqueKeySets" || key === "foreignKeySets" || key === "functionalDependencySets" || key === "ontologyModel") {
           scheduleValSqlRegenerate(key);
         }
+        if (key === "sms2Mappings" || key === "uniqueKeySets" || key === "foreignKeySets" || key === "functionalDependencySets") erdRefreshIfOpen();
         if (key === "queryPlan") {
           const planSnapshot = artifact.working;
           state.ui.lastPlanWasProfile = /^Profiling results:/m.test(planSnapshot || "");
@@ -30279,8 +30488,16 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.55.1";
+      const APP_VERSION = "1.56.0";
       const RELEASE_NOTES = [
+        { version: "1.56.0", date: "2026-11-25", title: "Explore and edit keys on the ER Diagram", items: [
+          "The [[ER Diagram|aa-tool-erd]] draws each source table as a card with its columns: unique keys as {{K1}}, {{K2}} chips, functional dependencies as {{D1}} (determines) and {{d1}} (determined), and foreign keys as lines ending in a circle at the exact column on both tables. Joins the mappings imply without a declared foreign key are drawn dashed; one click declares them.",
+          "Right-click a table to add a unique key or a functional dependency: the table moves to the front and you tick its columns. To add a foreign key, click a column's circle and then a column on another table, or drag between them. Each change is written into the key set panes at once, and typing in those panes redraws the diagram.",
+          "Before saving a key you can test it against the data with the same SQL the [[SQL validation tool|aa-tool-sqlvalidation]] runs, and see the result beside {*Save*}.",
+          "A dashed join's menu lists every mapping that implies it; step through them with ‹ › and each opens at its line in the SMS2 Mappings pane.",
+          "A list beside the diagram shows each data source's tables, read only when you open it, and each virtual graph's tables, including those named only inside a SQL query. Add any table, read its full column list from the data source, and refresh what was read.",
+          "Tables are laid out with {*Tidy Mycelium*} (or a grid, from {*Arrange the tables*}). Drag a table by its header and its lines follow; zoom with the wheel or touchpad and drag empty space to pan, as in the [[Ontology Visualization|aa-tool-ontology]]. It opens from each key set pane's ☰ menu and still exports as Mermaid text or an {{.svg}} picture."
+        ] },
         { version: "1.55.0", date: "2026-11-25", title: "Several queries in one pane", items: [
           "When the query pane holds several queries, the {*Contexts*} list, the virtual graphs offered as relevant to the query, the findings and the [[Query → Source Map|aa-tool-qsm]] all follow the query your cursor is in, the one that would run.",
           "A tag beside {*SPARQL Query*} and a mark at the right edge of the line numbers show which query the loaded mappings, keys and findings belong to, and say when the cursor is in another one. The ↻ button loads them for the query the cursor is in.",
@@ -30765,11 +30982,20 @@ ORDER BY ?table ?ordinal`;
         },
         {
           id: "aa-tool-erd", group: "workbench",
-          label: "ER Diagram (generated)",
+          label: "ER Diagram and keys",
           where: `<strong>ER Diagram</strong> in the ☰ menu (top-right).`,
           loc: { kind: "hero", highlight: "menu", caption: "In the ☰ menu (top-right)" },
           source: null,
-          body: `<p>Builds an entity-relationship diagram of the relational <em>source</em> tables — inferred from your SMS2 mappings, unique keys, and foreign keys — so you can see the implied shape of the database the virtual graph sits on. Rendered with Mermaid; supports search, zoom, and export (SVG or Mermaid text).</p>`
+          body: `<p>Draws the relational <em>source</em> tables behind your virtual graphs and lets you edit their keys on the tables themselves. Each table is a card listing its columns; the tables come from the loaded SMS2 mappings and the three key sets, and you can add others.</p>
+            <h5>Reading the diagram</h5>
+            <p>Unique keys show as <strong>K1</strong>, <strong>K2</strong>… chips on their columns; hover a chip to light up every column of that key. A functional dependency shows as <strong>D1</strong> on the determining columns and an outlined <strong>d1</strong> on the columns they determine. A foreign key is a line from the exact column on one table to the exact column on the other, with a filled circle at both ends; a foreign key over several columns also carries <strong>F1</strong> chips at both ends. A dashed line is a join the mappings imply (two tables build the same IRI template) that is not declared as a foreign key. Click or right-click it to declare it, or to see every mapping that implies it: step through them with <strong>‹ ›</strong> (or click one) and each opens at its line in the SMS2 Mappings pane, flashed. When a column carries more than two chips, they fold into one with a count, and hovering it shows them all. After the SQL validation tool runs, keys and lines that passed are outlined green and those that failed red, and a blue <strong>U</strong> marks a column the data shows to be unique that is not declared; click it to declare it.</p>
+            <h5>Editing keys</h5>
+            <p>Right-click a table (or use its <strong>⋯</strong> button) to add a unique key or a functional dependency, or to edit, test or remove one. The table moves to the front, the rest of the diagram fades, and you tick the columns: for a dependency, first the determining columns, then the ones they determine. <strong>Test</strong> runs the same SQL check the SQL validation tool uses against the table's data source and shows the result before you save; <strong>Save anyway</strong> keeps a key that failed. To add a foreign key, click the circle beside a column and then a column on another table (or drag from one to the other); press Esc or click empty space to drop the line. Click or right-click a foreign key's line to test it, add another column pair to it, or remove it.</p>
+            <p>Every change is written into the Unique Keys, Foreign Keys or Functional Dependencies pane, as if typed there, so undo, saving to Stardog and the findings work as usual; under several data sources, a new key goes under its table's data source heading. Typing in those panes redraws the diagram. The <strong>Key set text</strong> drawer under the diagram shows the text of each key set; click an entry to find its table. The ☰ menu in each key set pane's header opens this diagram.</p>
+            <h5>Tables and columns</h5>
+            <p>The list on the left has two tabs. <strong>Data source</strong> lists the data sources in use (and the others, on request); opening one reads its list of tables from Stardog, and <strong>+</strong> adds a table to the diagram and reads its columns. <strong>Mappings</strong> lists each virtual graph's tables, marking with <strong>SQL</strong> a table named only inside a SQL query; untick a virtual graph to show only the others' tables. Columns are those the mappings and keys name until you choose <strong>Read all columns</strong> on a table, which reads them from its data source (a query that returns no rows); a column the mappings or keys name that the data source does not have is struck through. The refresh button reads again only what was read before; it shows progress and can be stopped. The diagram is laid out automatically with <strong>Tidy Mycelium</strong>, the layout of the Ontology Visualization, and a table you add goes at the end. Drag a table by its header to move it: its lines follow, and their ends switch to the side of the table that faces the other one. The <strong>Arrange the tables</strong> menu in the toolbar lays everything out again, with <strong>Tidy Mycelium</strong> or as a <strong>Grid</strong> (rows and columns, joined tables next to each other); the one you choose is used from then on. A large diagram takes a moment to lay out, with progress and a stop button. How the tables are placed is not part of the Mermaid text. As in the Ontology Visualization, the mouse wheel, a two-finger touchpad scroll or a pinch zooms about the pointer, and dragging an empty part of the diagram moves it; the buttons zoom too. <strong>Read all columns</strong> appears only on tables whose data source is known.</p>
+            <h5>Mermaid</h5>
+            <p>The <strong>Mermaid</strong> tab shows the same diagram as Mermaid text, with search. Copy it, or download it as Mermaid text (.mmd) or as a picture drawn by Mermaid (.svg).</p>`
         },
         {
           id: "aa-tool-ontology", group: "workbench",
@@ -41169,8 +41395,8 @@ acme:temperature rdfs:range xsd:string .`
         {
           section: "tools",
           target: "#erdPanel",
-          title: "Inferred ER diagram",
-          body: "Generates an entity-relationship diagram from what the mappings and key sets imply about the underlying tables — no live schema introspection required.",
+          title: "ER diagram and keys",
+          body: "Draws the tables the mappings and key sets name, with their keys and joins, and lets you add, test and edit unique keys, foreign keys and functional dependencies on the tables themselves.",
           before: async () => {
             await tourGoto("#erdMenuItem", { parkSide: "right" });
             await tourWaitFor("#erdPanel:not(.hidden)");
@@ -47041,25 +47267,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
       let _erdLastSearch = "";
       let _mermaidLoadPromise = null;
       let _erdRenderGeneration = 0;
-      let _erdZoomScale = 1;        // current zoom as fraction of _erdMaxScaleFactor; 1 = max (12pt)
-      let _erdMaxScaleFactor = 1;   // scale factor that brings smallest SVG text to 16px (12pt)
-      let _erdNatW = 0;             // natural SVG pixel width from Mermaid
-      let _erdNatH = 0;             // natural SVG pixel height from Mermaid
-      const _ERD_ZOOM_STEP = 0.82;  // ~18% reduction per zoom-out step
-      const _ERD_ZOOM_MIN = 0.25;   // minimum 25% of max scale
-
-      function applyErdZoom(svgArg) {
-        const svgEl = svgArg || $("erdDiagramHost")?.querySelector("svg");
-        if (!svgEl || _erdNatW <= 0 || _erdNatH <= 0) return;
-        _erdZoomScale = Math.max(_ERD_ZOOM_MIN, Math.min(1, _erdZoomScale));
-        svgEl.style.width  = `${Math.round(_erdNatW * _erdMaxScaleFactor * _erdZoomScale)}px`;
-        svgEl.style.height = `${Math.round(_erdNatH * _erdMaxScaleFactor * _erdZoomScale)}px`;
-        const zoomIn  = $("erdZoomIn");
-        const zoomOut = $("erdZoomOut");
-        if (zoomIn)  zoomIn.disabled  = _erdZoomScale >= 1;
-        if (zoomOut) zoomOut.disabled = _erdZoomScale <= _ERD_ZOOM_MIN;
-      }
-
+      let _erdLastModel = { tables: {}, impliedRels: [] };
       function ensureMermaidLoaded() {
         if (window.mermaid) return Promise.resolve();
         if (_mermaidLoadPromise) return _mermaidLoadPromise;
@@ -47260,6 +47468,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         // history already hit once.
         const _escMermaidText = (s) => String(s || "").replace(/["\\]/g, "");
         const { blocksByVg } = parseAllRichMappingBlocks();
+        _erdLastModel = { tables: {}, impliedRels: [], blocksByVg };
         const allBlocks = Object.values(blocksByVg).flat();
         const blockMeta = allBlocks.map((block) => {
           const bindMap = buildWhereBindMap(block.whereText);
@@ -47390,6 +47599,8 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
           tgtCols.forEach((col) => { ensureCol(tgtTable, col, "string"); });
         });
 
+        // The Diagram tab draws from the same tables and columns (and the implied joins added below).
+        _erdLastModel = { tables, impliedRels: [], blocksByVg };
         if (!Object.keys(tables).length) { _erdValidationState = null; return null; }
 
         // Build a stable table-name → Mermaid-safe-ID map with collision disambiguation.
@@ -47411,19 +47622,26 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
 
         // Build implied join relations (same IRI template structure, different tables)
         const impliedGroups = {};
+        // Where each table builds the shared template (virtual graph, mapping, template variable), so the ER Diagram
+        // can jump to every mapping line that implies a join.
+        const impliedSources = {};
+        const blockVg = new Map();
+        Object.entries(blocksByVg).forEach(([vg, blocks]) => blocks.forEach((b) => blockVg.set(b, vg)));
         blockMeta.forEach(({ block, bindMap }) => {
           const table = _blockLabel(block);
           if (!table || (!block.fromTable && !block.sqlText)) return;
-          for (const [, shape] of Object.entries(bindMap)) {
+          for (const [varName, shape] of Object.entries(bindMap)) {
             if (!shape || !shape.columns.length || shape.kind !== "iri") continue;
             const key = _iriTemplateStructKey(shape);
             if (!impliedGroups[key]) impliedGroups[key] = new Map();
             if (!impliedGroups[key].has(table)) impliedGroups[key].set(table, shape.columns);
+            const sk = key + "\x00" + table;
+            (impliedSources[sk] = impliedSources[sk] || []).push({ vg: blockVg.get(block) || "", name: block.name || block.mappingId || "", mappingId: block.mappingId || "", varName, table });
           }
         });
         const impliedRels = [];
         const impliedSeen = new Set();
-        for (const tableMap of Object.values(impliedGroups)) {
+        for (const [gKey, tableMap] of Object.entries(impliedGroups)) {
           const tbls = Array.from(tableMap.keys());
           for (let i = 0; i < tbls.length; i++) {
             for (let j = i + 1; j < tbls.length; j++) {
@@ -47432,12 +47650,14 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
               impliedSeen.add(pk);
               impliedRels.push({
                 tableA: tbls[i], tableB: tbls[j],
-                colsA: tableMap.get(tbls[i]), colsB: tableMap.get(tbls[j])
+                colsA: tableMap.get(tbls[i]), colsB: tableMap.get(tbls[j]),
+                sources: [...(impliedSources[gKey + "\x00" + tbls[i]] || []), ...(impliedSources[gKey + "\x00" + tbls[j]] || [])]
               });
             }
           }
         }
 
+        _erdLastModel.impliedRels = impliedRels;
         // Derive FK labels from implied join analysis:
         // When one side of a shared-IRI join has a simple UK on the shared column, the
         // other side's column is a FK pointing to it. Single-column templates only (clear direction).
@@ -51856,12 +52076,17 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         const d = L.draw(m.boxes, m.links, m.opts);
         return { pos: d.pos, paths: d.paths.map((p) => p.points), algo: d.algo };
       }
-      function _ogGetWorker() {
-        if (_ogLayoutWorker) return _ogLayoutWorker;
+      // The worker's script: the layout library block's own text plus the job runner. Also used by the ER Diagram.
+      function _ogLayoutWorkerSource() {
         const lib = document.getElementById("ontology-layouts-lib");
         if (!lib || typeof Worker === "undefined" || typeof Blob === "undefined") return null;
-        const src = lib.textContent + "\n;const _ogLayoutJobRun = " + _ogLayoutJobRun.toString() + ";\n" +
+        return lib.textContent + "\n;const _ogLayoutJobRun = " + _ogLayoutJobRun.toString() + ";\n" +
           "self.onmessage = (ev) => { const m = ev.data; let out; try { out = { id: m.id, ok: true, res: _ogLayoutJobRun(self.OntologyLayouts, m) }; } catch (err) { out = { id: m.id, ok: false, err: String((err && err.message) || err) }; } self.postMessage(out); };";
+      }
+      function _ogGetWorker() {
+        if (_ogLayoutWorker) return _ogLayoutWorker;
+        const src = _ogLayoutWorkerSource();
+        if (!src) return null;
         const url = URL.createObjectURL(new Blob([src], { type: "text/javascript" }));
         try { _ogLayoutWorker = new Worker(url); } finally { setTimeout(() => URL.revokeObjectURL(url), 0); }
         return _ogLayoutWorker;
@@ -52481,130 +52706,79 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         el.style.left = x + "px"; el.style.top = y + "px";
       }
 
-      // ──────────────────────────────────────────────────────────────────────────
-      function toggleErdPanel() {
+      // ── ER Diagram panel ──────────────────────────────────────────────────────────
+      // Two tabs over one model. Diagram: the tables as cards with their columns, keys as chips, foreign keys and
+      // joins implied by the mappings as lines; keys are added and edited here and written straight into the key
+      // set panes (and read back from them). Mermaid: the same diagram as Mermaid text, searched, copied, and
+      // downloaded as .mmd or drawn by Mermaid into an .svg.
+      function toggleErdPanel(forceOpen) {
         const panel = $("erdPanel");
-        const opening = panel.classList.contains("hidden");
-        panel.classList.toggle("hidden");
-        if (opening && !applyStoredPanelPosition("erdPanel")) positionPanelNearCenter("erdPanel", "erdMenuItem");
-        if (opening) {
-          const hasMappings = Boolean((state.artifacts.sms2Mappings?.working || "").trim() || Object.keys(state.ui.mappingTextsByVg || {}).length);
-          const hasKeys = Boolean((state.artifacts.uniqueKeySets?.working || "").trim());
-          const hasFks = Boolean((state.artifacts.foreignKeySets?.working || "").trim());
-          // Always opens on the diagram; the Mermaid text is one click away. Only the tab is switched here: the
-          // diagram is drawn once, by runGenerateErd below (or by this switch when there is nothing to generate).
-          if (_erdActiveTab !== "diagram") switchErdTab("diagram", { render: !(hasMappings || hasKeys || hasFks) });
-          if (hasMappings || hasKeys || hasFks) runGenerateErd();
-        }
+        const wasHidden = panel.classList.contains("hidden");
+        if (!forceOpen && !wasHidden) { panel.classList.add("hidden"); kdEndModes(); return; }
+        panel.classList.remove("hidden");
+        if (wasHidden && !applyStoredPanelPosition("erdPanel")) positionPanelNearCenter("erdPanel", "erdMenuItem");
+        // Always opens on the diagram; the Mermaid text is one click away.
+        if (_erdActiveTab !== "diagram") switchErdTab("diagram", { render: false });
+        if (wasHidden && _kd.firstOpen) _kd.fitNext = true;
+        runGenerateErd();
+        if (wasHidden) requestAnimationFrame(() => { if (_kd.firstOpen) { _kd.firstOpen = false; kdFitZoom(); } });
+      }
+      // From a key set pane's ☰ menu: opens the panel with that key set's text in the drawer.
+      function openKeysDiagram(artifactKey) {
+        if (KD_KEYS.includes(artifactKey)) _kd.drawerKey = artifactKey;
+        toggleErdPanel(true);
       }
 
       function runGenerateErd() {
         const badge = $("erdStatusBadge");
-        if (badge) { badge.textContent = "generating…"; badge.style.opacity = "0.6"; }
-        _erdZoomScale = 1;
-        const zc = $("erdZoomControls");
-        if (zc) zc.classList.add("hidden");
         try {
           _erdMermaidSyntax = generateErdMermaid();
-          _erdSearchIndex = 0;
-          _erdLastSearch = "";
-          const inp = $("erdSearch");
-          if (inp) inp.value = "";
+          if (_erdActiveTab === "mermaid") {
+            _erdSearchIndex = 0;
+            _erdLastSearch = "";
+          }
           syncErdSearchState();
           renderErdOutput();
-          if (badge) {
-            badge.style.opacity = "";
-            const tableCount = _erdMermaidSyntax
-              ? ((_erdMermaidSyntax.match(/^\s+\S+\s+\{/gm) || []).length)
-              : 0;
-            badge.textContent = tableCount ? `${tableCount} table${tableCount !== 1 ? "s" : ""}` : "no data";
-          }
+          if (badge) badge.style.opacity = "";
         } catch (err) {
           if (badge) { badge.textContent = "error"; badge.style.opacity = ""; }
           log("error", "ERD generation failed", { err: String(err) });
         }
       }
+      // Coalesces the many triggers (typing in a key set pane, artifact loads, validation results) into one redraw.
+      let _erdRefreshTimer = 0;
+      function erdRefreshIfOpen() {
+        if ($("erdPanel")?.classList.contains("hidden")) return;
+        clearTimeout(_erdRefreshTimer);
+        _erdRefreshTimer = setTimeout(() => { if (!$("erdPanel")?.classList.contains("hidden")) runGenerateErd(); }, 200);
+      }
 
       function renderErdOutput() {
         const host = $("erdOutput");
         if (!host) return;
+        const diagram = _erdActiveTab === "diagram";
+        host.classList.toggle("hidden", diagram);
+        $("kdView")?.classList.toggle("hidden", !diagram);
+        if (diagram) { kdRender(); return; }
+        kdUpdateBadge();
         if (!_erdMermaidSyntax) {
           host.innerHTML = "";
           host.textContent = "Load SMS2 mappings, unique keys, or foreign keys to generate an ER diagram.";
           return;
         }
-        if (_erdActiveTab === "mermaid") {
-          const searchText = String($("erdSearch")?.value || "").trim();
-          host.innerHTML = splitLines(_erdMermaidSyntax).map((line, idx) =>
-            `<div class="api-response-line" data-api-response-line="${idx}">${highlightResponseLine(line, searchText) || " "}</div>`
-          ).join("");
-          if (searchText) {
-            const allMatches = host.querySelectorAll(".api-response-match");
-            const activeIdx = Math.min(_erdSearchIndex, Math.max(0, allMatches.length - 1));
-            if (allMatches[activeIdx]) {
-              allMatches[activeIdx].classList.add("pane-search-match-current");
-              allMatches[activeIdx].scrollIntoView({ block: "nearest" });
-            }
-          } else {
-            host.scrollTop = 0;
+        const searchText = String($("erdSearch")?.value || "").trim();
+        host.innerHTML = splitLines(_erdMermaidSyntax).map((line, idx) =>
+          `<div class="api-response-line" data-api-response-line="${idx}">${highlightResponseLine(line, searchText) || " "}</div>`
+        ).join("");
+        if (searchText) {
+          const allMatches = host.querySelectorAll(".api-response-match");
+          const activeIdx = Math.min(_erdSearchIndex, Math.max(0, allMatches.length - 1));
+          if (allMatches[activeIdx]) {
+            allMatches[activeIdx].classList.add("pane-search-match-current");
+            allMatches[activeIdx].scrollIntoView({ block: "nearest" });
           }
         } else {
-          const generation = ++_erdRenderGeneration;
-          host.innerHTML = '<div class="erd-diagram-host" id="erdDiagramHost"><div style="padding:14px;color:rgba(223,232,248,0.45);font-size:0.88rem;">Rendering diagram…</div></div>';
-          const uniqueId = "erd_svg_" + Math.random().toString(36).slice(2);
-          ensureMermaidLoaded()
-            .then(() => window.mermaid.render(uniqueId, _erdMermaidSyntax))
-            .then(({ svg }) => {
-              if (_erdRenderGeneration !== generation) return;
-              const diagramHost = $("erdDiagramHost");
-              if (!diagramHost) return;
-              diagramHost.innerHTML = svg;
-              // Measure natural SVG dimensions and compute the 12pt (16 CSS px) max-scale factor.
-              // Zoom state (_erdZoomScale) is controlled independently by the +/- buttons.
-              const svgEl = diagramHost.querySelector("svg");
-              if (svgEl) {
-                _erdNatW = parseFloat(svgEl.getAttribute("width") || "0");
-                _erdNatH = parseFloat(svgEl.getAttribute("height") || "0");
-                if (_erdNatW > 0 && _erdNatH > 0) {
-                  let minFontPx = Infinity;
-                  svgEl.querySelectorAll("text, tspan").forEach((el) => {
-                    const fs = parseFloat(window.getComputedStyle(el).fontSize);
-                    if (fs > 0 && fs < minFontPx) minFontPx = fs;
-                  });
-                  _erdMaxScaleFactor = (isFinite(minFontPx) && minFontPx > 0) ? Math.max(1, 16 / minFontPx) : 1;
-                  svgEl.removeAttribute("width");
-                  svgEl.removeAttribute("height");
-                  // Marker circles default to white in Mermaid's dark theme — replace with panel bg.
-                  // Walk up from the SVG to find the first opaque background colour.
-                  { let _bg = "#0d1520", _el = svgEl.parentElement;
-                    while (_el) {
-                      const _c = window.getComputedStyle(_el).backgroundColor;
-                      if (_c && _c !== "rgba(0, 0, 0, 0)") { _bg = _c; break; }
-                      if (_el === document.body) break;
-                      _el = _el.parentElement;
-                    }
-                    svgEl.querySelectorAll("defs marker circle").forEach(c => {
-                      c.style.setProperty("fill", _bg, "important");
-                    });
-                  }
-                  // Apply validation-based coloring to the SVG
-                  _applyErdValidationColoring(svgEl);
-                  applyErdZoom(svgEl);
-                  const zc = $("erdZoomControls");
-                  if (zc) zc.classList.remove("hidden");
-                }
-              }
-            })
-            .catch((err) => {
-              if (_erdRenderGeneration !== generation) return;
-              const diagramHost = $("erdDiagramHost");
-              if (!diagramHost) return;
-              const msg = String((err && err.message) || err || "rendering failed");
-              diagramHost.innerHTML = `<div style="padding:10px 0 6px;color:rgba(213,170,49,0.9);font-size:0.82rem;">Mermaid unavailable${msg ? ": " + esc(msg) : ""}. Showing raw syntax.</div>` +
-                splitLines(_erdMermaidSyntax).map((line, idx) =>
-                  `<div class="api-response-line" data-api-response-line="${idx}">${esc(line) || " "}</div>`
-                ).join("");
-            });
+          host.scrollTop = 0;
         }
       }
 
@@ -52616,13 +52790,18 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         const hasText = Boolean(input.value.trim());
         wrap.classList.toggle("has-text", hasText);
         cluster.classList.toggle("has-search", hasText);
-        // Hide search UI in diagram tab (not useful for SVG)
-        cluster.classList.toggle("erd-search-cluster-hidden", _erdActiveTab === "diagram");
+        wrap.title = _erdActiveTab === "diagram" ? "Find a table" : "Search Mermaid syntax";
+        input.placeholder = _erdActiveTab === "diagram" ? "Find table" : "Search";
       }
 
       function updateErdSearchCount() {
         const countEl = $("erdSearchCount");
         if (!countEl) return;
+        if (_erdActiveTab === "diagram") {
+          const n = kdSearchMatches().length;
+          countEl.textContent = n ? `${Math.min(_erdSearchIndex, n - 1) + 1}/${n}` : "";
+          return;
+        }
         const matches = $("erdOutput")?.querySelectorAll(".api-response-match") || [];
         countEl.textContent = matches.length ? `${_erdSearchIndex + 1}/${matches.length}` : "";
       }
@@ -52630,9 +52809,17 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
       function doErdSearch(dir = 1) {
         const searchInput = $("erdSearch");
         const host = $("erdOutput");
-        if (!host || !searchInput || _erdActiveTab !== "mermaid") return;
+        if (!host || !searchInput) return;
         const searchText = searchInput.value.trim();
         syncErdSearchState();
+        if (_erdActiveTab === "diagram") {
+          const matches = kdSearchMatches();
+          if (searchText !== _erdLastSearch) { _erdLastSearch = searchText; _erdSearchIndex = 0; }
+          else if (matches.length) _erdSearchIndex = (_erdSearchIndex + dir + matches.length) % matches.length;
+          if (matches.length) kdFindTable(matches[Math.min(_erdSearchIndex, matches.length - 1)]);
+          updateErdSearchCount();
+          return;
+        }
         if (!searchText) {
           _erdLastSearch = "";
           _erdSearchIndex = 0;
@@ -52662,9 +52849,9 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         if (inp) inp.value = "";
         const tabBar = $("erdTabs");
         if (tabBar) tabBar.querySelectorAll(".val-sql-tab").forEach((btn) => btn.classList.toggle("active", btn.dataset.tab === tabId));
-        // Zoom controls only visible on diagram tab
-        const zc = $("erdZoomControls");
-        if (zc) zc.classList.toggle("hidden", tabId !== "diagram" || _erdNatW <= 0);
+        if (tabId !== "diagram") kdEndModes();
+        $("erdOutput")?.classList.toggle("hidden", tabId === "diagram");
+        $("kdView")?.classList.toggle("hidden", tabId !== "diagram");
         syncErdSearchState();
         if (!render) return;
         renderErdOutput();
@@ -52680,25 +52867,1407 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         showStatusToast(copied ? "Mermaid syntax copied." : "Unable to copy.", copied ? "ok" : "error", 1800);
       }
 
-      function downloadErd() {
-        if (!_erdMermaidSyntax) return;
-        if (_erdActiveTab === "diagram") {
-          const svgEl = $("erdDiagramHost")?.querySelector("svg");
-          if (svgEl) {
-            const svgText = new XMLSerializer().serializeToString(svgEl);
-            const blob = new Blob([svgText], { type: "image/svg+xml" });
-            const url = URL.createObjectURL(blob);
-            const a = Object.assign(document.createElement("a"), { href: url, download: "erd_diagram.svg" });
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            return;
+      // "svg": the diagram drawn by Mermaid (with the validation colors), "mmd": the Mermaid text.
+      async function downloadErd(kind = "mmd") {
+        if (!_erdMermaidSyntax) { showStatusToast("Nothing to download yet: load mappings or key sets first.", "info", 2600); return; }
+        const save = (text, type, name) => {
+          const url = URL.createObjectURL(new Blob([text], { type }));
+          const a = Object.assign(document.createElement("a"), { href: url, download: name });
+          document.body.appendChild(a); a.click(); document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        };
+        if (kind !== "svg") { save(_erdMermaidSyntax, "text/plain", "erd_diagram.mmd"); return; }
+        await ensureMermaidLoaded();
+        const { svg } = await window.mermaid.render("erd_svg_" + Math.random().toString(36).slice(2), _erdMermaidSyntax);
+        const holder = document.createElement("div");
+        holder.style.cssText = "position:fixed;left:-100000px;top:0;";
+        holder.innerHTML = svg;
+        document.body.appendChild(holder);
+        const svgEl = holder.querySelector("svg");
+        if (svgEl) _applyErdValidationColoring(svgEl);
+        const text = svgEl ? new XMLSerializer().serializeToString(svgEl) : svg;
+        holder.remove();
+        save(text, "image/svg+xml", "erd_diagram.svg");
+      }
+
+      // ── ER Diagram, Diagram tab (kd = keys diagram) ─────────────────────────────────
+      // The key set texts stay the source of truth: every edit here rewrites the entry in the pane's text (as
+      // typing would, so undo, Save and the findings follow), and every change to the text redraws the diagram.
+      // Columns come from the mappings and key sets; a table's full column list is read from its data source only
+      // when asked for (one zero-row query per table), and the data source's table list only when its node opens.
+      const KD_KEYS = ["uniqueKeySets", "foreignKeySets", "functionalDependencySets"];
+      const KD_ZOOM_STEP = 0.85, KD_ZOOM_MIN = 0.25, KD_ZOOM_MAX = 1.6, KD_GAP_X = 70, KD_GAP_Y = 34, KD_MARGIN = 16;
+      const KD_KEY_COLORS = ["#37c6a3", "#80deea", "#9ccc65"];
+      const _kd = {
+        order: [], cols: 1, forceLayout: false, firstOpen: true,
+        added: [], removed: new Set(),           // tables added from the lists / taken off the diagram
+        fetched: {}, fetchErr: {}, fetching: new Set(),
+        dsTables: {}, dsListLoading: false, open: new Set(["inuse"]), shown: {},
+        side: "src", vgOff: new Set(), zoom: 1,
+        layoutKind: "tidy", fitNext: false,      // the layout a full re-layout uses (the Layout menu changes it)
+        drawer: false, drawerKey: "uniqueKeySets",
+        mode: null, link: null, pairFk: null, hot: null, job: null, testAbort: null, model: null,
+      };
+      const kdConnected = () => Boolean(state.connection?.isConnected && state.connection?.baseUrl && !state.ui.demoMode);
+
+      // One key set's text, split at its "# data-source: NAME" banners. A segment is editable when its text is
+      // nothing but parenthesized entries; otherwise (an older property-file form) it is shown but not rewritten.
+      const KD_PREFIX = { uniqueKeySets: /unique\.key\.sets\s*=\s*/gi, foreignKeySets: /foreign\.key\.sets\s*=\s*/gi, functionalDependencySets: /functional\.dependency\.sets\s*=\s*/gi };
+      function kdParseEntry(key, raw) {
+        if (key === "uniqueKeySets") { const u = parseUniqueKeySetsText(raw)[0]; return u ? { kind: "uk", table: u.fullTable, cols: u.cols } : null; }
+        if (key === "foreignKeySets") { const f = parseForeignKeySetsText(raw)[0]; return f ? { kind: "fk", table: f.srcTable, cols: f.srcCols, tgt: f.tgtTable, tgtCols: f.tgtCols } : null; }
+        const d = parseFunctionalDependencySetsText(raw)[0];
+        return d ? { kind: "fd", table: d.table, det: d.det, dep: d.dep } : null;
+      }
+      function kdParseArtifact(key) {
+        const lines = String(state.artifacts[key]?.working || "").split("\n");
+        const segs = [];
+        let cur = { ds: null, banner: null, body: [] };
+        lines.forEach((line) => {
+          const b = line.match(/^\s*#\s*data-source:\s*(.+)$/i);
+          if (b) { segs.push(cur); cur = { ds: b[1].trim(), banner: line, body: [] }; } else cur.body.push(line);
+        });
+        segs.push(cur);
+        const P = { key, segs: segs.filter((s, i) => i > 0 || s.body.some((l) => l.trim()) || segs.length === 1), entries: [] };
+        P.segs.forEach((seg, si) => {
+          seg.comments = seg.body.filter((l) => /^\s*#/.test(l));
+          const payload = seg.body.filter((l) => !/^\s*#/.test(l)).join("\n").replace(/\\\s*\n/g, " ").replace(KD_PREFIX[key], "");
+          seg.editable = !payload.replace(/\([^()]*\)/g, "").replace(/[\s,]/g, "");
+          seg.entries = [];
+          if (seg.editable) {
+            (payload.match(/\([^()]*\)/g) || []).forEach((raw) => {
+              const e = kdParseEntry(key, raw);
+              if (e) seg.entries.push(Object.assign(e, { raw }));
+            });
+          } else {
+            // shown as read, never rewritten
+            if (key === "uniqueKeySets") parseUniqueKeySetsText(payload).forEach((u) => seg.entries.push({ kind: "uk", table: u.fullTable, cols: u.cols, raw: _colRef(u.fullTable, u.cols), readOnly: true }));
+            else if (key === "foreignKeySets") parseForeignKeySetsText(payload).forEach((f) => seg.entries.push({ kind: "fk", table: f.srcTable, cols: f.srcCols, tgt: f.tgtTable, tgtCols: f.tgtCols, raw: f.raw, readOnly: true }));
+            else parseFunctionalDependencySetsText(payload).forEach((d) => seg.entries.push({ kind: "fd", table: d.table, det: d.det, dep: d.dep, raw: d.raw, readOnly: true }));
+          }
+          seg.entries.forEach((e) => { e.seg = si; e.ds = seg.ds; e.key = key; P.entries.push(e); });
+        });
+        return P;
+      }
+      function kdBuildText(P) {
+        const out = [];
+        P.segs.forEach((seg) => {
+          if (seg.banner != null) out.push(seg.banner);
+          if (!seg.dirty) { out.push(...seg.body); return; }
+          const live = seg.entries.map((e) => e.raw);
+          if (live.length) out.push(live.join(", ")); else out.push(...seg.comments);
+        });
+        return out.join("\n");
+      }
+      // Writes a key set's new text the way typing would: the pane's own input handling updates the saved text,
+      // its overlays, undo, the Save button and the findings.
+      function kdWriteArtifact(key, text) {
+        const ed = document.querySelector(`[data-artifact-editor="${key}"]`);
+        if (ed instanceof HTMLTextAreaElement && !ed.readOnly) {
+          ed.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, cancelable: true, inputType: "insertReplacementText" }));
+          ed.value = text;
+          ed.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+        if (state.artifacts[key]) state.artifacts[key].working = text;
+        if (key === "uniqueKeySets" || key === "functionalDependencySets") scheduleAutomaticMappingAnalysis(`auto-${key}-edited`);
+        scheduleValSqlRegenerate(key);
+        runGenerateErd();
+      }
+      const kdBannerMode = () => KD_KEYS.some((k) => /^\s*#\s*data-source:/im.test(state.artifacts[k]?.working || ""));
+      // Adds, replaces or removes one entry. `oldEntry` is a parsed entry (from the model), `next` the new
+      // entry text ("" removes). A new entry goes under its table's data source banner when the key sets use them.
+      function kdEditEntry(key, oldEntry, nextRaw, ds) {
+        const P = kdParseArtifact(key);
+        if (oldEntry) {
+          const seg = P.segs[oldEntry.seg];
+          const i = seg ? seg.entries.findIndex((e) => e.raw === oldEntry.raw) : -1;
+          if (!seg || i < 0 || !seg.editable) { showStatusToast("That entry is written in a form the diagram does not rewrite; edit it in the key set pane.", "info", 4200); return false; }
+          if (nextRaw) seg.entries[i] = Object.assign({}, seg.entries[i], { raw: nextRaw }); else seg.entries.splice(i, 1);
+          seg.dirty = true;
+        } else {
+          let si = ds ? P.segs.findIndex((s) => s.ds === ds) : -1;
+          if (si < 0 && kdBannerMode() && ds) {
+            if (P.segs.length === 1 && !P.segs[0].banner && !P.segs[0].body.some((l) => l.trim())) P.segs = [];
+            P.segs.push({ ds, banner: `# data-source: ${ds}`, body: [], comments: [], entries: [], editable: true });
+            si = P.segs.length - 1;
+          }
+          if (si < 0 && kdBannerMode()) {
+            const bannered = P.segs.filter((s) => s.ds);
+            if (bannered.length > 1) { showStatusToast("This table's data source is not known, so the key cannot be placed under a data source heading. Add it in the key set pane under the right heading.", "info", 5200); return false; }
+            si = P.segs.indexOf(bannered[0]);
+          }
+          if (si < 0) si = P.segs.length - 1;
+          const seg = P.segs[si];
+          if (!seg.editable) { showStatusToast("That key set is written in a form the diagram does not rewrite; edit it in the key set pane.", "info", 4200); return false; }
+          seg.entries.push({ raw: nextRaw });
+          seg.dirty = true;
+        }
+        kdWriteArtifact(key, kdBuildText(P));
+        return true;
+      }
+
+      // ── the model ───────────────────────────────────────────────────────────────
+      // Tables from the mappings (the same ones the Mermaid view uses), the three key sets and the tables added
+      // from the lists, merged by name: a bare name joins the one qualified name that ends with it (flights and
+      // iot.flights are one table).
+      function kdModel() {
+        const P = Object.fromEntries(KD_KEYS.map((k) => [k, kdParseArtifact(k)]));
+        const names = new Map();
+        const note = (name, ds, src) => {
+          const n = String(name || "").trim();
+          if (!n) return;
+          const k = n.toLowerCase();
+          const r = names.get(k) || { name: n, ds: new Set(), src: new Set() };
+          if (ds) r.ds.add(ds);
+          r.src.add(src);
+          names.set(k, r);
+        };
+        const mapTables = _erdLastModel.tables || {};
+        const vgTables = {};
+        let rich = { blocksByVg: _erdLastModel.blocksByVg };
+        if (!rich.blocksByVg) { try { rich = parseAllRichMappingBlocks(); } catch (_) { rich = { blocksByVg: {} }; } }
+        const fromMappings = new Set();
+        Object.entries(rich.blocksByVg || {}).forEach(([vg, blocks]) => {
+          const ds = dsNameForVg(vg);
+          const rec = vgTables[vg] = { ds, tables: new Set(), sql: new Set() };
+          blocks.forEach((b) => {
+            const label = _blockLabel(b);
+            const plain = b.fromTable && (!b.sqlShape || b.sqlShape.kind === "trivial" || b.sqlShape.kind === "empty");
+            if (label && (b.fromTable || b.sqlText)) { note(label, ds, plain ? "map" : "query"); rec.tables.add(label.toLowerCase()); fromMappings.add(label); }
+            (b.tables || []).forEach((tb) => { const n = tb && tb.table; if (n && n.toLowerCase() !== String(label).toLowerCase()) { rec.sql.add(n.toLowerCase()); note(n, ds, "sql"); } });
+          });
+        });
+        Object.keys(mapTables).forEach((n) => { if (!fromMappings.has(n)) note(n, null, "key"); });
+        KD_KEYS.forEach((k) => P[k].entries.forEach((e) => { note(e.table, e.ds, "key"); if (e.tgt) note(e.tgt, e.ds, "key"); }));
+        _kd.added.forEach((a) => note(a.name, a.ds, "added"));
+        // bare and partly qualified names join the single longer name that ends with them
+        const lows = [...names.keys()];
+        const alias = new Map();
+        lows.forEach((n) => { const c = lows.filter((m) => m !== n && m.endsWith("." + n)); if (c.length === 1) alias.set(n, c[0]); });
+        const canon = (n) => { let k = String(n || "").trim().toLowerCase(); for (let g = 0; g < 6 && alias.has(k); g++) k = alias.get(k); return k; };
+        const tables = new Map();
+        names.forEach((r, k) => {
+          const id = canon(k);
+          const t = tables.get(id) || { id, name: (names.get(id) || r).name, ds: new Set(), src: new Set(), aliases: new Set(), written: {}, uks: [], fds: [] };
+          r.ds.forEach((d) => t.ds.add(d)); r.src.forEach((s) => t.src.add(s)); t.aliases.add(r.name);
+          tables.set(id, t);
+        });
+        const sel = state.live.selectedDataSources || [];
+        // A table with no known data source takes the only one in play, and none when there are several.
+        const inPlay = new Set([...sel, ...Object.values(vgTables).map((v) => v.ds)].filter(Boolean));
+        const only = inPlay.size === 1 ? [...inPlay][0] : "";
+        tables.forEach((t) => {
+          t.dsName = [...t.ds][0] || only;
+          t.isQuery = t.src.has("query") && !t.src.has("map") && !t.src.has("key") && !t.src.has("added") && !t.src.has("sql");
+        });
+        const T = (n) => tables.get(canon(n));
+        // keys
+        const fks = [];
+        KD_KEYS.forEach((k) => P[k].entries.forEach((e) => {
+          const t = T(e.table);
+          if (!t) return;
+          if (!t.written[k]) t.written[k] = e.table;
+          if (e.kind === "uk") t.uks.push(e);
+          if (e.kind === "fd") t.fds.push(e);
+          if (e.kind === "fk") { const g = T(e.tgt); if (g) { fks.push({ e, from: t.id, to: g.id }); if (!g.written.fkTarget) g.written.fkTarget = e.tgt; } }
+        }));
+        // columns: read from the data source when asked; otherwise those the mappings and keys name
+        tables.forEach((t) => {
+          const known = [];
+          const add = (name, type) => { if (name && !known.some((c) => c.name.toLowerCase() === String(name).toLowerCase())) known.push({ name: String(name), type: type || "" }); };
+          t.aliases.forEach((a) => Object.entries(mapTables[a] || {}).forEach(([c, o]) => add(c, o?.type && o.type !== "string" ? o.type : "")));
+          t.uks.forEach((e) => e.cols.forEach((c) => add(c)));
+          t.fds.forEach((e) => [...e.det, ...e.dep].forEach((c) => add(c)));
+          fks.forEach((f) => { if (f.from === t.id) f.e.cols.forEach((c) => add(c)); if (f.to === t.id) f.e.tgtCols.forEach((c) => add(c)); });
+          const got = _kd.fetched[t.id];
+          if (got) {
+            const cols = got.cols.map((c) => ({ name: c.name, type: c.type || "" }));
+            known.forEach((c) => { if (!cols.some((x) => x.name.toLowerCase() === c.name.toLowerCase())) cols.push({ name: c.name, type: c.type, missing: true }); });
+            t.cols = cols;
+          } else t.cols = known;
+          t.colName = (c) => (t.cols.find((x) => x.name.toLowerCase() === String(c).toLowerCase()) || {}).name || c;
+        });
+        // joins the mappings imply (same IRI template over two tables), unless a foreign key already joins them
+        const implied = [];
+        (_erdLastModel.impliedRels || []).forEach((r) => {
+          const a = T(r.tableA), b = T(r.tableB);
+          if (!a || !b || a.id === b.id) return;
+          if (fks.some((f) => (f.from === a.id && f.to === b.id) || (f.from === b.id && f.to === a.id))) return;
+          implied.push({ a: a.id, b: b.id, colsA: r.colsA || [], colsB: r.colsB || [], parent: r.fkParent ? T(r.fkParent)?.id : null, sources: r.sources || [] });
+        });
+        // what is on the diagram
+        const vgs = Object.keys(vgTables);
+        const filtering = _kd.vgOff.size > 0;
+        const inShownVg = (t) => vgs.some((vg) => !_kd.vgOff.has(vg) && [...t.aliases].some((a) => vgTables[vg].tables.has(a.toLowerCase()) || vgTables[vg].sql.has(a.toLowerCase())));
+        const visible = [...tables.values()].filter((t) => {
+          if (_kd.removed.has(t.id)) return false;
+          const base = t.src.has("map") || t.src.has("query") || t.src.has("key") || t.src.has("added");
+          if (!base) return false;
+          if (!filtering) return true;
+          return t.src.has("added") || inShownVg(t);
+        }).map((t) => t.id);
+        const dsInUse = [...new Set([...sel, ...Object.values(vgTables).map((v) => v.ds), ...[...tables.values()].map((t) => t.dsName)].filter(Boolean))];
+        return { P, tables, canon, T, fks, implied, vgTables, visible, dsInUse };
+      }
+
+      // ── drawing ─────────────────────────────────────────────────────────────────
+      function kdRender() {
+        if ($("erdPanel")?.classList.contains("hidden") || _erdActiveTab !== "diagram") return;
+        const M = _kd.model = kdModel();
+        kdRenderTree();
+        kdRenderDrawer();
+        kdRenderFilterBar();
+        // Never rebuild the cards under a link in progress or an open key edit: that would drop the gesture.
+        // The redraw waits until it ends.
+        if (_kd.mode || _kd.link || _kd.drag) _kd.pendingCards = true;
+        else { _kd.pendingCards = false; kdRenderCards(M); }
+        kdUpdateBadge();
+      }
+      function kdUpdateBadge() {
+        const badge = $("erdStatusBadge");
+        if (!badge) return;
+        if (_kd.job) {
+          if (_kd.job.t0 != null) {
+            const s = (performance.now() - _kd.job.t0) / 1000;
+            badge.textContent = s < 0.3 ? `${_kd.job.label}…` : `${_kd.job.label}… ${s.toFixed(1)} s${s > 3 ? " (a large diagram can take a minute; ■ stops it)" : ""}`;
+          } else badge.textContent = `${_kd.job.label} ${Math.min(_kd.job.done + 1, _kd.job.total)} of ${_kd.job.total}…`;
+          return;
+        }
+        const n = _erdActiveTab === "diagram"
+          ? (_kd.model ? _kd.model.visible.length : 0)
+          : (_erdMermaidSyntax ? ((_erdMermaidSyntax.match(/^\s+\S+\s+\{/gm) || []).length) : 0);
+        badge.textContent = n ? `${n} table${n !== 1 ? "s" : ""}` : "no data";
+      }
+      function kdChipsHtml(t, col, M) {
+        const out = [];
+        const lc = col.toLowerCase();
+        const has = (cols) => cols.some((c) => String(c).toLowerCase() === lc);
+        t.uks.forEach((e, n) => {
+          if (!has(e.cols)) return;
+          const ref = _colRef(e.table, e.cols);
+          const vs = _valFailedUkSet.has(ref) ? " is-fail" : _valPassedUkSet.has(ref) ? " is-pass" : "";
+          const vt = vs === " is-fail" ? " — failed the SQL validation test" : vs === " is-pass" ? " — passed the SQL validation test" : "";
+          out.push(`<span class="kd-chip${vs}" style="background:${KD_KEY_COLORS[n % 3]}" data-kd-hk="uk:${n}:${esc(t.id)}" title="Unique key ${n + 1}: ${esc(e.cols.join(", "))}${vt}">K${n + 1}</span>`);
+        });
+        M.fks.forEach((f, i) => {
+          if (f.e.cols.length < 2 || (f.from !== t.id && f.to !== t.id)) return;
+          const label = `F${M.fks.filter((g, j) => j <= i && g.from === f.from && g.e.cols.length > 1).length}`;
+          if ((f.from === t.id && has(f.e.cols)) || (f.to === t.id && has(f.e.tgtCols))) out.push(`<span class="kd-chip is-f" data-kd-hk="fk:${i}" title="Foreign key ${esc(f.e.table)}(${esc(f.e.cols.join(", "))}) → ${esc(f.e.tgt)}(${esc(f.e.tgtCols.join(", "))})">${label}</span>`);
+        });
+        t.fds.forEach((e, n) => {
+          if (has(e.det)) out.push(`<span class="kd-chip is-d" data-kd-hk="fd:${n}:${esc(t.id)}" title="Dependency ${n + 1}: ${esc(e.det.join(", "))} determine(s) ${esc(e.dep.join(", "))}">D${n + 1}</span>`);
+          if (has(e.dep)) out.push(`<span class="kd-chip is-dd" data-kd-hk="fd:${n}:${esc(t.id)}" title="Dependency ${n + 1}: determined by ${esc(e.det.join(", "))}">d${n + 1}</span>`);
+        });
+        const declaredHere = t.uks.some((e) => e.cols.length === 1 && has(e.cols));
+        if (!declaredHere && (_valDiscoveredUkDetails || []).some((d) => M.T(d.tgtTable)?.id === t.id && d.tgtCols.length === 1 && String(d.tgtCols[0]).toLowerCase() === lc)) {
+          out.push(`<span class="kd-chip is-u" data-kd-discovered="${esc(t.id)}" data-kd-col="${esc(col)}" title="Unique in the data (SQL validation) but not declared as a unique key. Click to declare it.">U</span>`);
+        }
+        if (out.length <= 2) return `<span class="kd-chips">${out.join("")}</span>`;
+        return `<span class="kd-chips is-crowd">${out[0]}<span class="kd-chip is-stack" title="${out.length} keys use this column">+${out.length - 1}</span><span class="kd-pop">${out.join("")}</span></span>`;
+      }
+      function kdCardHtml(t, M) {
+        const id = esc(t.id);
+        const rows = t.cols.map((c) => {
+          const ports = t.isQuery ? "" : `<span class="kd-port is-L" data-kd-port="L"></span><span class="kd-port is-R" data-kd-port="R"></span>`;
+          const title = c.missing ? "Named by the mappings or key sets but not found in the data source" : "";
+          return `<div class="kd-row${c.missing ? " is-missing" : ""}" data-kd-t="${id}" data-kd-c="${esc(c.name)}"${title ? ` title="${esc(title)}"` : ""}>${ports}<span class="kd-cb"></span><span class="kd-cn">${esc(c.name)}</span><span class="kd-tag">D</span>${kdChipsHtml(t, c.name, M)}<span class="kd-ty">${esc(c.type || "")}</span></div>`;
+        }).join("");
+        let foot = "";
+        if (!t.isQuery) {
+          if (_kd.fetching.has(t.id)) foot = `<span class="kd-busy" style="font-size:0.68rem">Reading columns…</span>`;
+          else if (_kd.fetchErr[t.id]) foot = `<div class="kd-err">${esc(_kd.fetchErr[t.id])}</div><button type="button" class="secondary" data-kd-fetch="${id}">Try again</button>`;
+          else if (!_kd.fetched[t.id] && t.dsName) {
+            const why = !kdConnected() ? "Connect to Stardog to read the columns" : "";
+            foot = `<button type="button" class="secondary" data-kd-fetch="${id}"${why ? ` disabled title="${esc(why)}"` : ` title="Read every column of this table from ${esc(t.dsName)}"`}>Read all columns</button>`;
           }
         }
-        const blob = new Blob([_erdMermaidSyntax], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        const a = Object.assign(document.createElement("a"), { href: url, download: "erd_diagram.mmd" });
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        const dsLabel = t.dsName && (M.dsInUse.length > 1) ? `<span class="kd-ds" title="Data source">${esc(t.dsName)}</span>` : "";
+        const tip = t.isQuery ? "The result of a SQL query in the mappings" : `${t.name}${t.dsName ? " · " + t.dsName : ""}`;
+        return `<div class="kd-card${t.isQuery ? " is-query" : ""}" data-kd-card="${id}"><div class="kd-ch" title="${esc(tip)}"><span class="kd-nm">${esc(t.name)}</span>${dsLabel}<button type="button" class="kd-more" data-kd-more="${id}" title="Keys and options for this table">&#8943;</button></div>${rows}${foot ? `<div class="kd-card-foot">${foot}</div>` : ""}</div>`;
+      }
+      function kdRenderCards(M) {
+        const cv = $("kdCanvas");
+        if (!cv) return;
+        if (!M.visible.length) {
+          cv.innerHTML = `<div class="kd-empty">No tables yet. The diagram shows the tables the loaded mappings and key sets name. Add tables from the <b>Data source</b> list on the left.</div>`;
+          cv.style.width = ""; cv.style.height = ""; cv.style.transform = "";
+          $("kdSizer").style.width = ""; $("kdSizer").style.height = ""; $("kdSizer").style.padding = ""; _kd.padX = 0; _kd.padY = 0;
+          return;
+        }
+        const prev = new Set([...cv.querySelectorAll("[data-kd-card]")].map((c) => c.getAttribute("data-kd-card")));
+        cv.innerHTML = `<svg class="kd-lines" id="kdLines"></svg>` + M.visible.map((id) => kdCardHtml(M.tables.get(id), M)).join("");
+        _kd.rowIndex = null; _kd.cardIndex = null;
+        kdPlace(M);
+        if (prev.size) cv.querySelectorAll("[data-kd-card]").forEach((c) => { if (!prev.has(c.getAttribute("data-kd-card"))) c.classList.add("is-new"); });
+        kdDrawLines(M);
+      }
+      // Places the cards in a grid in `_kd.order`. A full layout (first drawing, Arrange, a change of what the
+      // diagram holds by more than one table, a virtual graph filter) orders them anew: groups of joined tables
+      // together, each breadth-first from its best-linked table. One new table goes at the end. Sizes are the
+      // cards' measured sizes, so a card that grows (columns read) pushes the next row down.
+      function kdPlace(M) {
+        const vis = M.visible;
+        if (_kd.free && _kd.forceLayout) {
+          // what the diagram holds changed all at once: a Tidy Mycelium drawing is laid out again, a hand-made one gives way to the grid
+          _kd.forceLayout = false;
+          if (_kd.freeKind === "tidy") setTimeout(() => kdArrange("tidy", { auto: true }).catch(handleError), 0);
+          else { _kd.free = null; _kd.freeKind = null; _kd.forceLayout = true; }
+        }
+        if (_kd.free) { kdPlaceFree(vis); return; }
+        const kept = _kd.order.filter((id) => vis.includes(id));
+        const fresh = vis.filter((id) => !kept.includes(id));
+        if (_kd.forceLayout || !kept.length || fresh.length > 1) {
+          _kd.order = kdLayoutOrder(M, vis);
+          _kd.cols = kdLayoutCols(_kd.order);
+          _kd.forceLayout = false;
+          // Tidy Mycelium is the default: the grid below gives every card its size and a first place, then the worker
+          // lays them out (a large diagram takes a moment, with progress and Stop in the toolbar).
+          if (_kd.layoutKind === "tidy" && vis.length > 1 && !_kd.job) setTimeout(() => kdArrange("tidy", { auto: true }).catch(handleError), 0);
+          else _kd.fitNext = false;
+        } else _kd.order = [...kept, ...fresh];
+        const cards = new Map([...$("kdCanvas").querySelectorAll("[data-kd-card]")].map((c) => [c.getAttribute("data-kd-card"), c]));
+        const C = Math.max(1, Math.min(_kd.cols, _kd.order.length));
+        const size = _kd.order.map((id) => { const el = cards.get(id); return { w: el ? el.offsetWidth : 0, h: el ? el.offsetHeight : 0 }; });
+        const colW = new Array(C).fill(0), rowH = [];
+        size.forEach((s, i) => { const c = i % C, r = (i - c) / C; colW[c] = Math.max(colW[c], s.w); rowH[r] = Math.max(rowH[r] || 0, s.h); });
+        const colX = [KD_MARGIN], rowY = [KD_MARGIN];
+        for (let c = 1; c < C; c++) colX[c] = colX[c - 1] + colW[c - 1] + KD_GAP_X;
+        for (let r = 1; r < rowH.length; r++) rowY[r] = rowY[r - 1] + rowH[r - 1] + KD_GAP_Y;
+        let w = 0, h = 0;
+        _kd.order.forEach((id, i) => {
+          const el = cards.get(id);
+          if (!el) return;
+          const c = i % C, r = (i - c) / C;
+          el.style.left = `${colX[c]}px`;
+          el.style.top = `${rowY[r]}px`;
+          w = Math.max(w, colX[c] + size[i].w);
+          h = Math.max(h, rowY[r] + size[i].h);
+        });
+        const cv = $("kdCanvas");
+        cv.style.width = `${w + KD_MARGIN * 3}px`;
+        cv.style.height = `${h + KD_MARGIN * 3}px`;
+        kdApplyZoom();
+      }
+      // Positions kept per table (dragged by hand, or from Tidy Mycelium). A table without one goes at the end: in a row
+      // under everything else.
+      function kdPlaceFree(vis) {
+        const cards = new Map([...$("kdCanvas").querySelectorAll("[data-kd-card]")].map((c) => [c.getAttribute("data-kd-card"), c]));
+        let bottom = KD_MARGIN - KD_GAP_Y;
+        vis.forEach((id) => { const p = _kd.free.get(id), el = cards.get(id); if (p && el) bottom = Math.max(bottom, p.y + el.offsetHeight); });
+        let x = KD_MARGIN, y = bottom + KD_GAP_Y, rowH = 0;
+        const fresh = vis.filter((id) => !_kd.free.has(id));
+        fresh.forEach((id) => {
+          const el = cards.get(id);
+          const w = el ? el.offsetWidth : 0;
+          if (x > KD_MARGIN && x + w > 1800) { x = KD_MARGIN; y += rowH + KD_GAP_Y; rowH = 0; }
+          _kd.free.set(id, { x, y });
+          x += w + KD_GAP_X;
+          rowH = Math.max(rowH, el ? el.offsetHeight : 0);
+        });
+        if (fresh.length > 1 && _kd.freeKind === "tidy" && !_kd.job) setTimeout(() => kdArrange("tidy", { auto: true }).catch(handleError), 0);
+        vis.forEach((id) => { const el = cards.get(id), p = _kd.free.get(id); if (el && p) { el.style.left = `${p.x}px`; el.style.top = `${p.y}px`; } });
+        kdSizeCanvasFree(vis, cards);
+      }
+      function kdSizeCanvasFree(vis, cards) {
+        let w = 0, h = 0;
+        vis.forEach((id) => { const el = cards.get(id), p = _kd.free.get(id); if (el && p) { w = Math.max(w, p.x + el.offsetWidth); h = Math.max(h, p.y + el.offsetHeight); } });
+        const cv = $("kdCanvas");
+        cv.style.width = `${w + KD_MARGIN * 3}px`;
+        cv.style.height = `${h + KD_MARGIN * 3}px`;
+        kdApplyZoom();
+        const svg = $("kdLines");
+        if (svg) { svg.setAttribute("width", cv.offsetWidth); svg.setAttribute("height", cv.offsetHeight); }
+      }
+      // Layout menu: "grid" (rows and columns, joined tables next to each other) or "tidy" (the Ontology Visualization's
+      // Tidy Mycelium, run in a background worker with progress and Stop; a large diagram takes a second or more).
+      // Neither is part of the Mermaid text, which stays valid Mermaid either way.
+      async function kdArrange(kind, opts = {}) {
+        if (!opts.auto) _kd.layoutKind = kind === "tidy" ? "tidy" : "grid";
+        if (kind !== "tidy") { _kd.free = null; _kd.freeKind = null; _kd.forceLayout = true; kdRender(); return; }
+        const M = _kd.model;
+        if (!M || _kd.job) return;
+        const ids = M.visible.filter((id) => kdCard(id));
+        if (ids.length < 2) return;
+        const idx = new Map(ids.map((id, i) => [id, i]));
+        // a little room round each table for the line ends
+        const boxes = ids.map((id) => { const el = kdCard(id); return { w: el.offsetWidth + 28, h: el.offsetHeight + 18 }; });
+        const links = [], seen = new Set();
+        kdLinks(M).forEach(([a, b]) => {
+          const i = idx.get(a), j = idx.get(b);
+          if (i == null || j == null || i === j) return;
+          const k = i < j ? `${i},${j}` : `${j},${i}`;
+          if (seen.has(k)) return;
+          seen.add(k);
+          links.push([i, j, 1, 0]);
+        });
+        const t0 = performance.now();
+        let cancel = () => {};
+        _kd.job = { label: "Arranging", done: 0, total: 1, t0, ctl: { abort: () => cancel() } };
+        const tick = setInterval(kdUpdateBadge, 250);
+        kdJobUi();
+        let out;
+        try {
+          out = await kdRunLayoutWorker({ op: "draw", boxes, links, opts: { seed: 1, layout: "tidyMycelium", route: { straight: true } } }, (fn) => { cancel = fn; });
+        } finally {
+          clearInterval(tick);
+          _kd.job = null;
+          kdJobUi();
+        }
+        log("debug", `ER Diagram Tidy Mycelium: ${ids.length} tables, ${links.length} links, ${(performance.now() - t0).toFixed(0)} ms, ${out?.res ? "done" : out?.cancelled ? "stopped" : "failed: " + (out?.error || "")}`);
+        if (!out || !out.res) {
+          if (out && !out.cancelled) showStatusToast("The tables could not be arranged that way: " + (out.error || "unknown error"), "error", 4500);
+          kdRender();
+          return;
+        }
+        const pos = out.res.pos;
+        let minX = Infinity, minY = Infinity;
+        pos.forEach((p, i) => { minX = Math.min(minX, p.x - boxes[i].w / 2); minY = Math.min(minY, p.y - boxes[i].h / 2); });
+        _kd.free = new Map(ids.map((id, i) => [id, { x: pos[i].x - boxes[i].w / 2 - minX + KD_MARGIN + 14, y: pos[i].y - boxes[i].h / 2 - minY + KD_MARGIN + 9 }]));
+        _kd.freeKind = "tidy";
+        kdRender();
+        // the first drawing after the panel opens is fitted to the view once it has its final layout
+        if (opts.auto && _kd.fitNext) { _kd.fitNext = false; kdFitZoom(); }
+      }
+      let _kdWorker = null, _kdWorkerSeq = 0;
+      function kdRunLayoutWorker(msg, onCancel) {
+        return new Promise((resolve) => {
+          let done = false, w = null;
+          const finish = (o) => { if (!done) { done = true; resolve(o); } };
+          try {
+            if (!_kdWorker) {
+              const src = _ogLayoutWorkerSource();
+              if (src) { const url = URL.createObjectURL(new Blob([src], { type: "text/javascript" })); try { _kdWorker = new Worker(url); } finally { setTimeout(() => URL.revokeObjectURL(url), 0); } }
+            }
+            w = _kdWorker;
+          } catch (err) { w = null; }
+          const id = ++_kdWorkerSeq;
+          onCancel(() => { if (w) { w.terminate(); if (_kdWorker === w) _kdWorker = null; } finish({ cancelled: true }); });
+          if (w) {
+            w.onmessage = (ev) => { if (ev.data && ev.data.id === id) finish(ev.data.ok ? { res: ev.data.res } : { error: ev.data.err }); };
+            w.onerror = (ev) => { ev.preventDefault(); if (_kdWorker === w) _kdWorker = null; finish({ error: ev.message || "layout worker error" }); };
+            w.postMessage({ ...msg, id });
+          } else {
+            setTimeout(() => { if (done) return; try { finish({ res: _ogLayoutJobRun(window.OntologyLayouts, msg) }); } catch (err) { finish({ error: String((err && err.message) || err) }); } }, 30);
+          }
+        });
+      }
+      function kdLinks(M) {
+        const links = M.fks.map((f) => [f.from, f.to]);
+        M.implied.forEach((r) => links.push([r.a, r.b]));
+        return links;
+      }
+      function kdLayoutOrder(M, vis) {
+        const adj = new Map(vis.map((id) => [id, new Set()]));
+        kdLinks(M).forEach(([a, b]) => { if (a !== b && adj.has(a) && adj.has(b)) { adj.get(a).add(b); adj.get(b).add(a); } });
+        const deg = (id) => adj.get(id).size;
+        const seen = new Set(), comps = [];
+        vis.forEach((id) => {
+          if (seen.has(id)) return;
+          const comp = [], q = [id];
+          seen.add(id);
+          while (q.length) { const x = q.shift(); comp.push(x); adj.get(x).forEach((y) => { if (!seen.has(y)) { seen.add(y); q.push(y); } }); }
+          comps.push(comp);
+        });
+        comps.sort((a, b) => b.length - a.length);
+        const order = [];
+        comps.forEach((comp) => {
+          const start = comp.slice().sort((a, b) => deg(b) - deg(a) || a.localeCompare(b))[0];
+          const done = new Set([start]), q = [start];
+          while (q.length) {
+            const x = q.shift();
+            order.push(x);
+            [...adj.get(x)].filter((y) => !done.has(y)).sort((a, b) => deg(b) - deg(a) || a.localeCompare(b)).forEach((y) => { done.add(y); q.push(y); });
+          }
+        });
+        return order;
+      }
+      // Columns for the grid from the window's shape and the cards' average size.
+      function kdLayoutCols(order) {
+        const vp = $("kdVp");
+        const cards = [...$("kdCanvas").querySelectorAll("[data-kd-card]")];
+        if (!order.length || !cards.length || !vp) return 1;
+        const avgW = cards.reduce((s, c) => s + c.offsetWidth, 0) / cards.length + KD_GAP_X;
+        const avgH = cards.reduce((s, c) => s + c.offsetHeight, 0) / cards.length + KD_GAP_Y;
+        const aspect = Math.max(0.4, (vp.clientWidth || 800) / Math.max(1, vp.clientHeight || 500));
+        let c = 1;
+        while (c < order.length && (c + 1) * avgW / ((order.length / (c + 1)) * avgH) <= aspect * 1.2) c++;
+        return c;
+      }
+      // Like the graph model view, the diagram can be moved past its edges: the sizer keeps almost a viewport of free
+      // space on every side (padX/padY, in screen pixels), so zooming about the pointer and dragging to pan work even
+      // when the whole diagram fits in the view. When that margin changes, the scroll moves by the same amount so the
+      // picture stays where it was.
+      function kdApplyZoom() {
+        const cv = $("kdCanvas"), sz = $("kdSizer"), vp = $("kdVp");
+        if (!cv || !sz) return;
+        cv.style.transform = `scale(${_kd.zoom})`;
+        const oldX = _kd.padX || 0, oldY = _kd.padY || 0;
+        const padX = vp && vp.clientWidth ? Math.max(0, vp.clientWidth - 60) : oldX;
+        const padY = vp && vp.clientHeight ? Math.max(0, vp.clientHeight - 60) : oldY;
+        _kd.padX = padX; _kd.padY = padY;
+        sz.style.padding = `${padY}px ${padX}px`;
+        sz.style.width = `${cv.offsetWidth * _kd.zoom}px`;
+        sz.style.height = `${cv.offsetHeight * _kd.zoom}px`;
+        if (vp && (padX !== oldX || padY !== oldY)) { vp.scrollLeft += padX - oldX; vp.scrollTop += padY - oldY; }
+        const zi = $("erdZoomIn"), zo = $("erdZoomOut");
+        if (zi) zi.disabled = _kd.zoom >= KD_ZOOM_MAX;
+        if (zo) zo.disabled = _kd.zoom <= KD_ZOOM_MIN;
+      }
+      function kdSetZoom(z, at) {
+        const vp = $("kdVp");
+        const next = Math.max(KD_ZOOM_MIN, Math.min(KD_ZOOM_MAX, z));
+        if (!vp) { _kd.zoom = next; return; }
+        const r = vp.getBoundingClientRect();
+        const mx = at ? at.clientX - r.left : vp.clientWidth / 2, my = at ? at.clientY - r.top : vp.clientHeight / 2;
+        const fx = (vp.scrollLeft + mx - (_kd.padX || 0)) / _kd.zoom, fy = (vp.scrollTop + my - (_kd.padY || 0)) / _kd.zoom;
+        _kd.zoom = next;
+        kdApplyZoom();
+        vp.scrollLeft = fx * next + _kd.padX - mx;
+        vp.scrollTop = fy * next + _kd.padY - my;
+      }
+      // Zoom factor for one wheel event. Line- and page-mode deltas (some mice, Firefox) are converted to pixels; a
+      // pinch sends small deltas with ctrlKey and gets a stronger rate. One notch (100 px) zooms by about 14%; a fast spin
+      // that arrives as one large event is capped at three notches.
+      function kdWheelFactor(e) {
+        const px = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1);
+        const d = Math.max(-300, Math.min(300, px * (e.ctrlKey ? 6 : 1)));
+        return Math.exp(-d * 0.0015);
+      }
+      function kdFitZoom() {
+        const vp = $("kdVp"), cv = $("kdCanvas");
+        if (!vp || !cv || !cv.offsetWidth) return;
+        kdSetZoom(Math.min(1, (vp.clientWidth - 8) / cv.offsetWidth, (vp.clientHeight - 8) / cv.offsetHeight));
+        vp.scrollLeft = _kd.padX || 0; vp.scrollTop = _kd.padY || 0;
+      }
+      // Lines join the two exact column rows, measured from the page and divided by the zoom (the canvas is scaled).
+      function kdRowEl(tid, col) {
+        if (!_kd.rowIndex) {
+          _kd.rowIndex = new Map();
+          document.querySelectorAll("#kdCanvas .kd-row").forEach((r) => _kd.rowIndex.set(r.getAttribute("data-kd-t") + "" + r.getAttribute("data-kd-c").toLowerCase(), r));
+        }
+        return _kd.rowIndex.get(tid + "" + String(col).toLowerCase()) || null;
+      }
+      function kdPortXY(tid, col, side) {
+        const row = kdRowEl(tid, col);
+        const el = row && row.querySelector(`[data-kd-port="${side}"]`);
+        if (!el) return null;
+        const cr = $("kdCanvas").getBoundingClientRect(), r = el.getBoundingClientRect();
+        return { x: (r.left + r.width / 2 - cr.left) / _kd.zoom, y: (r.top + r.height / 2 - cr.top) / _kd.zoom, el };
+      }
+      function kdCard(tid) {
+        if (!_kd.cardIndex) _kd.cardIndex = new Map([...document.querySelectorAll("#kdCanvas [data-kd-card]")].map((c) => [c.getAttribute("data-kd-card"), c]));
+        return _kd.cardIndex.get(tid) || null;
+      }
+      function kdSides(a, b) {
+        const A = kdCard(a)?.getBoundingClientRect(), B = kdCard(b)?.getBoundingClientRect();
+        if (!A || !B) return ["R", "L"];
+        if (A.right < B.left) return ["R", "L"];
+        if (B.right < A.left) return ["L", "R"];
+        return ["R", "R"];
+      }
+      function kdCurve(p, ps, q, qs) {
+        const out = (s) => (s === "R" ? 1 : -1), d = ps === qs ? 46 : Math.max(40, Math.abs(q.x - p.x) * 0.45);
+        return `M${p.x} ${p.y} C${p.x + out(ps) * d} ${p.y}, ${q.x + out(qs) * d} ${q.y}, ${q.x} ${q.y}`;
+      }
+      function kdDrawLines(M) {
+        const svg = $("kdLines");
+        if (!svg) return;
+        const cv = $("kdCanvas");
+        svg.setAttribute("width", cv.offsetWidth); svg.setAttribute("height", cv.offsetHeight);
+        document.querySelectorAll("#kdCanvas .kd-port.is-on, #kdCanvas .kd-port.is-on-implied").forEach((p) => p.classList.remove("is-on", "is-on-implied"));
+        const vis = new Set(M.visible);
+        const vs = _erdValidationState || {};
+        let s = "";
+        M.fks.forEach((f, i) => {
+          if (!vis.has(f.from) || !vis.has(f.to)) return;
+          const [ps, qs] = kdSides(f.from, f.to);
+          const sid = _mermaidSafeId(f.e.table), tid = _mermaidSafeId(f.e.tgt);
+          const pair = [sid, tid].sort().join("\x00");
+          const cls = (vs.failedFkSrcs?.has(sid) || vs.failedRelPairs?.has(pair)) ? " is-fail" : (vs.passedFkSrcs?.has(sid) || vs.passedRelPairs?.has(pair)) ? " is-pass" : "";
+          let g = "";
+          f.e.cols.forEach((c, j) => {
+            const p = kdPortXY(f.from, c, ps), q = kdPortXY(f.to, f.e.tgtCols[j], qs);
+            if (!p || !q) return;
+            p.el.classList.add("is-on"); q.el.classList.add("is-on");
+            const d = kdCurve(p, ps, q, qs);
+            g += `<path class="kd-fk${cls}" d="${d}"/><path class="kd-hit" d="${d}" data-kd-line="fk:${i}"/>`;
+          });
+          s += `<g data-kd-g="fk:${i}"${_kd.hot === `fk:${i}` ? ' class="is-hot"' : ""}><title>${esc(`Foreign key ${f.e.table}(${f.e.cols.join(", ")}) → ${f.e.tgt}(${f.e.tgtCols.join(", ")})`)}</title>${g}</g>`;
+        });
+        M.implied.forEach((r, i) => {
+          if (!vis.has(r.a) || !vis.has(r.b)) return;
+          const [ps, qs] = kdSides(r.a, r.b);
+          const n = Math.min(r.colsA.length, r.colsB.length);
+          const ipair = [...M.tables.get(r.a).aliases].map(_mermaidSafeId).flatMap((x) => [...M.tables.get(r.b).aliases].map((y) => [x, _mermaidSafeId(y)].sort().join(" ")));
+          const icls = ipair.some((k) => vs.failedRelPairs?.has(k)) ? " is-fail" : ipair.some((k) => vs.passedRelPairs?.has(k)) ? " is-pass" : "";
+          let g = "";
+          for (let j = 0; j < n; j++) {
+            const p = kdPortXY(r.a, r.colsA[j], ps), q = kdPortXY(r.b, r.colsB[j], qs);
+            if (!p || !q) continue;
+            p.el.classList.add("is-on-implied"); q.el.classList.add("is-on-implied");
+            const d = kdCurve(p, ps, q, qs);
+            g += `<path class="kd-implied${icls}" d="${d}"/><path class="kd-hit" d="${d}" data-kd-line="imp:${i}"/>`;
+          }
+          s += `<g data-kd-g="imp:${i}"><title>${esc(`Joined in the mappings through the same IRI template: ${M.tables.get(r.a).name}(${r.colsA.join(", ")}) and ${M.tables.get(r.b).name}(${r.colsB.join(", ")}). Not declared as a foreign key.`)}</title>${g}</g>`;
+        });
+        s += `<path class="kd-link-line" id="kdLinkLine" d=""/>`;
+        svg.innerHTML = s;
+      }
+
+      // ── the lists on the left ───────────────────────────────────────────────────
+      function kdTreeNode(key, depth, inner, open, extraCls = "") {
+        return `<div class="kd-tn${extraCls}" data-kd-node="${esc(key)}" style="padding-left:${8 + depth * 13}px"><span class="kd-tw">${open ? "&#9662;" : "&#9656;"}</span>${inner}</div>`;
+      }
+      function kdTableRow(M, name, ds, depth, sqlOnly) {
+        const t = M.T(name);
+        const on = t && M.visible.includes(t.id) && (!ds || !t.dsName || t.dsName === ds);
+        const tag = sqlOnly ? `<span class="kd-sqltag" title="Read only inside a SQL query in the mappings">SQL</span>` : "";
+        return on
+          ? `<div class="kd-tn kd-tbl is-on" data-kd-find="${esc(t.id)}" style="padding-left:${8 + depth * 13}px" title="On the diagram; click to find it"><span class="kd-on">&#10003;</span><span class="kd-nm">${esc(name)}</span>${tag}</div>`
+          : `<div class="kd-tn kd-tbl" style="padding-left:${8 + depth * 13}px"><button type="button" class="kd-add" data-kd-add="${esc(name)}" data-kd-ds="${esc(ds || "")}" title="Add to the diagram${ds && kdConnected() ? " and read its columns" : ""}">+</button><span class="kd-nm">${esc(name)}</span>${tag}</div>`;
+      }
+      function kdRenderTree() {
+        const host = $("kdTree"), M = _kd.model;
+        if (!host || !M) return;
+        document.querySelectorAll("#kdSideTabs [data-kd-side]").forEach((b) => b.classList.toggle("is-on", b.getAttribute("data-kd-side") === _kd.side));
+        const f = String($("kdTreeFilter")?.value || "").trim().toLowerCase();
+        let h = "";
+        if (_kd.side === "src") {
+          const dsNode = (ds) => {
+            const key = "ds:" + ds, open = _kd.open.has(key) || Boolean(f && _kd.dsTables[ds]?.status === "ok");
+            const st = _kd.dsTables[ds];
+            let out = kdTreeNode(key, 0, `<span class="kd-nm">${esc(ds)}</span><span class="kd-ct">${st?.status === "ok" ? st.list.length.toLocaleString() + " tables" : ""}</span>`, open);
+            if (!open) return out;
+            if (!st || st.status === "loading") return out + `<div class="kd-note">Reading the table list…</div>`;
+            if (st.status === "error") return out + `<div class="kd-note">${esc(st.error)}</div>`;
+            const groups = new Map();
+            st.list.forEach((x) => { const g = [x.catalog, x.schema].filter(Boolean).join(" › ") || ""; if (!groups.has(g)) groups.set(g, []); groups.get(g).push(x); });
+            const many = groups.size > 1;
+            groups.forEach((list, g) => {
+              const gk = key + "|" + g, gOpen = !many || _kd.open.has(gk) || Boolean(f);
+              if (many) out += kdTreeNode(gk, 1, `<span class="kd-nm">${esc(g)}</span><span class="kd-ct">${list.length.toLocaleString()}</span>`, gOpen);
+              if (!gOpen) return;
+              const match = f ? list.filter((x) => x.table.toLowerCase().includes(f)) : list;
+              const lim = _kd.shown[gk] || 100;
+              out += match.slice(0, lim).map((x) => kdTableRow(M, x.schema ? `${x.schema}.${x.table}` : x.table, ds, many ? 2 : 1)).join("");
+              if (match.length > lim) out += `<button type="button" class="secondary kd-more-rows" data-kd-more-rows="${esc(gk)}">Show ${Math.min(300, match.length - lim)} more of ${(match.length - lim).toLocaleString()}</button>`;
+              if (f && !match.length && many) out += "";
+            });
+            return out;
+          };
+          const inUse = M.dsInUse;
+          h += `<div class="kd-tn kd-group">In use</div>`;
+          h += inUse.length ? inUse.map(dsNode).join("") : `<div class="kd-note">No data source is known yet. Choose data sources in the Key sets header or load mappings.</div>`;
+          const others = (state.ui.availableDataSources || []).filter((d) => !inUse.includes(d));
+          const oOpen = _kd.open.has("others");
+          h += kdTreeNode("others", 0, `<span class="kd-nm">Other data sources</span><span class="kd-ct">${others.length || ""}</span>`, oOpen, " kd-group-node");
+          if (oOpen) {
+            if (!kdConnected()) h += `<div class="kd-note">Connect to Stardog to list the data sources.</div>`;
+            else if (_kd.dsListLoading) h += `<div class="kd-note">Reading the data source list…</div>`;
+            else h += others.length ? others.map(dsNode).join("") : `<div class="kd-note">No other data sources.</div>`;
+          }
+        } else {
+          const vgs = Object.keys(M.vgTables);
+          if (!vgs.length) h = `<div class="kd-note">No mappings are loaded.</div>`;
+          vgs.forEach((vg) => {
+            const rec = M.vgTables[vg], key = "vg:" + vg, open = _kd.open.has(key) || Boolean(f);
+            const names = [...new Set([...rec.tables])].map((l) => M.T(l)?.name || l);
+            const sqlNames = [...rec.sql].filter((l) => !rec.tables.has(l)).map((l) => M.T(l)?.name || l);
+            h += kdTreeNode(key, 0, `<input type="checkbox" data-kd-vg="${esc(vg)}"${_kd.vgOff.has(vg) ? "" : " checked"} title="Show this virtual graph's tables on the diagram"><span class="kd-nm" title="${esc(vg)}${rec.ds ? " · " + esc(rec.ds) : ""}">${esc(vg)}</span><span class="kd-ct">${names.length + sqlNames.length}</span>`, open);
+            if (!open) return;
+            h += names.filter((n) => !f || n.toLowerCase().includes(f)).map((n) => kdTableRow(M, n, rec.ds, 1, false)).join("");
+            h += sqlNames.filter((n) => !f || n.toLowerCase().includes(f)).map((n) => kdTableRow(M, n, rec.ds, 1, true)).join("");
+          });
+        }
+        host.innerHTML = h;
+      }
+      function kdRenderFilterBar() {
+        const bar = $("kdFilterBar");
+        if (!bar) return;
+        const on = _kd.vgOff.size > 0;
+        bar.classList.toggle("hidden", !on);
+        if (on) {
+          const shown = Object.keys(_kd.model?.vgTables || {}).filter((v) => !_kd.vgOff.has(v));
+          bar.innerHTML = `<span>Showing the tables of ${shown.length ? esc(shown.join(", ")) : "no virtual graph"}</span><span style="flex:1"></span><button type="button" class="secondary" data-kd-showall style="font-size:0.74rem;padding:1px 8px">Show all</button>`;
+        }
+      }
+      function kdRenderDrawer() {
+        const d = $("kdDrawer"), M = _kd.model;
+        if (!d || !M) return;
+        d.classList.toggle("is-closed", !_kd.drawer);
+        $("kdDrawerTw").innerHTML = _kd.drawer ? "&#9662;" : "&#9656;";
+        document.querySelectorAll("#kdDrawerTabs [data-kd-drawer]").forEach((b) => b.classList.toggle("is-on", b.getAttribute("data-kd-drawer") === _kd.drawerKey));
+        const n = (k) => M.P[k].entries.length;
+        $("kdDrawerSum").textContent = `${n("uniqueKeySets")} unique · ${n("foreignKeySets")} foreign · ${n("functionalDependencySets")} dependencies`;
+        const ents = M.P[_kd.drawerKey].entries;
+        $("kdDrawerBody").innerHTML = ents.length
+          ? ents.map((e) => `<span class="kd-ent" data-kd-ent="${esc(M.T(e.table)?.id || "")}" title="Find this table">${esc(e.raw)}</span>`).join(`<span class="kd-hint">, </span>`)
+          : `<span class="kd-hint">None declared.</span>`;
+      }
+      function kdFindTable(id) {
+        if (!id) return;
+        if (!_kd.model?.visible.includes(id)) { _kd.removed.delete(id); _kd.vgOff.clear(); kdRender(); }
+        const card = kdCard(id);
+        if (!card) return;
+        card.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+        card.classList.remove("is-flash"); void card.offsetWidth; card.classList.add("is-flash");
+      }
+      function kdSearchMatches() {
+        const q = String($("erdSearch")?.value || "").trim().toLowerCase();
+        if (!q || !_kd.model) return [];
+        return _kd.order.filter((id) => _kd.model.visible.includes(id) && _kd.model.tables.get(id)?.name.toLowerCase().includes(q));
+      }
+
+      // ── reading from the data source (lazy, one thing at a time, cancellable) ────
+      async function kdEnsureDsTables(ds, force, signal) {
+        if (!force && _kd.dsTables[ds] && _kd.dsTables[ds].status !== "error") return;
+        if (!kdConnected()) { _kd.dsTables[ds] = { status: "error", error: "Connect to Stardog to list this data source's tables." }; kdRenderTree(); return; }
+        const prev = _kd.dsTables[ds];
+        _kd.dsTables[ds] = { status: "loading" };
+        kdRenderTree();
+        try {
+          const text = await requestWithPathFallback(dataSourceRequestPaths(ds, "/tables"), { method: "GET", accept: "application/json", abortSignal: signal });
+          const raw = JSON.parse(text);
+          const arr = Array.isArray(raw) ? raw : (raw.tables || []);
+          const list = arr.map((x) => ({ catalog: x.catalog || "", schema: x.schema || "", table: x.table_name || x.name || "", type: String(x.table_type || "TABLE").toUpperCase() }))
+            .filter((x) => x.table && !/INDEX|SEQUENCE/.test(x.type))
+            .sort((a, b) => (a.schema + "." + a.table).localeCompare(b.schema + "." + b.table));
+          _kd.dsTables[ds] = { status: "ok", list };
+        } catch (e) {
+          // stopped: keep what was there before
+          _kd.dsTables[ds] = (e?.name === "AbortError" || signal?.aborted) && prev ? prev : { status: "error", error: summarizeSchemaDriftError(e.message || String(e)) };
+        }
+        kdRenderTree();
+      }
+      async function kdReadColumns(t, signal) {
+        const text = await requestWithPathFallback(dataSourceRequestPaths(t.dsName, "/query"),
+          { method: "POST", contentType: "text/plain", body: `SELECT * FROM ${_sqlQTable(t.name)} WHERE 1=0`, accept: "application/json", abortSignal: signal });
+        const parsed = JSON.parse(text);
+        return Object.entries(parsed.mColumns || {}).sort(([a], [b]) => Number(a) - Number(b)).map(([, c]) => ({ name: c.mName || "", type: c.mType || "" })).filter((c) => c.name);
+      }
+      // Runs `steps` one after another with progress in the badge; the refresh button becomes Stop meanwhile.
+      // Stopping keeps what was read so far and leaves the rest as it was.
+      async function kdRunJob(label, steps) {
+        if (_kd.job || !steps.length) return;
+        const ctl = new AbortController();
+        _kd.job = { label, done: 0, total: steps.length, ctl };
+        kdJobUi();
+        try {
+          for (const step of steps) {
+            if (ctl.signal.aborted) break;
+            await step(ctl.signal);
+            if (ctl.signal.aborted) break;
+            _kd.job.done++;
+            kdUpdateBadge();
+          }
+        } finally {
+          _kd.job = null;
+          kdJobUi();
+          kdRender();
+        }
+      }
+      function kdStopJob() { if (_kd.job) _kd.job.ctl.abort(); }
+      function kdJobUi() {
+        const btn = $("kdRefreshBtn");
+        if (btn) { btn.classList.toggle("is-stop", Boolean(_kd.job)); btn.title = _kd.job ? "Stop reading from the data source" : "Read the columns again from the data source for the tables whose columns were read, and the table lists already opened"; }
+        kdUpdateBadge();
+      }
+      function kdColumnStep(id) {
+        return async (signal) => {
+          const t = _kd.model?.tables.get(id);
+          if (!t || !t.dsName || t.isQuery) return;
+          _kd.fetching.add(id);
+          kdRender();
+          try {
+            const cols = await kdReadColumns(t, signal);
+            _kd.fetched[id] = { cols, ds: t.dsName };
+            delete _kd.fetchErr[id];
+          } catch (e) {
+            if (e?.name !== "AbortError" && !signal.aborted) _kd.fetchErr[id] = summarizeSchemaDriftError(e.message || String(e));
+          } finally {
+            _kd.fetching.delete(id);
+          }
+        };
+      }
+      function kdFetchColumns(ids) {
+        if (!kdConnected()) { showStatusToast("Connect to Stardog to read columns from the data source.", "info", 3000); return Promise.resolve(); }
+        return kdRunJob("Reading columns", ids.map(kdColumnStep));
+      }
+      // Refresh: only what was already read (the columns of those tables, the table lists already opened).
+      function kdRefresh() {
+        if (!kdConnected()) { showStatusToast("Connect to Stardog to read from the data source.", "info", 3000); return Promise.resolve(); }
+        const dsSteps = Object.keys(_kd.dsTables).filter((ds) => _kd.dsTables[ds].status === "ok").map((ds) => (signal) => kdEnsureDsTables(ds, true, signal));
+        const colSteps = Object.keys(_kd.fetched).filter((id) => _kd.model?.tables.has(id)).map(kdColumnStep);
+        if (!dsSteps.length && !colSteps.length) { runGenerateErd(); showStatusToast("Redrawn from the mappings and key sets. Nothing had been read from a data source yet.", "info", 3200); return Promise.resolve(); }
+        return kdRunJob("Refreshing", [...dsSteps, ...colSteps]);
+      }
+      function kdAddTable(name, ds) {
+        const M = _kd.model;
+        const existing = M && M.T(name);
+        if (existing) { _kd.removed.delete(existing.id); }
+        if (!_kd.added.some((a) => a.name.toLowerCase() === name.toLowerCase())) _kd.added.push({ name, ds });
+        kdRender();
+        const t = _kd.model.T(name);
+        if (!t) return;
+        requestAnimationFrame(() => kdFindTable(t.id));
+        if (ds && kdConnected() && !_kd.fetched[t.id]) kdFetchColumns([t.id]).catch(handleError);
+      }
+
+      // ── menus ───────────────────────────────────────────────────────────────────
+      function kdMenuEl() {
+        let m = $("kdMenu");
+        if (!m) { m = document.createElement("div"); m.id = "kdMenu"; m.className = "kd-menu hidden"; document.body.appendChild(m); }
+        return m;
+      }
+      function kdShowMenu(html, x, y) {
+        const m = kdMenuEl();
+        m.innerHTML = html;
+        m.classList.remove("hidden");
+        m.style.left = `${Math.max(4, Math.min(x, window.innerWidth - m.offsetWidth - 8))}px`;
+        m.style.top = `${Math.max(4, Math.min(y, window.innerHeight - m.offsetHeight - 8))}px`;
+      }
+      const kdHideMenu = () => $("kdMenu")?.classList.add("hidden");
+      function kdTableMenu(id, x, y) {
+        const M = _kd.model, t = M?.tables.get(id);
+        if (!t) return;
+        const query = t.isQuery;
+        let h = `<div class="kd-mh" title="${esc(t.name)}">${esc(t.name)}</div>`;
+        if (!query) {
+          h += `<button type="button" class="kd-it" data-kd-act="newuk" data-kd-id="${esc(id)}"><span class="kd-dot" style="background:${KD_KEY_COLORS[0]}"></span>Add unique key…</button>`;
+          h += `<button type="button" class="kd-it" data-kd-act="newfd" data-kd-id="${esc(id)}"><span class="kd-dot" style="background:#f0b25a"></span>Add functional dependency…</button>`;
+        }
+        if (t.uks.length) h += `<div class="kd-sec">Unique keys</div>` + t.uks.map((e, n) => `<div class="kd-ex"><span class="kd-chip" style="background:${KD_KEY_COLORS[n % 3]}">K${n + 1}</span><span class="kd-d">${esc(e.cols.join(", "))}</span><button type="button" data-kd-act="testuk" data-kd-id="${esc(id)}" data-kd-n="${n}" data-kd-raw="${esc(e.raw)}">Test</button>${e.readOnly ? "" : `<button type="button" data-kd-act="edituk" data-kd-id="${esc(id)}" data-kd-n="${n}" data-kd-raw="${esc(e.raw)}">Edit</button><button type="button" data-kd-act="rmuk" data-kd-id="${esc(id)}" data-kd-n="${n}" data-kd-raw="${esc(e.raw)}">Remove</button>`}</div><div class="kd-res" data-kd-res="uk:${n}"></div>`).join("");
+        if (t.fds.length) h += `<div class="kd-sec">Functional dependencies</div>` + t.fds.map((e, n) => `<div class="kd-ex"><span class="kd-chip is-d">D${n + 1}</span><span class="kd-d">${esc(e.det.join(", "))} → ${esc(e.dep.join(", "))}</span><button type="button" data-kd-act="testfd" data-kd-id="${esc(id)}" data-kd-n="${n}" data-kd-raw="${esc(e.raw)}">Test</button>${e.readOnly ? "" : `<button type="button" data-kd-act="editfd" data-kd-id="${esc(id)}" data-kd-n="${n}" data-kd-raw="${esc(e.raw)}">Edit</button><button type="button" data-kd-act="rmfd" data-kd-id="${esc(id)}" data-kd-n="${n}" data-kd-raw="${esc(e.raw)}">Remove</button>`}</div><div class="kd-res" data-kd-res="fd:${n}"></div>`).join("");
+        h += `<div class="kd-sec"></div>`;
+        if (!query && t.dsName) {
+          const why = !kdConnected() ? "Connect to Stardog to read the columns" : "";
+          h += `<button type="button" class="kd-it" data-kd-act="fetch" data-kd-id="${esc(id)}"${why ? ` disabled title="${esc(why)}"` : ""}><span class="kd-dot"></span>${_kd.fetched[id] ? "Read the columns again" : "Read all columns from the data source"}</button>`;
+        }
+        h += `<button type="button" class="kd-it" data-kd-act="hide" data-kd-id="${esc(id)}"><span class="kd-dot"></span>Take off the diagram (keys are kept)</button>`;
+        kdShowMenu(h, x, y);
+      }
+      function kdFkMenu(i, x, y, justMade) {
+        const f = _kd.model?.fks[i];
+        if (!f) return;
+        const pairs = f.e.cols.map((c, j) => `${esc(f.e.table)}.${esc(c)} → ${esc(f.e.tgt)}.${esc(f.e.tgtCols[j])}`).join("<br>");
+        kdShowMenu(`<div class="kd-mh">${justMade ? "Foreign key added" : "Foreign key"}</div><div class="kd-fkd">${pairs}</div><div class="kd-res" data-kd-res="fk:${i}"></div>
+          <button type="button" class="kd-it" data-kd-act="testfk" data-kd-n="${i}" data-kd-raw="${esc(f.e.raw)}"><span class="kd-dot" style="background:var(--accent)"></span>Test against the data</button>
+          ${f.e.readOnly ? "" : `<button type="button" class="kd-it" data-kd-act="pair" data-kd-n="${i}" data-kd-raw="${esc(f.e.raw)}"><span class="kd-dot" style="background:#b39ddb"></span>Add another column pair (compound key)</button>
+          <button type="button" class="kd-it" data-kd-act="rmfk" data-kd-n="${i}" data-kd-raw="${esc(f.e.raw)}"><span class="kd-dot" style="background:var(--danger)"></span>Remove this foreign key</button>`}
+          ${justMade ? `<button type="button" class="kd-it" data-kd-act="close"><span class="kd-dot"></span>Done</button>` : ""}`, x, y);
+      }
+      function kdImpliedMenu(i, x, y) {
+        const M = _kd.model, r = M?.implied[i];
+        if (!r) return;
+        const A = M.tables.get(r.a), B = M.tables.get(r.b);
+        const opt = (from, fc, to, tc, dir) => `<button type="button" class="kd-it" data-kd-act="declare" data-kd-n="${i}" data-kd-dir="${dir}"><span class="kd-dot" style="background:#b39ddb"></span>Declare ${esc(from.name)}(${esc(fc.join(", "))}) → ${esc(to.name)}(${esc(tc.join(", "))})</button>`;
+        let h = `<div class="kd-mh">Join implied by the mappings</div><div class="kd-fkd">Both tables build the same IRI template from these columns. It is not declared as a foreign key.</div>`;
+        if (r.colsA.length === r.colsB.length && r.colsA.length) {
+          if (!r.parent || r.parent === r.b) h += opt(A, r.colsA, B, r.colsB, "ab");
+          if (!r.parent || r.parent === r.a) h += opt(B, r.colsB, A, r.colsA, "ba");
+        }
+        // Every mapping that builds the shared template: step through them like finding pills; each step jumps to that
+        // mapping's line in the SMS2 Mappings pane and flashes it. The menu stays open.
+        const src = r.sources || [];
+        if (src.length) {
+          _kd.srcStep = { i, at: -1 };
+          h += `<div class="kd-sec">In the mappings</div><div class="kd-ex kd-src-nav"><button type="button" data-kd-act="srcstep" data-kd-n="${i}" data-kd-dir="-1" title="Previous mapping">&#8249;</button><span class="kd-d" data-kd-src-label>${src.length} mapping line${src.length === 1 ? "" : "s"}</span><button type="button" data-kd-act="srcstep" data-kd-n="${i}" data-kd-dir="1" title="Next mapping">&#8250;</button></div>`
+            + src.map((s, k) => `<button type="button" class="kd-it kd-src-it" data-kd-act="srcgo" data-kd-n="${i}" data-kd-k="${k}" title="Go to this line in the SMS2 Mappings pane"><span class="kd-dot" style="background:#80deea"></span><span class="kd-d">${esc(s.table)} · ${esc(s.name || s.mappingId || "mapping")}${s.vg && Object.keys(M.vgTables).length > 1 ? ` · ${esc(s.vg)}` : ""}</span></button>`).join("");
+        }
+        kdShowMenu(h, x, y);
+      }
+      // Jumps to the line of one mapping where the template variable is bound (BIND(TEMPLATE(...) AS ?var)), else the mapping's header.
+      function kdJumpToSource(s) {
+        const lines = String(state.artifacts.sms2Mappings?.working || "").split(/\r?\n/);
+        const loc = typeof findCombinedMappingBlockLocation === "function" ? findCombinedMappingBlockLocation(lines, s.vg, s.name || s.mappingId) : null;
+        if (!loc || !Number.isFinite(loc.blockStartLineIdx)) { _qsmJumpMapping({ vg: s.vg, name: s.name, mappingId: s.mappingId }, "?" + s.varName); return; }
+        const end = Number.isFinite(loc.blockEndLineIdx) ? loc.blockEndLineIdx : lines.length - 1;
+        const re = new RegExp("TEMPLATE[\\s\\S]*AS\\s*\\?" + String(s.varName).replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "i");
+        let idx = loc.blockStartLineIdx;
+        for (let k = loc.blockStartLineIdx; k <= end; k++) if (re.test(lines[k] || "")) { idx = k; break; }
+        jumpToArtifactFlowLine("sms2Mappings", idx);
+        return idx;
+      }
+
+      // ── editing keys ────────────────────────────────────────────────────────────
+      const kdOrdered = (t, cols) => [...cols].sort((a, b) => t.cols.findIndex((c) => c.name === a) - t.cols.findIndex((c) => c.name === b));
+      // The name a key set entry uses for the table: as that key set already writes it, else as another key set
+      // or the mappings write it. A functional dependency needs schema.table: the schema comes from the data
+      // source's table list when the name has none.
+      function kdNameFor(t, key) {
+        let n = t.written[key] || t.written.uniqueKeySets || t.written.foreignKeySets || t.written.fkTarget || t.written.functionalDependencySets || t.name;
+        if (key === "functionalDependencySets" && !n.includes(".")) {
+          const hit = (_kd.dsTables[t.dsName]?.list || []).filter((x) => x.table.toLowerCase() === n.toLowerCase());
+          if (hit.length === 1 && hit[0].schema) n = `${hit[0].schema}.${hit[0].table}`;
+        }
+        return n;
+      }
+      function kdEntryRaw(key, t, a, b, tgt) {
+        const n = kdNameFor(t, key);
+        if (key === "uniqueKeySets") return `(${a.map((c) => `${n}.${c}`).join(", ")})`;
+        if (key === "functionalDependencySets") return `(${a.map((c) => `${n}.${c}`).join(",")}->${b.map((c) => `${n}.${c}`).join(",")})`;
+        const tn = tgt.written.fkTarget || kdNameFor(tgt, "foreignKeySets");
+        return `(${a.map((c) => `${n}.${c}`).join(",")} -> ${b.map((c) => `${tn}.${c}`).join(",")})`;
+      }
+      function kdEnterMode(m) {
+        kdHideMenu();
+        kdEndLink();
+        _kd.mode = Object.assign({ pick: new Set(), det: new Set(), test: null }, m);
+        const cv = $("kdCanvas"), card = kdCard(m.id);
+        if (!card) { _kd.mode = null; return; }
+        cv.classList.add("is-editing");
+        cv.classList.toggle("is-fdmode", m.kind === "fd");
+        card.classList.add("is-focus");
+        // bring the table forward: centered in the visible area and enlarged
+        const vr = $("kdVp").getBoundingClientRect(), cr = card.getBoundingClientRect();
+        const s = Math.max(1.15, Math.min(1.5, (vr.height - 140) / Math.max(1, cr.height)));
+        const cx = vr.left + vr.width / 2, cy = vr.top + vr.height / 2 + 30;
+        card.style.transform = `translate(${(cx - (cr.left + cr.width * s / 2)) / _kd.zoom}px, ${(cy - (cr.top + cr.height * s / 2)) / _kd.zoom}px) scale(${s})`;
+        kdPaintMode();
+      }
+      function kdExitMode() {
+        const card = document.querySelector("#kdCanvas .kd-card.is-focus");
+        if (card) { card.style.transform = ""; card.classList.remove("is-focus"); }
+        $("kdCanvas")?.classList.remove("is-editing", "is-fdmode");
+        document.querySelector(".kd-banner")?.remove();
+        if (_kd.testAbort) { _kd.testAbort.abort(); _kd.testAbort = null; }
+        _kd.mode = null;
+        setTimeout(() => kdRender(), 300);
+      }
+      function kdEndModes() { kdHideMenu(); kdEndLink(); if (_kd.mode) kdExitMode(); }
+      function kdPaintMode() {
+        const m = _kd.mode, M = _kd.model, t = M?.tables.get(m.id);
+        if (!m || !t) return;
+        document.querySelectorAll("#kdCanvas .kd-card.is-focus .kd-row").forEach((r) => {
+          const c = r.getAttribute("data-kd-c");
+          r.classList.toggle("is-picked", m.pick.has(c));
+          r.classList.toggle("is-locked", m.step === "dep" && m.det.has(c));
+        });
+        const list = kdOrdered(t, m.pick);
+        const tr = m.test, res = !tr ? "" : tr === "busy" ? `<span class="kd-busy">Testing against the data…</span>` : `<span class="${tr.ok ? "kd-ok" : tr.ok === false ? "kd-bad" : "kd-hint"}">${tr.ok ? "&#10003; " : tr.ok === false ? "&#10007; " : ""}${esc(tr.msg)}</span>`;
+        const saveLbl = (n) => (!tr || tr === "busy" || tr.ok == null ? n : tr.ok ? "&#10003; " + n : "Save anyway");
+        const warn = tr && tr !== "busy" && tr.ok === false;
+        if (m.kind === "uk") {
+          const n = m.edit != null ? m.edit + 1 : t.uks.length + 1;
+          const dup = t.uks.some((e, i) => i !== m.edit && e.cols.length === list.length && list.every((c) => e.cols.some((x) => x.toLowerCase() === c.toLowerCase())));
+          kdBanner(m, { step: m.edit != null ? "Edit unique key" : "New unique key", what: "Select the column(s) that together identify one row",
+            preview: dup ? `<span class="kd-bad" style="font-family:var(--sans)">The same columns as an existing key</span>` : esc(list.length ? `K${n} (${list.join(", ")})` : ""),
+            res, test: list.length > 0 && !dup, primary: saveLbl(`Save as K${n}`), disabled: !list.length || dup || tr === "busy", act: "saveuk", warn });
+        } else if (m.step === "det") {
+          kdBanner(m, { fd: true, step: "Functional dependency · step 1 of 2", what: "Select the determinant column(s)",
+            preview: esc(list.length ? list.join(", ") + " → …" : ""), res: "", primary: "Next", disabled: !list.length, act: "nextfd" });
+        } else {
+          const n = m.edit != null ? m.edit + 1 : t.fds.length + 1;
+          kdBanner(m, { fd: true, step: "Functional dependency · step 2 of 2", what: "Select the column(s) they determine",
+            preview: esc(kdOrdered(t, m.det).join(", ") + " → " + (list.join(", ") || "…")), res, test: list.length > 0,
+            primary: saveLbl(`Save as D${n}`), disabled: !list.length || tr === "busy", act: "savefd", back: true, warn });
+        }
+      }
+      function kdBanner(m, b) {
+        document.querySelector(".kd-banner")?.remove();
+        const t = _kd.model.tables.get(m.id);
+        const el = document.createElement("div");
+        el.className = "kd-banner" + (b.fd ? " is-fd" : "");
+        el.innerHTML = `<div class="kd-txt"><div class="kd-step">${b.step} · ${esc(t.name)}</div><div class="kd-what">${b.what}</div><span class="kd-preview">${b.preview || ""}</span><span class="kd-res">${b.res || ""}</span></div>
+          ${b.back ? `<button type="button" class="secondary" data-kd-act="backfd">Back</button>` : ""}<button type="button" class="secondary" data-kd-act="cancel">Cancel</button>
+          ${b.test !== undefined ? `<button type="button" class="secondary" data-kd-act="testmode"${b.test ? "" : " disabled"} title="Run the same check the SQL validation tool runs">Test</button>` : ""}
+          <button type="button" class="secondary${b.warn ? " kd-save-warn" : ""}" data-kd-act="${b.act}"${b.disabled ? " disabled" : ""}>${b.primary}</button>`;
+        document.querySelector("#kdView .kd-stage").appendChild(el);
+      }
+      // One check against the data, the same SQL the SQL validation tool runs. Returns { ok, msg }; ok is
+      // null when it could not run.
+      async function kdRunTest(kind, spec) {
+        if (!kdConnected()) return { ok: null, msg: state.ui.demoMode ? "Sample queries have no data to test against." : "Connect to Stardog to test against the data." };
+        if (!spec.ds) return { ok: null, msg: "No data source is known for this table." };
+        let sql;
+        if (kind === "uk") sql = buildUniqueKeyTestSql(spec.table, spec.cols, "result");
+        else if (kind === "fk") sql = buildFkInclusionTestSql(spec.table, spec.cols, spec.tgt, spec.tgtCols, "result");
+        else sql = buildFunctionalDependencySql(_sqlQTable(spec.table), spec.det, spec.dep).count;
+        if (_kd.testAbort) _kd.testAbort.abort();
+        const ctl = _kd.testAbort = new AbortController();
+        const t0 = performance.now();
+        try {
+          const text = await requestWithPathFallback(dataSourceRequestPaths(spec.ds, "/query"), { method: "POST", contentType: "text/plain", body: sql, accept: "application/json", abortSignal: ctl.signal });
+          const parsed = JSON.parse(text);
+          const row = Object.values(parsed.mRows || {})[0] || {};
+          const v = String(Object.values(row)[0] ?? "").trim();
+          const secs = ` · ${((performance.now() - t0) / 1000).toFixed(1)} s`;
+          if (kind === "fd") {
+            const n = Number(v);
+            return n === 0 ? { ok: true, msg: "Holds for every row" + secs } : { ok: false, msg: `${Number.isFinite(n) ? n.toLocaleString() : "Some"} determinant value${n === 1 ? "" : "s"} go with more than one value` + secs };
+          }
+          if (kind === "uk") return v === "PASS" ? { ok: true, msg: "No two rows share these values" + secs } : { ok: false, msg: "Some rows share these values, so this is not a unique key" + secs };
+          return v === "PASS" ? { ok: true, msg: `Every value has a matching row in ${spec.tgt}` + secs } : { ok: false, msg: `Some values have no matching row in ${spec.tgt}` + secs };
+        } catch (e) {
+          if (e?.name === "AbortError") return { ok: null, msg: "Test stopped." };
+          return { ok: null, msg: summarizeSchemaDriftError(e.message || String(e)) };
+        } finally { if (_kd.testAbort === ctl) _kd.testAbort = null; }
+      }
+      const kdResHtml = (r) => `<span class="${r.ok ? "kd-ok" : r.ok === false ? "kd-bad" : "kd-hint"}">${r.ok ? "&#10003; " : r.ok === false ? "&#10007; " : ""}${esc(r.msg)}</span>`;
+
+      // ── linking columns: click a circle then a column on another table, or drag ────
+      function kdStartLink(tid, col, side, ev) {
+        const p = kdPortXY(tid, col, side);
+        if (!p) return;
+        _kd.link = { tid, col, side, x: p.x, y: p.y, moved: false, downX: ev.clientX, downY: ev.clientY, dragging: true };
+        $("kdView").classList.add("is-linking");
+        kdCard(tid)?.classList.add("is-src");
+        const pairTo = _kd.pairFk != null ? _kd.model.fks[_kd.pairFk]?.to : null;
+        document.querySelectorAll("#kdCanvas .kd-row").forEach((r) => {
+          const rt = r.getAttribute("data-kd-t");
+          r.classList.toggle("is-target", rt !== tid && !_kd.model.tables.get(rt)?.isQuery && (pairTo == null || rt === pairTo));
+        });
+      }
+      function kdEndLink() {
+        if (!_kd.link) return;
+        _kd.link = null;
+        if (_kd.pendingCards) requestAnimationFrame(() => { if (!_kd.link && !_kd.mode) kdRender(); });
+        $("kdView")?.classList.remove("is-linking");
+        document.querySelectorAll("#kdCanvas .kd-card.is-src").forEach((c) => c.classList.remove("is-src"));
+        document.querySelectorAll("#kdCanvas .kd-row.is-target").forEach((r) => r.classList.remove("is-target"));
+        $("kdLinkLine")?.setAttribute("d", "");
+      }
+      function kdFinishLink(row, cx, cy) {
+        const L = _kd.link;
+        kdEndLink();
+        const M = _kd.model;
+        const from = M.tables.get(L.tid), to = M.tables.get(row.getAttribute("data-kd-t"));
+        const tc = row.getAttribute("data-kd-c");
+        if (!from || !to || from.id === to.id) return;
+        const pair = _kd.pairFk != null ? M.fks[_kd.pairFk] : null;
+        _kd.pairFk = null;
+        let ok;
+        if (pair && pair.from === from.id && pair.to === to.id) {
+          if (pair.e.cols.some((c) => c.toLowerCase() === L.col.toLowerCase())) { showStatusToast("That column is already in this foreign key.", "info", 2600); return; }
+          ok = kdEditEntry("foreignKeySets", pair.e, kdEntryRaw("foreignKeySets", from, [...pair.e.cols, L.col], [...pair.e.tgtCols, tc], to));
+        } else {
+          ok = kdEditEntry("foreignKeySets", null, kdEntryRaw("foreignKeySets", from, [L.col], [tc], to), from.dsName);
+        }
+        if (!ok) return;
+        const i = _kd.model.fks.findIndex((f) => f.from === from.id && f.to === to.id && f.e.cols.some((c) => c.toLowerCase() === L.col.toLowerCase()));
+        if (i >= 0) kdFkMenu(i, cx + 12, cy + 12, true);
+      }
+
+      function kdBind() {
+        const view = $("kdView");
+        if (!view || view._kdBound) return;
+        view._kdBound = true;
+        view.addEventListener("pointerdown", (e) => {
+          if (_kd.mode) return;
+          const t = e.target instanceof Element ? e.target : null;
+          if (!t) return;
+          if (_kd.link && !_kd.link.dragging) {   // second click of click-then-click
+            const row = t.closest(".kd-row.is-target");
+            if (row) kdFinishLink(row, e.clientX, e.clientY);
+            else { kdEndLink(); _kd.pairFk = null; }
+            e.preventDefault(); e.stopPropagation();
+            return;
+          }
+          const head = e.button === 0 && !t.closest(".kd-more") ? t.closest(".kd-ch") : null;
+          if (head) {
+            // drag a table by its header; every table keeps its own position from then on
+            const card = head.closest("[data-kd-card]"), id = card.getAttribute("data-kd-card");
+            if (!_kd.free) {
+              _kd.free = new Map([...document.querySelectorAll("#kdCanvas [data-kd-card]")].map((c) => [c.getAttribute("data-kd-card"), { x: parseFloat(c.style.left) || 0, y: parseFloat(c.style.top) || 0 }]));
+              _kd.freeKind = "manual";
+            }
+            const p = _kd.free.get(id) || { x: 0, y: 0 };
+            _kd.drag = { id, card, sx: e.clientX, sy: e.clientY, ox: p.x, oy: p.y, moved: false, raf: 0 };
+            kdHideMenu();
+            e.preventDefault();
+            return;
+          }
+          const port = t.closest("[data-kd-port]");
+          if (port) {
+            kdHideMenu();
+            const row = port.closest(".kd-row");
+            kdStartLink(row.getAttribute("data-kd-t"), row.getAttribute("data-kd-c"), port.getAttribute("data-kd-port"), e);
+            e.preventDefault();
+            return;
+          }
+          // drag the empty canvas to pan (not on a table, a line, or the viewport's own scrollbars)
+          const vp = $("kdVp");
+          if (e.button === 0 && vp && vp.contains(t) && !t.closest("[data-kd-card], [data-kd-line]")) {
+            const r = vp.getBoundingClientRect();
+            if (e.clientX - r.left >= vp.clientWidth || e.clientY - r.top >= vp.clientHeight) return;
+            _kd.pan = { sx: e.clientX, sy: e.clientY, sl: vp.scrollLeft, st: vp.scrollTop, moved: false };
+            e.preventDefault();
+          }
+        }, true);
+        // a pan that moved is not a click on the canvas
+        view.addEventListener("click", (e) => { if (_kd.panClickEaten) { _kd.panClickEaten = false; e.stopPropagation(); e.preventDefault(); } }, true);
+        document.addEventListener("pointermove", (e) => {
+          const P = _kd.pan;
+          if (P) {
+            if (!P.moved && Math.hypot(e.clientX - P.sx, e.clientY - P.sy) < 3) return;
+            if (!P.moved) { P.moved = true; $("kdVp")?.classList.add("is-panning"); }
+            const vp = $("kdVp");
+            if (vp) { vp.scrollLeft = P.sl - (e.clientX - P.sx); vp.scrollTop = P.st - (e.clientY - P.sy); }
+            return;
+          }
+          const D = _kd.drag;
+          if (D) {
+            const dx = (e.clientX - D.sx) / _kd.zoom, dy = (e.clientY - D.sy) / _kd.zoom;
+            if (!D.moved && Math.hypot(dx, dy) * _kd.zoom < 3) return;
+            D.moved = true;
+            const x = Math.max(0, D.ox + dx), y = Math.max(0, D.oy + dy);
+            D.card.style.left = `${x}px`;
+            D.card.style.top = `${y}px`;
+            _kd.free.set(D.id, { x, y });
+            // lines follow on the next frame; their ends move to the side facing the other table
+            if (!D.raf) D.raf = requestAnimationFrame(() => { D.raf = 0; if (_kd.model) kdDrawLines(_kd.model); });
+            return;
+          }
+          const L = _kd.link;
+          if (!L) return;
+          if (Math.hypot(e.clientX - L.downX, e.clientY - L.downY) > 5) L.moved = true;
+          const cr = $("kdCanvas").getBoundingClientRect(), x = (e.clientX - cr.left) / _kd.zoom, y = (e.clientY - cr.top) / _kd.zoom;
+          const h = L.x + (L.side === "R" ? 1 : -1) * Math.max(30, Math.abs(x - L.x) * 0.4);
+          $("kdLinkLine")?.setAttribute("d", `M${L.x} ${L.y} C${h} ${L.y}, ${x - (x > L.x ? 30 : -30)} ${y}, ${x} ${y}`);
+        });
+        document.addEventListener("pointerup", (e) => {
+          const P = _kd.pan;
+          if (P) {
+            _kd.pan = null;
+            $("kdVp")?.classList.remove("is-panning");
+            if (P.moved) _kd.panClickEaten = true;
+            return;
+          }
+          const D = _kd.drag;
+          if (D) {
+            _kd.drag = null;
+            if (D.raf) cancelAnimationFrame(D.raf);
+            if (_kd.pendingCards) { kdRender(); return; }
+            if (D.moved) {
+              _kd.freeKind = "manual";
+              const vis = _kd.model?.visible || [];
+              kdSizeCanvasFree(vis, new Map(vis.map((id) => [id, kdCard(id)]).filter(([, c]) => c)));
+              if (_kd.model) kdDrawLines(_kd.model);
+            }
+            return;
+          }
+          const L = _kd.link;
+          if (!L || !L.dragging) return;
+          L.dragging = false;
+          if (!L.moved) return;   // a plain click: the line now follows the pointer until the next click
+          const row = document.elementFromPoint(e.clientX, e.clientY)?.closest?.(".kd-row.is-target");
+          if (row) kdFinishLink(row, e.clientX, e.clientY); else kdEndLink();
+        });
+        view.addEventListener("contextmenu", (e) => {
+          const hit = e.target instanceof Element ? e.target.closest("[data-kd-line]") : null;
+          if (hit && !_kd.mode) {
+            e.preventDefault();
+            const [kind, i] = hit.getAttribute("data-kd-line").split(":");
+            if (kind === "fk") kdFkMenu(Number(i), e.clientX + 8, e.clientY + 8); else kdImpliedMenu(Number(i), e.clientX + 8, e.clientY + 8);
+            return;
+          }
+          const card = e.target instanceof Element ? e.target.closest("[data-kd-card]") : null;
+          if (!card || _kd.mode) return;
+          e.preventDefault();
+          kdTableMenu(card.getAttribute("data-kd-card"), e.clientX, e.clientY);
+        });
+        view.addEventListener("click", (e) => {
+          const t = e.target instanceof Element ? e.target : null;
+          if (!t) return;
+          const act = t.closest("[data-kd-act]");
+          if (act) { kdAct(act, e); return; }
+          if (_kd.mode) {
+            const row = t.closest(".kd-card.is-focus .kd-row");
+            if (row && !row.classList.contains("is-locked")) {
+              const c = row.getAttribute("data-kd-c");
+              if (_kd.mode.pick.has(c)) _kd.mode.pick.delete(c); else _kd.mode.pick.add(c);
+              _kd.mode.test = null;
+              kdPaintMode();
+            }
+            return;
+          }
+          const more = t.closest("[data-kd-more]");
+          if (more) { const r = more.getBoundingClientRect(); kdTableMenu(more.getAttribute("data-kd-more"), r.right, r.bottom + 4); e.stopPropagation(); return; }
+          const fetch = t.closest("[data-kd-fetch]");
+          if (fetch && !fetch.disabled) { kdFetchColumns([fetch.getAttribute("data-kd-fetch")]).catch(handleError); return; }
+          const disc = t.closest("[data-kd-discovered]");
+          if (disc) {
+            const M = _kd.model, tb = M.tables.get(disc.getAttribute("data-kd-discovered"));
+            if (tb) kdEditEntry("uniqueKeySets", null, kdEntryRaw("uniqueKeySets", tb, [disc.getAttribute("data-kd-col")]), tb.dsName);
+            return;
+          }
+          const hit = t.closest("[data-kd-line]");
+          if (hit) {
+            const [kind, i] = hit.getAttribute("data-kd-line").split(":");
+            if (kind === "fk") kdFkMenu(Number(i), e.clientX + 8, e.clientY + 8); else kdImpliedMenu(Number(i), e.clientX + 8, e.clientY + 8);
+            e.stopPropagation();
+            return;
+          }
+          const add = t.closest("[data-kd-add]");
+          if (add) { kdAddTable(add.getAttribute("data-kd-add"), add.getAttribute("data-kd-ds") || ""); return; }
+          const find = t.closest("[data-kd-find]");
+          if (find) { kdFindTable(find.getAttribute("data-kd-find")); return; }
+          const moreRows = t.closest("[data-kd-more-rows]");
+          if (moreRows) { const k = moreRows.getAttribute("data-kd-more-rows"); _kd.shown[k] = (_kd.shown[k] || 100) + 300; kdRenderTree(); return; }
+          if (t.closest("[data-kd-vg]")) return;   // handled on change
+          const node = t.closest("[data-kd-node]");
+          if (node) {
+            const k = node.getAttribute("data-kd-node");
+            if (_kd.open.has(k)) _kd.open.delete(k); else _kd.open.add(k);
+            if (_kd.open.has(k) && k.startsWith("ds:")) kdEnsureDsTables(k.slice(3)).catch(handleError);
+            if (_kd.open.has(k) && k === "others" && kdConnected() && !(state.ui.availableDataSources || []).length && !_kd.dsListLoading) {
+              _kd.dsListLoading = true;
+              fetchAllDataSources().catch(() => {}).finally(() => { _kd.dsListLoading = false; kdRenderTree(); });
+            }
+            kdRenderTree();
+            return;
+          }
+          const side = t.closest("[data-kd-side]");
+          if (side) { _kd.side = side.getAttribute("data-kd-side"); kdRenderTree(); return; }
+          if (t.closest("[data-kd-showall]")) { _kd.vgOff.clear(); _kd.forceLayout = true; kdRender(); return; }
+        });
+        view.addEventListener("change", (e) => {
+          const cb = e.target instanceof Element ? e.target.closest("[data-kd-vg]") : null;
+          if (!cb) return;
+          const vg = cb.getAttribute("data-kd-vg");
+          if (cb.checked) _kd.vgOff.delete(vg); else _kd.vgOff.add(vg);
+          _kd.forceLayout = true;
+          kdRender();
+        });
+        view.addEventListener("mouseover", (e) => {
+          if (_kd.mode || _kd.link) return;
+          document.querySelectorAll("#kdCanvas .kd-row.is-hl, #kdCanvas .kd-row.is-hl-d, #kdCanvas .kd-row.is-hl-f").forEach((r) => r.classList.remove("is-hl", "is-hl-d", "is-hl-f"));
+          const t = e.target instanceof Element ? e.target : null;
+          const M = _kd.model;
+          if (!t || !M) return;
+          const mark = (tid, c, cls) => kdRowEl(tid, c)?.classList.add(cls);
+          const chip = t.closest("[data-kd-hk]");
+          let hot = null;
+          if (chip) {
+            const [k, n, ...rest] = chip.getAttribute("data-kd-hk").split(":");
+            const tid = rest.join(":");
+            if (k === "uk") (M.tables.get(tid)?.uks[Number(n)]?.cols || []).forEach((c) => mark(tid, c, "is-hl"));
+            if (k === "fd") { const d = M.tables.get(tid)?.fds[Number(n)]; if (d) [...d.det, ...d.dep].forEach((c) => mark(tid, c, "is-hl-d")); }
+            if (k === "fk") { const f = M.fks[Number(n)]; if (f) { f.e.cols.forEach((c) => mark(f.from, c, "is-hl-f")); f.e.tgtCols.forEach((c) => mark(f.to, c, "is-hl-f")); hot = "fk:" + n; } }
+          }
+          const line = t.closest("[data-kd-line]");
+          if (line) hot = line.getAttribute("data-kd-line");
+          if (hot !== _kd.hot) { _kd.hot = hot; document.querySelectorAll("#kdLines [data-kd-g]").forEach((g) => g.classList.toggle("is-hot", g.getAttribute("data-kd-g") === hot)); }
+        });
+        $("kdDrawer")?.addEventListener("click", (e) => {
+          const t = e.target instanceof Element ? e.target : null;
+          if (!t) return;
+          const ent = t.closest("[data-kd-ent]");
+          if (ent) { kdFindTable(ent.getAttribute("data-kd-ent")); return; }
+          const dtab = t.closest("[data-kd-drawer]");
+          if (dtab) { _kd.drawerKey = dtab.getAttribute("data-kd-drawer"); _kd.drawer = true; kdRenderDrawer(); return; }
+          if (t.closest("#kdDrawerHead")) { _kd.drawer = !_kd.drawer; kdRenderDrawer(); }
+        });
+        kdMenuEl().addEventListener("click", (e) => {
+          const act = e.target instanceof Element ? e.target.closest("[data-kd-act]") : null;
+          if (act && !act.disabled) kdAct(act, e);
+        });
+        document.addEventListener("pointerdown", (e) => {
+          const m = $("kdMenu");
+          if (m && !m.classList.contains("hidden") && !(e.target instanceof Element && e.target.closest("#kdMenu"))) kdHideMenu();
+        }, true);
+        document.addEventListener("keydown", (e) => {
+          if (e.key !== "Escape" || $("erdPanel")?.classList.contains("hidden")) return;
+          if (!$("kdMenu")?.classList.contains("hidden")) { kdHideMenu(); return; }
+          if (_kd.link) { kdEndLink(); _kd.pairFk = null; return; }
+          if (_kd.mode) kdExitMode();
+        });
+        // Typing in the mappings redraws the diagram (the key set panes call erdRefreshIfOpen from their own sync).
+        document.addEventListener("input", (e) => {
+          if (e.target instanceof HTMLTextAreaElement && e.target.getAttribute("data-artifact-editor") === "sms2Mappings") erdRefreshIfOpen();
+        });
+        window.addEventListener("resize", () => { if (!$("erdPanel")?.classList.contains("hidden") && _kd.model && !_kd.mode) kdDrawLines(_kd.model); });
+      }
+
+      async function kdAct(el, e) {
+        const a = el.getAttribute("data-kd-act");
+        if (el.disabled) return;
+        const M = _kd.model;
+        const id = el.getAttribute("data-kd-id");
+        const slot = Number(el.getAttribute("data-kd-n"));   // where this menu shows a test result
+        const t = id ? M?.tables.get(id) : null;
+        // The model may have been rebuilt since the menu opened: find the entry by its text, not its position.
+        let n = slot;
+        const raw = el.getAttribute("data-kd-raw");
+        if (raw != null && M) {
+          if (/uk$/.test(a)) n = t ? t.uks.findIndex((e) => e.raw === raw) : -1;
+          else if (/fd$/.test(a)) n = t ? t.fds.findIndex((e) => e.raw === raw) : -1;
+          else n = M.fks.findIndex((f) => f.e.raw === raw);
+          if (n < 0) { kdHideMenu(); showStatusToast("That key changed in the meantime; open the menu again.", "info", 3000); return; }
+        }
+        const keepMenu = a === "testuk" || a === "testfd" || a === "testfk" || a === "srcstep" || a === "srcgo" || a === "layoutmenu";
+        if (!keepMenu) kdHideMenu();
+        if (a === "srcstep" || a === "srcgo") {
+          const r = M?.implied[slot], src = r?.sources || [];
+          if (!src.length) return;
+          const st = _kd.srcStep && _kd.srcStep.i === slot ? _kd.srcStep : (_kd.srcStep = { i: slot, at: -1 });
+          st.at = a === "srcgo" ? Number(el.getAttribute("data-kd-k")) : (st.at + Number(el.getAttribute("data-kd-dir")) + src.length) % src.length;
+          if (st.at < 0) st.at = src.length - 1;
+          const label = document.querySelector("#kdMenu [data-kd-src-label]");
+          if (label) label.textContent = `${st.at + 1} of ${src.length}: ${src[st.at].table} · ${src[st.at].name || src[st.at].mappingId || "mapping"}`;
+          document.querySelectorAll("#kdMenu .kd-src-it").forEach((b) => b.classList.toggle("is-current", Number(b.getAttribute("data-kd-k")) === st.at));
+          kdJumpToSource(src[st.at]);
+          return;
+        }
+        const m = _kd.mode;
+        if (a === "newuk" && t) kdEnterMode({ kind: "uk", id });
+        else if (a === "newfd" && t) kdEnterMode({ kind: "fd", id, step: "det" });
+        else if (a === "edituk" && t) { kdEnterMode({ kind: "uk", id, edit: n, entry: t.uks[n] }); _kd.mode.pick = new Set(t.uks[n].cols.map(t.colName)); kdPaintMode(); }
+        else if (a === "editfd" && t) { kdEnterMode({ kind: "fd", id, step: "det", edit: n, entry: t.fds[n] }); _kd.mode.pick = new Set(t.fds[n].det.map(t.colName)); _kd.mode.prevDep = t.fds[n].dep.map(t.colName); kdPaintMode(); }
+        else if (a === "rmuk" && t) kdEditEntry("uniqueKeySets", t.uks[n], "");
+        else if (a === "rmfd" && t) kdEditEntry("functionalDependencySets", t.fds[n], "");
+        else if (a === "rmfk") { const f = M.fks[n]; if (f) kdEditEntry("foreignKeySets", f.e, ""); }
+        else if (a === "hide" && t) { _kd.removed.add(id); _kd.added = _kd.added.filter((x) => M.T(x.name)?.id !== id); kdRender(); }
+        else if (a === "fetch" && t) kdFetchColumns([id]).catch(handleError);
+        else if (a === "close") { /* menu already hidden */ }
+        else if (a === "pair") { _kd.pairFk = n; const f = M.fks[n]; showStatusToast(`Click the next column's circle on ${f.e.table}, then its match on ${f.e.tgt}.`, "info", 4000); }
+        else if (a === "declare") {
+          const r = M.implied[n];
+          if (r) {
+            const [from, fc, to, tc] = el.getAttribute("data-kd-dir") === "ab" ? [r.a, r.colsA, r.b, r.colsB] : [r.b, r.colsB, r.a, r.colsA];
+            const F = M.tables.get(from), Tt = M.tables.get(to);
+            kdEditEntry("foreignKeySets", null, kdEntryRaw("foreignKeySets", F, fc, tc, Tt), F.dsName);
+          }
+        }
+        else if (a === "testuk" || a === "testfd") {
+          const k = a === "testuk" ? "uk" : "fd", ent = (k === "uk" ? t.uks : t.fds)[n];
+          const out = document.querySelector(`#kdMenu [data-kd-res="${k}:${slot}"]`);
+          if (out) out.innerHTML = `<span class="kd-busy">Testing against the data…</span>`;
+          const r = await kdRunTest(k, k === "uk" ? { table: ent.table, cols: ent.cols, ds: ent.ds || t.dsName } : { table: ent.table, det: ent.det, dep: ent.dep, ds: ent.ds || t.dsName });
+          const out2 = document.querySelector(`#kdMenu [data-kd-res="${k}:${slot}"]`);
+          if (out2) out2.innerHTML = kdResHtml(r);
+        }
+        else if (a === "testfk") {
+          const f = M.fks[n];
+          const out = document.querySelector(`#kdMenu [data-kd-res="fk:${slot}"]`);
+          if (out) out.innerHTML = `<span class="kd-busy">Testing against the data…</span>`;
+          const r = f ? await kdRunTest("fk", { table: f.e.table, cols: f.e.cols, tgt: f.e.tgt, tgtCols: f.e.tgtCols, ds: f.e.ds || M.tables.get(f.from)?.dsName }) : { ok: null, msg: "" };
+          const out2 = document.querySelector(`#kdMenu [data-kd-res="fk:${slot}"]`);
+          if (out2) out2.innerHTML = kdResHtml(r);
+        }
+        else if (m && a === "cancel") kdExitMode();
+        else if (m && a === "testmode") {
+          const T = M.tables.get(m.id);
+          const name = kdNameFor(T, m.kind === "uk" ? "uniqueKeySets" : "functionalDependencySets");
+          const spec = m.kind === "uk" ? { table: name, cols: kdOrdered(T, m.pick), ds: T.dsName } : { table: name, det: kdOrdered(T, m.det), dep: kdOrdered(T, m.pick), ds: T.dsName };
+          m.test = "busy"; kdPaintMode();
+          const r = await kdRunTest(m.kind, spec);
+          if (_kd.mode === m) { m.test = r; kdPaintMode(); }
+        }
+        else if (m && a === "saveuk") {
+          const T = M.tables.get(m.id);
+          const raw = kdEntryRaw("uniqueKeySets", T, kdOrdered(T, m.pick));
+          kdExitMode();
+          kdEditEntry("uniqueKeySets", m.entry || null, raw, T.dsName);
+        }
+        else if (m && a === "nextfd") { m.det = new Set(m.pick); m.pick = new Set((m.prevDep || []).filter((c) => !m.det.has(c))); m.step = "dep"; m.test = null; kdPaintMode(); }
+        else if (m && a === "backfd") { m.pick = new Set(m.det); m.step = "det"; m.test = null; kdPaintMode(); }
+        else if (m && a === "savefd") {
+          const T = M.tables.get(m.id);
+          const raw = kdEntryRaw("functionalDependencySets", T, kdOrdered(T, m.det), kdOrdered(T, m.pick));
+          kdExitMode();
+          kdEditEntry("functionalDependencySets", m.entry || null, raw, T.dsName);
+        }
       }
 
       function parseUniqueKeySetsText(text) {
@@ -53110,20 +54679,36 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         });
       }
 
+      // PASS when the column(s) identify every row of the table; shared by the SQL validation tool and the ER Diagram's Test.
+      function buildUniqueKeyTestSql(fullTable, cols, alias) {
+        const qCols = cols.map(_sqlQ);
+        const distinctExpr = qCols.length === 1
+          ? qCols[0]
+          : `CONCAT(${qCols.map((qc) => `CAST(${qc} AS VARCHAR(255))`).join(`, '~', `)})`;
+        return `SELECT CASE WHEN COUNT(*) = COUNT(DISTINCT ${distinctExpr}) THEN 'PASS' ELSE 'FAIL' END AS ${alias || "__VTALIAS__"} FROM ${_sqlQTable(fullTable)}`;
+      }
+      // PASS when every non-NULL source value has a matching target row (inclusion dependency). Shared like the one above.
+      function buildFkInclusionTestSql(srcTable, srcCols, tgtTable, tgtCols, alias) {
+        const sNotNull = srcCols.map((c) => `s.${_sqlQ(c)} IS NOT NULL`).join(" AND ");
+        const joinOn = srcCols.length === 1
+          ? `s.${_sqlQ(srcCols[0])} = t.${_sqlQ(tgtCols[0])}`
+          : srcCols.map((c, i) => `CAST(s.${_sqlQ(c)} AS VARCHAR(255)) = CAST(t.${_sqlQ(tgtCols[i])} AS VARCHAR(255))`).join(" AND ");
+        return [
+          `SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS ${alias || "__VTALIAS__"}`,
+          `FROM ${_sqlQTable(srcTable)} s LEFT JOIN ${_sqlQTable(tgtTable)} t ON ${joinOn}`,
+          `WHERE ${sNotNull} AND t.${_sqlQ(tgtCols[0])} IS NULL`,
+        ].join("\n");
+      }
+
       function buildUniqueKeyChecks() {
         const checks = [];
         parseUniqueKeySetsTextWithDs(state.artifacts.uniqueKeySets?.working || "").forEach(({ fullTable, cols, dsName }) => {
-          const qTable = _sqlQTable(fullTable);
-          const qCols = cols.map(_sqlQ);
-          const distinctExpr = qCols.length === 1
-            ? qCols[0]
-            : `CONCAT(${qCols.map((qc) => `CAST(${qc} AS VARCHAR(255))`).join(`, '~', `)})`;
           const compound = cols.length > 1;
           checks.push({
             table: fullTable,
             label: _colRef(fullTable, cols),
             comment: `${_colRef(fullTable, cols)} is asserted as a ${compound ? "compound " : ""}unique key for ${fullTable}. Verify the ${compound ? "combination of columns" : "column"} identifies every row uniquely (no duplicate values)`,
-            sql: `SELECT CASE WHEN COUNT(*) = COUNT(DISTINCT ${distinctExpr}) THEN 'PASS' ELSE 'FAIL' END AS __VTALIAS__ FROM ${qTable}`,
+            sql: buildUniqueKeyTestSql(fullTable, cols),
             dsName: dsName || null,
             vgName: null,
           });
@@ -53441,27 +55026,17 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         };
         const checks = [];
         fkEntries.forEach(({ srcTable, srcCols, tgtTable, tgtCols }) => {
-          const sFrom = _sqlQTable(srcTable);
           const tFrom = _sqlQTable(tgtTable);
           const sColRef = _colRef(srcTable, srcCols);
           const tColRef = _colRef(tgtTable, tgtCols);
-          const sNotNull = srcCols.map((c) => `s.${_sqlQ(c)} IS NOT NULL`).join(" AND ");
-          const joinOn = srcCols.length === 1
-            ? `s.${_sqlQ(srcCols[0])} = t.${_sqlQ(tgtCols[0])}`
-            : srcCols.map((c, i) => `CAST(s.${_sqlQ(c)} AS VARCHAR(255)) = CAST(t.${_sqlQ(tgtCols[i])} AS VARCHAR(255))`).join(" AND ");
           const tDistinctExpr = tgtCols.length === 1
             ? _sqlQ(tgtCols[0])
             : `CONCAT(${tgtCols.map((c) => `CAST(${_sqlQ(c)} AS VARCHAR(255))`).join(`, '~', `)})`;
-          const tNotNullCheck = `t.${_sqlQ(tgtCols[0])} IS NULL`;
           const parentDeclaredUk = _parentIsUk(tgtTable, tgtCols);
           const subTests = [
             {
               comment: `Inclusion dependency — every non-NULL ${sColRef} value must exist in ${tColRef}. PASS = referential integrity holds. FAIL = some child values are orphaned (no matching parent row) — orphaned references cause unexpected join misses in the virtual graph`,
-              sql: [
-                `SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS __VTALIAS__`,
-                `FROM ${sFrom} s LEFT JOIN ${tFrom} t ON ${joinOn}`,
-                `WHERE ${sNotNull} AND ${tNotNullCheck}`,
-              ].join("\n"),
+              sql: buildFkInclusionTestSql(srcTable, srcCols, tgtTable, tgtCols),
             },
           ];
           if (!parentDeclaredUk) {
@@ -55019,7 +56594,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           if (_pillFocusKind) enterPillFocusMode(_pillFocusKind);
           // Refresh ERD if open so failed UK badges turn red immediately
           const _erdP = $("erdPanel");
-          if (_erdP && !_erdP.classList.contains("hidden") && _erdMermaidSyntax) runGenerateErd();
+          if (_erdP && !_erdP.classList.contains("hidden")) erdRefreshIfOpen();
         }
       }
 
@@ -60501,6 +62076,9 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         if (exceptId !== "mappingVgMenu" && $("mappingVgSelect")) $("mappingVgSelect").value = mappingSelectionLabel();
         if (exceptId !== "keyDataSourceMenu") state.ui.keyDsMenuPinnedOpen = false;
         if (exceptId !== "keyDataSourceMenu") state.ui.keyDsMenuScrollTop = 0;
+        document.querySelectorAll("[data-ks-menu]").forEach((element) => element.classList.add("hidden"));
+        if (exceptId !== "erdDownloadMenu") $("erdDownloadMenu")?.classList.add("hidden");
+        if (exceptId !== "kdLayoutMenu") $("kdLayoutMenu")?.classList.add("hidden");
         document.querySelectorAll("[id^='labPathVarMenu_']").forEach((element) => {
           if (element.id === exceptId) return;
           element.classList.add("hidden");
@@ -67250,36 +68828,45 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         on("erdSearch", "input", () => doErdSearch(1));
         on("erdSearch", "keydown", (event) => { if (event.key === "Enter") { event.preventDefault(); doErdSearch(event.shiftKey ? -1 : 1); } });
         on("erdCopyBtn", "click", () => copyErdToClipboard().catch(handleError));
-        on("erdDownloadBtn", "click", downloadErd);
-        on("erdZoomIn",  "click", () => { _erdZoomScale = _erdZoomScale / _ERD_ZOOM_STEP; applyErdZoom(); });
-        on("erdZoomOut", "click", () => { _erdZoomScale = _erdZoomScale * _ERD_ZOOM_STEP; applyErdZoom(); });
-        // Touchpad pinch-to-zoom, mirroring QSM's wheel-zoom. Browsers report a trackpad pinch
-        // gesture as a wheel event with ctrlKey=true (same signal as physical Ctrl+scroll), so
-        // gating on e.ctrlKey lets plain two-finger scroll keep using the diagram host's native
-        // overflow:auto panning instead of being hijacked into zoom (unlike QSM's SVG, the ERD
-        // host has no drag-to-pan, so native scroll is its only panning mechanism — must be kept).
-        // #erdOutput is a static shell (only its innerHTML is replaced on regenerate), so binding
-        // once here survives every re-render; #erdDiagramHost/its svg are looked up live inside
-        // the handler since those nodes ARE replaced each time the diagram regenerates.
-        $("erdOutput")?.addEventListener("wheel", (e) => {
-          if (!e.ctrlKey) return;
-          const scrollHost = $("erdDiagramHost");
-          const svgEl = scrollHost?.querySelector("svg");
-          if (!scrollHost || !svgEl || _erdNatW <= 0 || _erdNatH <= 0) return;
+        on("erdDownloadBtn", "click", (e) => {
+          e.stopPropagation();
+          const menu = $("erdDownloadMenu");
+          if (!menu) return;
+          const opening = menu.classList.contains("hidden");
+          closeDropdownMenus(opening ? "erdDownloadMenu" : "");
+          menu.classList.toggle("hidden", !opening);
+        });
+        on("erdDownloadMenu", "click", (e) => {
+          const item = e.target.closest("[data-erd-download]");
+          if (!item) return;
+          $("erdDownloadMenu")?.classList.add("hidden");
+          downloadErd(item.getAttribute("data-erd-download")).catch(handleError);
+        });
+        on("erdZoomIn",  "click", () => kdSetZoom(_kd.zoom / KD_ZOOM_STEP));
+        on("erdZoomOut", "click", () => kdSetZoom(_kd.zoom * KD_ZOOM_STEP));
+        on("kdZoomFit", "click", () => kdFitZoom());
+        on("kdRefreshBtn", "click", () => { if (_kd.job) kdStopJob(); else kdRefresh().catch(handleError); });
+        on("kdArrangeBtn", "click", (e) => {
+          e.stopPropagation();
+          const menu = $("kdLayoutMenu");
+          if (!menu) return;
+          const opening = menu.classList.contains("hidden");
+          closeDropdownMenus(opening ? "kdLayoutMenu" : "");
+          menu.classList.toggle("hidden", !opening);
+        });
+        on("kdLayoutMenu", "click", (e) => {
+          const item = e.target.closest("[data-kd-layout]");
+          if (!item) return;
+          $("kdLayoutMenu")?.classList.add("hidden");
+          kdArrange(item.getAttribute("data-kd-layout")).catch(handleError);
+        });
+        // Like the graph model view: the mouse wheel, a two-finger touchpad scroll and a pinch (a wheel event with
+        // ctrlKey) all zoom the diagram about the pointer; dragging the empty canvas pans it (see kdBind).
+        $("kdVp")?.addEventListener("wheel", (e) => {
           e.preventDefault();
-          const rect = scrollHost.getBoundingClientRect();
-          const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-          const oldW = svgEl.getBoundingClientRect().width, oldH = svgEl.getBoundingClientRect().height;
-          const ratioX = (scrollHost.scrollLeft + mx) / oldW;
-          const ratioY = (scrollHost.scrollTop + my) / oldH;
-          // Continuous exponential response (vs. the +/- buttons' fixed step) so pinch feels smooth.
-          const factor = Math.exp(-e.deltaY * 0.01);
-          _erdZoomScale = Math.max(_ERD_ZOOM_MIN, Math.min(1, _erdZoomScale * factor));
-          applyErdZoom(svgEl);
-          const newW = svgEl.getBoundingClientRect().width, newH = svgEl.getBoundingClientRect().height;
-          scrollHost.scrollLeft = ratioX * newW - mx;
-          scrollHost.scrollTop = ratioY * newH - my;
+          kdSetZoom(_kd.zoom * kdWheelFactor(e), { clientX: e.clientX, clientY: e.clientY });
         }, { passive: false });
+        kdBind();
         window.addEventListener("resize", () => {
           applyLeftPanelHeight();
           if (!$("reasoningPanel")?.classList.contains("hidden") && !applyStoredPanelPosition("reasoningPanel")) positionPanelNearCenter("reasoningPanel", "reasoningSettingsBtn");
@@ -68548,6 +70135,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       if (/[?&]selftest\b/.test(location.search)) {
         window.__APP_TESTHOOKS__ = {
           state,
+          kdModel, kdRender, kdParseArtifact, kdBuildText, kdEditEntry, kdEntryRaw, kdLayoutOrder, kdAddTable, kdArrange, kdJumpToSource, kdImpliedMenu, openKeysDiagram, runGenerateErd, toggleErdPanel, _kd, keySetsTitleHtml,   // ER Diagram key editing
           typeahead: TA_API,     // typeahead engine (suggestions for a caret position)                 // read analysis findings (state.ui.mappingAnalysis)
           DEMO_SCENARIOS,        // fixture corpus to iterate
           FINDING_CONSEQUENCE_RULES, // consequence kind -> cause kinds (shared-cause suppression table)
