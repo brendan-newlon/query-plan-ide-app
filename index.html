@@ -8330,7 +8330,20 @@ return OntologyLayouts;
             ["etxid", "the last transaction to return", "--to-uuid"],
           ] },
           "GET /{db}/export": { cli: "stardog data export", params: [
-            ["graph-uri", "export one named graph (tag:stardog:api:context:default is the default graph)", "-g"],
+            ["graph-uri", "export one named graph; tag:stardog:api:context:all exports every graph, and without it only the default graph is exported", "-g"],
+            ["server-side", "true writes the export to a file in the exports folder of Stardog's home on the server instead of returning it; the answer names the file", "--server-side"],
+            ["format", "with server-side: the RDF format, for example Turtle or N-Quads", "-f"],
+            ["compression", "with server-side: for example GZIP", "--compression"],
+          ], confirmWhenParam: "server-side" },
+          "POST /{db}/{txid}/add": { cli: "stardog data add --server-side", params: [
+            ["begin", "true opens the transaction named in the path first, so any new ID works as txid", "(sent by the CLI)"],
+            ["commit", "true commits it when the load ends", "(sent by the CLI)"],
+            ["graph-uri", "the named graph to load into", "-g"],
+          ], fields: [
+            ["filename", "a file already on the server to load, instead of sending the data in Body", "<files> with --server-side"],
+            ["context", "the named graph to load into", "-g"],
+            ["format", "the file's RDF media type, for example text/turtle", "-f"],
+            ["compression", "NONE, or for example GZIP", "--compression"],
           ] },
           "GET /{db}/query": { cli: "stardog query execute", params: queryParams },
           "POST /{db}/query": { cli: "stardog query execute", params: queryParams },
@@ -8355,7 +8368,7 @@ return OntologyLayouts;
             bodyTemplate: { name: "cache://", target: "", database: "", graph: "virtual://", registerOnly: false, computeSource: "", partitionColumn: "" } },
           "POST /{db}/entityresolution": { cli: "stardog entity-resolution resolve", fields: [
             ["stardog.er.query", "the query that selects the entities to compare", "<query>"],
-            ["stardog.er.iri.field.name", "the query variable that holds each entity's IRI", "<iri>"],
+            ["stardog.er.iri.field.name", "the value of the command's iri argument (by its name, which field of the query holds each entity's IRI)", "<iri>"],
             ["stardog.er.target.named.graph", "the named graph the matches are written to", "<target-named-graph>"],
             ["stardog.external.compute.name", "the external compute data source that runs the matching", "-c"],
             ["stardog.er.edge.label", "the property written between matched entities", "-e"],
@@ -8365,6 +8378,7 @@ return OntologyLayouts;
             ["superuser", "true creates a superuser", "-s"],
           ] },
           "POST /admin/cache/status": { cli: "stardog-admin cache status", note: "An empty array returns the status of every cache." },
+          "GET /admin/token": { cli: "stardog-admin user token", note: "The answer's token signs another app in as the user connected here: send it as the header Authorization: Bearer followed by the token. Treat it like a password; it stops working when it expires." },
           "PUT /admin/databases/{db}/options": { cli: "stardog-admin metadata get", note: "This reads options: Body names the options to read, each with an empty value.",
             bodyTemplate: { "reasoning.schemas": "", "reasoning.schema.graphs": "" } },
         };
@@ -8611,6 +8625,12 @@ return OntologyLayouts;
       const API_ENDPOINT_CATALOG_EXTRA = [
         { line: "GraphQL|GET|/{db}/graphql|Explain a GraphQL query: the SPARQL it becomes and the query plan (stardog graphql explain)|j||query",
           params: { variables: '{"@explain": true}' } },
+        { line: "Users|GET|/admin/token|Get an authentication token (JWT) for the connected user, to sign in from another app (stardog-admin user token)|j||" },
+        { line: "Transactions|POST|/{db}/{txid}/add|Load a file that is already on the server, in its own transaction (stardog data add --server-side)|j|application/json|",
+          params: { begin: "true", commit: "true" }, freshTxid: true,
+          body: { filename: "", context: "", format: "text/turtle", compression: "NONE" } },
+        { line: "DB Admin|GET|/{db}/export|Export the database to a file on the server instead of downloading it (stardog data export --server-side)|t||",
+          params: { "server-side": "true", format: "Turtle", "graph-uri": "tag:stardog:api:context:all" } },
       ];
 
       let _apiCatalogCache = null;
@@ -8622,7 +8642,8 @@ return OntologyLayouts;
         };
         const list = API_ENDPOINT_CATALOG.map(parse);
         API_ENDPOINT_CATALOG_EXTRA.forEach((extra) => {
-          const entry = { ...parse(extra.line), params: extra.params || {}, extra: true };
+          const entry = { ...parse(extra.line), params: extra.params || {}, extra: true,
+            ...(extra.body ? { body: extra.body } : {}), ...(extra.freshTxid ? { freshTxid: true } : {}) };
           let at = list.length;
           for (let i = list.length - 1; i >= 0; i--) if (list[i].section === entry.section) { at = i + 1; break; }
           list.splice(at, 0, entry);
@@ -8687,11 +8708,15 @@ return OntologyLayouts;
         entry.required.forEach((name) => { params[name] = ""; });
         Object.assign(params, entry.params || {});
         const key = `${entry.method} ${entry.path}`;
-        const template = API_CLI_EXTRAS[key]?.bodyTemplate;
+        const template = entry.body || API_CLI_EXTRAS[key]?.bodyTemplate;
         const preset = apiPresetFromSpec({ method: entry.method, path: pathTemplate, accept: entry.accept, params, contentType: /^(GET|HEAD)$/.test(entry.method) ? "" : (entry.contentType || (template ? "application/json" : "")), ...(template ? { body: JSON.parse(JSON.stringify(template)) } : {}) });
         preset.fromCatalog = true;
         preset.catalogLabel = key;
         preset.catalogKey = key;
+        if (entry.freshTxid) {
+          const tx = (preset.variables || []).find((v) => v.name === "txid");
+          if (tx) tx.value = globalThis.crypto?.randomUUID ? crypto.randomUUID() : `tx-${Date.now().toString(36)}`;
+        }
         if (API_READ_ONLY_CALLS.has(key)) preset.readOnly = entry.method;
         if (apiRunNeedsConfirm(preset, entry.method, entry.path)) preset.confirm = true;
         return preset;
@@ -8699,11 +8724,19 @@ return OntologyLayouts;
 
       // A call that changes the server asks before it runs: declared calls that say so, and any
       // catalog call that is not a read (GET/HEAD, or a POST or PUT listed in API_READ_ONLY_CALLS);
-      // SPARQL Update asks even when sent with GET. The method typed into the form counts, so a read
+      // SPARQL Update asks even when sent with GET, and so does a read whose extras name a parameter
+      // that makes it write (server-side export). The method typed into the form counts, so a read
       // whose method is changed by hand to DELETE asks too.
-      function apiRunNeedsConfirm(config, method, path) {
+      function apiRunNeedsConfirm(config, method, path, params = {}) {
         if (!config) return false;
         if (config.confirm) return true;
+        const flag = API_CLI_EXTRAS[config.catalogKey || apiCallKey(config.method, config.pathTemplate || config.path)]?.confirmWhenParam;
+        if (flag) {
+          const query = new URLSearchParams(String(path || "").split("?")[1] || "");
+          const inPath = query.has(flag) && !/^false$/i.test(query.get(flag));
+          const inParams = params && Object.prototype.hasOwnProperty.call(params, flag) && !/^(false|)$/i.test(String(params[flag]));
+          if (inPath || inParams) return true;
+        }
         if (!config.fromCatalog) return false;
         const m = String(method || "").toUpperCase();
         if (/\/update$/.test(String(path || ""))) return true;
@@ -31348,8 +31381,12 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.61.0";
+      const APP_VERSION = "1.62.0";
       const RELEASE_NOTES = [
+        { version: "1.62.0", date: "2026-11-26", title: "Tokens, and loading and exporting files on the server", items: [
+          "{*All Stardog endpoints…*} can get an authentication token for the connected user, to paste into another app that connects to Stardog.",
+          "A file that is already on the server can be loaded into a database in one step, and a database can be exported to a file on the server. The export asks you to confirm first, because it writes a file."
+        ] },
         { version: "1.61.0", date: "2026-11-26", title: "Command-line options in the API panel", items: [
           "Picking an operation in {*All Stardog endpoints…*} also lists the query parameters and body fields that Stardog's command-line tools send but the HTTP API reference leaves out, each with the command-line option it matches. Examples: the external compute source and partition column for virtual graph imports and caches, and the input, graphs and size limit for {*Data Model*}.",
           "Imports that run on external compute (such as Databricks), cache creation and entity resolution start with a complete request body to fill in.",
@@ -31752,7 +31789,7 @@ ORDER BY ?table ?ordinal`;
           source: null,
           body: `<p>A request builder for the Stardog HTTP API. Pick a preset operation from the dropdown, or craft a custom request (method, path, headers, body). Responses come back with search, copy, and download, and can be loaded straight into an artifact editor.</p>
             <p>Use it to inspect what the server exposes — which virtual graphs and data sources exist, what a mapping or stored query actually contains — without leaving the workbench.</p>
-            <p>Related calls share one entry in the dropdown. Choosing such an entry (for example <em>Running Queries</em> or <em>VG Info</em>) fills in its first call and shows a second list beside the dropdown with the rest of the group. Every other operation in Stardog's HTTP API is under <em>All Stardog endpoints…</em> at the bottom: type a few words of a name or path, pick the operation, and the method, path, parameters and content types are filled in for you. Where Stardog's command-line tools send parameters or body fields that the HTTP API reference does not list (for example the external compute source for imports and caches, or the graphs a data model is built from), the line above the request names them with the command-line option each matches, and writes such as imports start with a body to fill in. Rows marked <em>CLI</em> are calls the command-line tools make that have no row of their own in the reference, such as explaining a GraphQL query. In <em>Query Params JSON</em>, a list sends the parameter once for each value. Calls that change something on the server (stop a query, delete, write) show a warning above the request and ask you to confirm before they run.</p>
+            <p>Related calls share one entry in the dropdown. Choosing such an entry (for example <em>Running Queries</em> or <em>VG Info</em>) fills in its first call and shows a second list beside the dropdown with the rest of the group. Every other operation in Stardog's HTTP API is under <em>All Stardog endpoints…</em> at the bottom: type a few words of a name or path, pick the operation, and the method, path, parameters and content types are filled in for you. Where Stardog's command-line tools send parameters or body fields that the HTTP API reference does not list (for example the external compute source for imports and caches, or the graphs a data model is built from), the line above the request names them with the command-line option each matches, and writes such as imports start with a body to fill in. Rows marked <em>CLI</em> are calls the command-line tools make that have no row of their own in the reference: explaining a GraphQL query, getting a token that another app can use to connect, loading a file that is already on the server, and exporting to a file on the server. In <em>Query Params JSON</em>, a list sends the parameter once for each value. Calls that change something on the server (stop a query, delete, write) show a warning above the request and ask you to confirm before they run.</p>
             <p>When the response is about something that can be edited (a database's options or namespaces, a virtual graph's options, a data source's options), a <strong>pencil</strong> button appears next to <em>Run</em> and opens an editor for it. The editor gives each option a control that fits it: a switch for yes/no values, a list for values from a fixed set, a text box for anything else, with the documented default shown beside it. The same editor opens from the <strong>gear</strong> on a row of the database, virtual graph and data source lists. Saving needs editing turned on for the live server, asks you to confirm, and reads the values back from the server afterwards. Credentials are shown as the server returns them.</p>
             <p>To create something, type a name into the filter of a database, virtual graph or data source list: a <strong>+ Create</strong> row appears when no entry has that name. A database needs only a name (full-text search is optional) and DB Controls opens next to load data. A virtual graph asks which data source it reads from and which database may query it, and its mappings are generated from the data source's tables. A data source opens the options editor on its connection type, and Stardog refuses it if it cannot reach the source. To remove one, use <strong>Delete database…</strong> in DB Controls, or <strong>Delete virtual graph…</strong> / <strong>Delete data source…</strong> in the options editor. Each asks you to type the name, and a data source that a virtual graph still uses is not removed.</p>
             ${buildApiCommandDocsHtml()}`
@@ -63565,7 +63602,9 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         const note = $("labCallNote");
         if (!note) return;
         const config = state.ui.labPresetConfig;
-        const warn = Boolean(config?.confirm);
+        let presetParams = {};
+        try { presetParams = JSON.parse($("labParamsInput")?.value || "{}") || {}; } catch { presetParams = {}; }
+        const warn = Boolean(config?.confirm) || Boolean(config && apiRunNeedsConfirm(config, config.method, config.pathTemplate || config.path, presetParams));
         const parts = [];
         if (warn) parts.push("This call changes something on the server. Run asks you to confirm first.");
         if (config?.hint) parts.push(config.hint);
@@ -63602,7 +63641,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         const blankVar = (state.ui.labPresetConfig?.pathTemplate ? state.ui.labPresetConfig.variables || [] : [])
           .find((v) => !String(state.ui.labPathVariables?.[v.name] ?? "").trim());
         if (blankVar) throw new Error(`Fill in ${blankVar.label || blankVar.name} in the path before running this call.`);
-        if (apiRunNeedsConfirm(state.ui.labPresetConfig, method, path)
+        if (apiRunNeedsConfirm(state.ui.labPresetConfig, method, path, params)
           && !window.confirm(`${method} ${path}\n\nThis call changes something on the server. Run it?`)) return;
         const downloadAs = state.ui.labPresetConfig?.downloadAs || null;
         if (downloadAs) {
@@ -70818,6 +70857,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           if (t && (list.contains(t) || $("labCatalogWrap")?.contains(t))) return;
           list.classList.add("hidden");
         }, true);
+        on("labParamsInput", "input", () => updateApiCallNote());
         on("labCatalogList", "click", (e) => {
           const row = e.target instanceof Element ? e.target.closest("[data-api-endpoint]") : null;
           if (row) chooseApiCatalogEntry(Number(row.getAttribute("data-api-endpoint")));
@@ -71574,7 +71614,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           dbcOptionMissingDefaults: (defaults = DBC_OPTION_DEFAULTS) => Object.keys(DBC_OPTION_META).filter((n) => !(n in defaults)), // every documented DB option has a default note
           ooMeta, ooToEditor, ooFromEditor, ooReadbackDiffers, ooOptionNames: (kind) => Object.keys(OO_META[kind] || {}), // virtual graph / data source option editor
           apiEditTarget, selectorRowGearHtml,
-          API_CALL_GROUPS, API_CALL_SPECS, API_COMMAND_EDITORIAL, API_RESPONSE_TRANSFORMS, API_DROPDOWN_BUDGET, API_CATALOG_OPTION, apiCallResolvable, apiCatalogEntries, apiPresetFromCatalog, apiPresetFromSpec, apiRunNeedsConfirm, API_CLI_EXTRAS, apiCliExtrasNote, apiCallKey, apiCatalogVarFor, selectApiCall, loadSelectedLabPreset, buildApiCommandDocsHtml,   // API helper: groups, catalog, confirmation // API pencil target and the gear on list rows
+          API_CALL_GROUPS, API_CALL_SPECS, API_COMMAND_EDITORIAL, API_RESPONSE_TRANSFORMS, API_DROPDOWN_BUDGET, API_CATALOG_OPTION, apiCallResolvable, apiCatalogEntries, apiPresetFromCatalog, apiPresetFromSpec, apiRunNeedsConfirm, API_CLI_EXTRAS, apiCliExtrasNote, apiCallKey, chooseApiCatalogEntry, apiCatalogVarFor, selectApiCall, loadSelectedLabPreset, buildApiCommandDocsHtml,   // API helper: groups, catalog, confirmation // API pencil target and the gear on list rows
           renderSelectorMenu, ooErrText, apiVirtualGraphDefault, // the create row in list menus; the server's words for a refusal; the API panel's default graph
           ooCreateCheck: (kind, name, ds) => { // what the create form would say about this name, without touching the form
             const keep = { kind: _oo.kind, newName: _oo.newName, newDs: _oo.newDs };
