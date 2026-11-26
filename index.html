@@ -8715,11 +8715,20 @@ return OntologyLayouts;
         preset.catalogKey = key;
         if (entry.freshTxid) {
           const tx = (preset.variables || []).find((v) => v.name === "txid");
-          if (tx) tx.value = globalThis.crypto?.randomUUID ? crypto.randomUUID() : `tx-${Date.now().toString(36)}`;
+          if (tx) { tx.value = newTransactionId(); preset.freshTxid = true; }
         }
         if (API_READ_ONLY_CALLS.has(key)) preset.readOnly = entry.method;
         if (apiRunNeedsConfirm(preset, entry.method, entry.path)) preset.confirm = true;
         return preset;
+      }
+
+      // A transaction ID for a call that opens and commits its own transaction (server-side load).
+      // Every Run gets a new one, so each run can be told apart in the server's logs.
+      function newTransactionId() {
+        if (globalThis.crypto?.randomUUID) return crypto.randomUUID();
+        const hex = [...(globalThis.crypto?.getRandomValues ? crypto.getRandomValues(new Uint8Array(16)) : Array.from({ length: 16 }, () => Math.random() * 256))]
+          .map((b) => (b & 255).toString(16).padStart(2, "0")).join("");
+        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
       }
 
       // A call that changes the server asks before it runs: declared calls that say so, and any
@@ -31381,7 +31390,7 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.62.0";
+      const APP_VERSION = "1.62.1";
       const RELEASE_NOTES = [
         { version: "1.62.0", date: "2026-11-26", title: "Tokens, and loading and exporting files on the server", items: [
           "{*All Stardog endpoints…*} can get an authentication token for the connected user, to paste into another app that connects to Stardog.",
@@ -63643,6 +63652,12 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         if (blankVar) throw new Error(`Fill in ${blankVar.label || blankVar.name} in the path before running this call.`);
         if (apiRunNeedsConfirm(state.ui.labPresetConfig, method, path, params)
           && !window.confirm(`${method} ${path}\n\nThis call changes something on the server. Run it?`)) return;
+        // This run uses the transaction ID in the path; the next run gets a new one.
+        if (state.ui.labPresetConfig?.freshTxid && state.ui.labPathVariables && "txid" in state.ui.labPathVariables) {
+          state.ui.labPathVariables.txid = newTransactionId();
+          renderLabPathVariables();
+          resolveLabPathFromTemplate();
+        }
         const downloadAs = state.ui.labPresetConfig?.downloadAs || null;
         if (downloadAs) {
           const result = await requestBinary({ method, path, params, headers, accept, contentType, body });
