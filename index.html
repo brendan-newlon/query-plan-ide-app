@@ -2668,6 +2668,20 @@
     .api-toolbar .compact-select,
     .api-toolbar .selector-wrap { flex: 1 1 auto; max-width: none; min-width: 220px; }
     .api-toolbar button { flex: 0 0 auto; }
+    .api-toolbar .api-call-select { flex: 0 1 auto; min-width: 150px; max-width: 220px; }
+    .api-catalog-wrap { flex: 1 1 auto; min-width: 200px; display: flex; }
+    .api-catalog-wrap input { width: 100%; }
+    .api-catalog-list { max-height: 260px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; padding: 4px 0; }
+    .api-catalog-count { padding: 2px 10px 4px; font-size: 11px; color: var(--muted); }
+    .api-catalog-tag { padding: 6px 10px 2px; font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .api-catalog-row { display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left; background: none; border: 0; border-radius: 0; padding: 3px 10px; color: inherit; font: inherit; cursor: pointer; }
+    .api-catalog-row:hover, .api-catalog-row:focus-visible { background: var(--accent-soft); }
+    .api-catalog-row code { flex: 0 0 auto; }
+    .api-catalog-row .api-catalog-summary { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .api-catalog-method { flex: 0 0 52px; font-size: 10px; font-weight: 700; letter-spacing: .03em; }
+    .api-catalog-method.is-write { color: var(--warn); }
+    .api-call-note { font-size: 12px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--warn); color: var(--warn); }
+    .api-call-note.is-hint { border-color: var(--border); color: var(--muted); }
     .api-status-row { display:flex; align-items:center; gap:8px; width:100%; overflow:visible; }
     .api-status-badges { display:flex; align-items:center; gap:6px; flex-wrap:nowrap; min-width:0; flex:1 1 auto; overflow:hidden; }
     #clearApiResponseBtn, #apiResponseCopyBtn { padding: 3px 8px; min-height: 0; height: 24px; font-size: 0.72rem; line-height: 1; }
@@ -3181,41 +3195,57 @@
               <select id="labPresetSelect" class="compact-select">
                 <option value="">Choose an API call</option>
                 <optgroup label="Server">
-                  <option value="Server Aliveness Check">Server Aliveness Check</option>
+                  <option value="Server Health">Server Health</option>
                   <option value="Server Status">Server Status</option>
-                  <option value="Server Version">Server Version</option>
                   <option value="Server Properties">Server Properties</option>
                   <option value="Server Diagnostics">Server Diagnostics (download)</option>
                   <option value="Server Logs">Server Logs (download)</option>
+                  <option value="Running Queries">Running Queries</option>
                   <option value="Stored Queries">Stored Queries</option>
                 </optgroup>
                 <optgroup label="Database">
+                  <option value="Databases">Databases</option>
                   <option value="DB Options">DB Options</option>
                   <option value="Namespaces">Namespaces</option>
+                  <option value="Reasoning">Reasoning</option>
+                  <option value="Integrity Constraints">Integrity Constraints</option>
                   <option value="Optimize DB">Optimize DB</option>
                 </optgroup>
                 <optgroup label="Virtual Graph">
-                  <option value="Virtual Graphs (Current DB)">Virtual Graphs (Current DB)</option>
-                  <option value="Virtual Graphs (All)">Virtual Graphs (All)</option>
+                  <option value="Virtual Graphs">Virtual Graphs</option>
                   <option value="VG Info">VG Info</option>
                   <option value="VG Options">VG Options</option>
-                  <option value="VG SMS">VG SMS</option>
+                  <option value="VG Mappings">VG Mappings</option>
                 </optgroup>
                 <optgroup label="Data Source">
                   <option value="Data Sources">Data Sources</option>
+                  <option value="DS Info">DS Info</option>
                   <option value="DS Options">DS Options</option>
                   <option value="Refresh Metadata">Refresh Metadata</option>
                   <option value="Test Source for Schema Drift">Test Source for Schema Drift…</option>
                 </optgroup>
+                <optgroup label="Cache">
+                  <option value="Caches">Caches</option>
+                </optgroup>
                 <optgroup label="Permissions">
                   <option value="Get or Compare Permissions">Get or Compare Permissions…</option>
+                  <option value="Users &amp; Roles">Users &amp; Roles</option>
+                </optgroup>
+                <optgroup label="More">
+                  <option value="All Stardog Endpoints">All Stardog endpoints…</option>
                 </optgroup>
               </select>
+              <select id="labCallSelect" class="compact-select api-call-select hidden" title="Other calls in this group" aria-label="Call in this group"></select>
+              <div id="labCatalogWrap" class="api-catalog-wrap hidden">
+                <input id="labCatalogInput" type="text" placeholder="Search all endpoints" autocomplete="off" aria-label="Search all Stardog endpoints" aria-controls="labCatalogList">
+              </div>
               <button id="runLabBtn">Run</button>
               <button id="apiEditBtn" class="secondary hidden" type="button" title="Edit" aria-label="Edit what this response shows"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 14 14" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 2.2l2.3 2.3M1.8 12.2l.5-2.6 7.2-7.4 2.3 2.3-7.4 7.2z"/></svg></button>
             </div>
           </div>
           <div class="grid" style="gap:8px;">
+            <div id="labCatalogList" class="api-catalog-list hidden" role="listbox" aria-label="Stardog endpoints"></div>
+            <div id="labCallNote" class="api-call-note hidden"></div>
             <div class="api-status-row">
               <div class="api-status-badges">
                 <span class="badge" id="apiStatusBadge">status n/a</span>
@@ -7861,14 +7891,19 @@ return OntologyLayouts;
           whenToUse: "Use after a large data load, or when query plans look stale/suboptimal and statistics may be out of date. This is a real, potentially expensive server-side operation — not a read-only lookup.",
         },
         "Virtual Graphs (Current DB)": {
-          method: "GET", path: "/admin/virtual_graphs",
-          summary: "Lists the virtual graphs known to the server.",
-          whenToUse: "Use to confirm a virtual graph you expect to exist is actually registered, or to see the full list before picking one for another command.",
+          method: "GET", path: "/admin/virtual_graphs/list",
+          summary: "Lists the virtual graphs the selected database can query: those registered to it, plus those open to every database. Each row shows the graph's data source and whether it is available.",
+          whenToUse: "Use to check which virtual graphs a query on this database can reach with <code>FROM &lt;virtual://…&gt;</code> or <code>GRAPH &lt;virtual://…&gt;</code>.",
         },
         "Virtual Graphs (All)": {
           method: "GET", path: "/admin/virtual_graphs",
-          summary: "Lists the virtual graphs known to the server (same endpoint as \"Virtual Graphs (Current DB)\" — Stardog's virtual graph list is server-wide, not scoped per database).",
-          whenToUse: "Use interchangeably with \"Virtual Graphs (Current DB)\" for the same purpose.",
+          summary: "Lists the names of every virtual graph on the server, whichever database it belongs to.",
+          whenToUse: "Use to confirm a virtual graph you expect to exist is actually registered, or to see the full list before picking one for another command.",
+        },
+        "Virtual Graphs (Details)": {
+          method: "GET", path: "/admin/virtual_graphs/list",
+          summary: "Lists every virtual graph on the server with its data source, its database and whether it is available.",
+          whenToUse: "Use to see at a glance which data source backs each virtual graph, or which graphs are offline.",
         },
         "VG Info": {
           method: "GET", path: "/admin/virtual_graphs/{virtualGraph}/info",
@@ -7900,6 +7935,205 @@ return OntologyLayouts;
           summary: "Forces Stardog to re-read the underlying database's schema/metadata for a data source.",
           whenToUse: "Use after changing the schema of an underlying relational database (added/renamed columns or tables) so Stardog's cached metadata catches up.",
         },
+        "Server Readiness": {
+          method: "GET", path: "/admin/ready",
+          summary: "Answers 200 when the server is ready to take queries, and 503 while it is still starting or cannot serve.",
+          whenToUse: "Use after a restart, or behind a load balancer, when the server answers <em>Aliveness</em> but queries still fail.",
+        },
+        "Server Health Check": {
+          method: "GET", path: "/admin/healthcheck",
+          summary: "Answers 200 when the server, and in a cluster the node, reports itself healthy; 503 otherwise.",
+          whenToUse: "Use to check the same signal a monitoring system or cluster load balancer reads.",
+        },
+        "Prometheus Metrics": {
+          method: "GET", path: "/admin/status/prometheus",
+          summary: "Returns the server and database metrics in Prometheus text format. Add <code>include</code> or <code>exclude</code> query parameters to narrow the list.",
+          whenToUse: "Use to read a single counter or gauge (for example query counts, memory or cache use) without setting up a monitoring server.",
+        },
+        "Running Queries": {
+          method: "GET", path: "/admin/queries",
+          summary: "Lists the queries running right now: each one's ID, database, user, start time, timeout and the query text.",
+          whenToUse: "Use when the server feels slow, to find a long-running query and its ID before looking at its details or stopping it.",
+        },
+        "Query Details": {
+          method: "GET", path: "/admin/queries/{queryId}",
+          summary: "Returns one running query's details, including its plan while it runs (<code>plan</code> and <code>verbose</code> are set). The query ID list is filled from the running queries.",
+          whenToUse: "Use to see what plan a query that is still running was given, without waiting for it to finish.",
+        },
+        "Kill Query": {
+          method: "DELETE", path: "/admin/queries/{queryId}",
+          summary: "Stops a running query. Run asks for confirmation first.",
+          whenToUse: "Use to stop a runaway query that is holding resources other users need.",
+        },
+        "Processes": {
+          method: "GET", path: "/admin/processes",
+          summary: "Lists the server's running processes: queries, and long jobs such as data loads, optimize and cache refreshes, with their status.",
+          whenToUse: "Use to see whether a long job is still running before starting another one or restarting the server.",
+        },
+        "Kill Process": {
+          method: "DELETE", path: "/admin/processes/{processId}",
+          summary: "Stops a running process. Run asks for confirmation first.",
+          whenToUse: "Use to stop a long job that is stuck or was started by mistake.",
+        },
+        "Stored Query": {
+          method: "GET", path: "/admin/queries/stored/{storedQuery}",
+          summary: "Returns one stored query with its text, database, description and sharing settings.",
+          whenToUse: "Use to read a single stored query exactly as the server holds it.",
+        },
+        "Databases": {
+          method: "GET", path: "/admin/databases",
+          summary: "Lists the databases on the server that you can see.",
+          whenToUse: "Use to confirm a database exists and is spelled the way a query or virtual graph expects.",
+        },
+        "DB Size": {
+          method: "GET", path: "/{database}/size",
+          summary: "Returns the number of triples in the database (an estimate unless <code>exact</code> is set to true in the query parameters). Virtual graphs are not counted.",
+          whenToUse: "Use to put a plan's cardinality estimates in context, or to check a data load arrived.",
+        },
+        "All DB Options": {
+          method: "GET", path: "/admin/databases/options",
+          summary: "Returns every database with all of its options in one response.",
+          whenToUse: "Use to compare a setting across databases, for example reasoning or query timeouts.",
+        },
+        "Open Transactions": {
+          method: "GET", path: "/{database}/transaction",
+          summary: "Lists the transactions currently open on the database.",
+          whenToUse: "Use when writes hang or time out, to see whether an open transaction is holding them up.",
+        },
+        "DB Option Reference": {
+          method: "GET", path: "/admin/config_properties",
+          summary: "Returns the description of every database option the server knows: its type, default, and whether it can be changed while the database is online.",
+          whenToUse: "Use to look up what an option means and what values it accepts before changing it.",
+        },
+        "Reasoning Schema": {
+          method: "GET", path: "/{database}/reasoning/schema",
+          summary: "Returns the schema (TBox) the reasoner uses for the database, as RDF.",
+          whenToUse: "Use when reasoning gives unexpected results, to see which class and property axioms are actually in force.",
+        },
+        "Consistency Check": {
+          method: "GET", path: "/{database}/reasoning/consistency",
+          summary: "Reports whether the database's data is logically consistent with its schema.",
+          whenToUse: "Use when a reasoning query returns everything or nothing: an inconsistent database makes reasoning results unreliable.",
+        },
+        "Explain Inconsistency": {
+          method: "GET", path: "/{database}/reasoning/explain/inconsistency",
+          summary: "Returns the statements that make the database inconsistent.",
+          whenToUse: "Use after <em>Consistency Check</em> reports false, to find the data or axiom to fix.",
+        },
+        "Data Model": {
+          method: "GET", path: "/{database}/model",
+          summary: "Returns the data model Stardog derives from the database's schema, in one of five forms chosen with the <code>output</code> parameter: <code>text</code> (an outline of classes, their parents and properties), <code>owl</code>, <code>shacl</code> (shapes), <code>sql</code> (the tables the SQL endpoint offers) or <code>graphql</code> (the GraphQL schema). With <code>reasoning</code> set to true it shows the model as the reasoner sees it. It is a summary: labels, comments and other annotations are left out, so the model panes load the schema graphs themselves rather than this.",
+          whenToUse: "Use for a quick outline of the model, or to see which tables or GraphQL types Stardog will offer to BI tools and GraphQL clients for this database.",
+        },
+        "Explain Inference": {
+          method: "POST", path: "/{database}/reasoning/explain",
+          summary: "Explains why the reasoner concludes a statement: paste one triple into <em>Body</em> and the answer is shown as a tree, each inferred statement above the asserted statements and schema axioms it follows from.",
+          whenToUse: "Use when a reasoning query returns a result you did not expect, to find the axiom or data that produced it.",
+        },
+        "Constraints": {
+          method: "GET", path: "/{database}/icv",
+          summary: "Returns the integrity constraints stored for the database, as RDF.",
+          whenToUse: "Use to see which constraints a validation or a guarded write is checked against.",
+        },
+        "SHACL Report": {
+          method: "POST", path: "/{database}/icv/report",
+          summary: "Checks the database's data against its SHACL shapes and returns the validation report: each violation with its focus node, path and message. <code>countLimit</code> caps the number of violations (100 to start); other parameters narrow it to some shapes, nodes or a named graph.",
+          whenToUse: "Use when query results look incomplete or wrong and you suspect the data breaks the model's rules.",
+        },
+        "Validate Constraint": {
+          method: "POST", path: "/{database}/icv/validate",
+          summary: "Checks whether the data satisfies constraints you paste into <em>Body</em> (Turtle), without storing them. Answers valid or not valid.",
+          whenToUse: "Use to try a constraint before adding it, or to test one rule on its own.",
+        },
+        "Cached Graphs": {
+          method: "GET", path: "/admin/cache/graphs",
+          summary: "Lists the cached datasets: copies of a virtual graph or query result that Stardog keeps on a cache target and answers from instead of the source.",
+          whenToUse: "Use when virtual graph results look stale, or a plan reads from a cache you did not expect, to see which caches exist.",
+        },
+        "Cache Targets": {
+          method: "GET", path: "/admin/cache/target",
+          summary: "Lists the cache targets: the Stardog servers that hold cached datasets.",
+          whenToUse: "Use to check where caches are stored before creating or refreshing one.",
+        },
+        "Cache Status": {
+          method: "POST", path: "/admin/cache/status",
+          summary: "Returns the status of the caches named in <em>Body</em> (a JSON array of cache names), including when each was last refreshed.",
+          whenToUse: "Use to check how fresh a cache is before trusting results that come from it.",
+        },
+        "Refresh Cache": {
+          method: "POST", path: "/admin/cache/refresh/{cache}",
+          summary: "Reloads a cache from its source. This can take a long time and puts load on the source; Run asks you to confirm first.",
+          whenToUse: "Use after the source data has changed, when results served from the cache must be current.",
+        },
+        "VG Database": {
+          method: "GET", path: "/admin/virtual_graphs/{virtualGraph}/database",
+          summary: "Returns the database a virtual graph belongs to (<code>*</code> when every database may query it).",
+          whenToUse: "Use when a query cannot see a virtual graph, to check it is registered to the database the query runs on.",
+        },
+        "VG Availability": {
+          method: "GET", path: "/admin/virtual_graphs/{virtualGraph}/available",
+          summary: "Reports whether a virtual graph is online and can be queried.",
+          whenToUse: "Use when queries against a virtual graph fail, to tell an offline graph from a mapping problem.",
+        },
+        "VG R2RML": {
+          method: "GET", path: "/admin/virtual_graphs/{virtualGraph}/mappingsString/R2RML",
+          summary: "Returns the virtual graph's mappings in the W3C R2RML syntax (Turtle) instead of SMS2.",
+          whenToUse: "Use when the mappings need to go to a tool that reads R2RML, or to compare them with an R2RML original.",
+        },
+        "Data Sources (Details)": {
+          method: "GET", path: "/admin/data_sources/list",
+          summary: "Lists every data source with its type (for example POSTGRESQL or REST), whether it is available and whether it can be shared by several virtual graphs.",
+          whenToUse: "Use to see at a glance which data sources are offline or which kind of source each one is.",
+        },
+        "Data Source Types": {
+          method: "GET", path: "/admin/data_sources/data_source_type_description",
+          summary: "Describes every data source type the server supports and the options each type takes.",
+          whenToUse: "Use before creating or editing a data source, to see which options its type accepts.",
+        },
+        "DS Info": {
+          method: "GET", path: "/admin/data_sources/{dataSource}/info",
+          summary: "Returns a data source's type, whether it is available and whether it can be shared.",
+          whenToUse: "Use for a quick look at one data source without reading all its options.",
+        },
+        "DS Availability": {
+          method: "GET", path: "/admin/data_sources/{dataSource}/available",
+          summary: "Reports whether a data source is online.",
+          whenToUse: "Use when every virtual graph on one source fails, to confirm the source itself is down.",
+        },
+        "Test DS Connection": {
+          method: "POST", path: "/admin/data_sources/{dataSource}/test_data_source",
+          summary: "Asks the server to open a connection to the data source; no data changes. A success answers with no body, a failure with the database's error.",
+          whenToUse: "Use after changing a password, network rule or driver, to confirm the server can reach the source.",
+        },
+        "Refresh Row Counts": {
+          method: "POST", path: "/admin/data_sources/{dataSource}/refresh_counts",
+          summary: "Makes the server re-read the row-count estimates of the data source's tables. The query planner uses these counts to choose join order for virtual graph queries.",
+          whenToUse: "Use after a table in the source has grown or shrunk a lot, when plans for virtual graph queries look built on old sizes.",
+        },
+        "Users": {
+          method: "GET", path: "/admin/users",
+          summary: "Lists the user names on the server.",
+          whenToUse: "Use to confirm an account exists before looking at its roles or permissions.",
+        },
+        "User's Roles": {
+          method: "GET", path: "/admin/users/{user}/roles",
+          summary: "Lists the roles assigned to a user.",
+          whenToUse: "Use when a user's access differs from what you expect, to see which roles it comes from.",
+        },
+        "Roles": {
+          method: "GET", path: "/admin/roles",
+          summary: "Lists the roles defined on the server.",
+          whenToUse: "Use to see which roles exist before assigning or comparing them.",
+        },
+        "Users with Role": {
+          method: "GET", path: "/admin/roles/{role}/users",
+          summary: "Lists the users who have a role.",
+          whenToUse: "Use before changing a role's permissions, to see who the change affects.",
+        },
+        "All Stardog Endpoints": {
+          summary: "Search every operation in Stardog's HTTP API by name, path or section, and pick one to fill in the request: method, path with the same database, virtual graph and data source lists as the calls above, required query parameters, and the content types to send and accept. Calls that change the server ask for confirmation before they run.",
+          whenToUse: "Use for anything the dropdown does not offer directly, such as transactions, GraphQL schemas, stored functions, checkpoints or cluster status.",
+        },
         "Test Source for Schema Drift": {
           summary: "For each selected virtual graph (defaults to every loaded one, or narrow it under \"Sources to test\" — pick \"All relevant to current query\" or specific sources), resolves its data source and runs a zero-row probe (<code>SELECT … WHERE 1=0</code>) per mapped table or custom-SQL mapping block, so a table/column Stardog's mappings still expect but the source no longer has shows up as a failure without scanning any real rows.",
           whenToUse: "Use after a change (or a suspected change) to the underlying relational schema, to confirm every table and column the loaded SMS2 mappings depend on still exists and is queryable — before relying on query results that assume the mappings are accurate.",
@@ -7911,6 +8145,448 @@ return OntologyLayouts;
           opensPanel: "effectivePermissionsPanel",
         },
       };
+
+      // ===== API helper: call groups, declarative calls and the endpoint catalog =====
+      // The dropdown stays short by listing groups: an entry named in API_CALL_GROUPS loads its
+      // first call and shows the group's other calls in a second list (#labCallSelect) beside the
+      // dropdown. Every endpoint not offered there is still one search away under "All Stardog
+      // endpoints" (API_ENDPOINT_CATALOG, generated from Stardog's published OpenAPI document).
+      // A call is resolved, in order, from API_CALL_SPECS (declarative), then the loader functions in
+      // labPresetHandlers(), then the panel openers in API_PANEL_CALLS. Each call needs an
+      // API_COMMAND_EDITORIAL entry; the About panel lists every grouped call.
+      const API_CATALOG_OPTION = "All Stardog Endpoints";
+      const API_PANEL_CALLS = { "Get or Compare Permissions": () => openEffectivePermissionsPanel(), "Test Source for Schema Drift": () => openSchemaDriftPanel() };
+      // At most this many entries in the main dropdown; a new call joins a group or the catalog.
+      const API_DROPDOWN_BUDGET = 26;
+      const API_CALL_GROUPS = {
+        "Server Health": ["Server Aliveness Check", "Server Readiness", "Server Health Check"],
+        "Server Status": ["Server Status", "Server Version", "Prometheus Metrics"],
+        "Running Queries": ["Running Queries", "Query Details", "Kill Query", "Processes", "Kill Process"],
+        "Stored Queries": ["Stored Queries", "Stored Query"],
+        "Databases": ["Databases", "DB Size", "Data Model", "All DB Options", "Open Transactions", "DB Option Reference"],
+        "Reasoning": ["Reasoning Schema", "Explain Inference", "Consistency Check", "Explain Inconsistency"],
+        "Integrity Constraints": ["Constraints", "SHACL Report", "Validate Constraint"],
+        "Caches": ["Cached Graphs", "Cache Targets", "Cache Status", "Refresh Cache"],
+        "Virtual Graphs": ["Virtual Graphs (Current DB)", "Virtual Graphs (All)", "Virtual Graphs (Details)"],
+        "VG Info": ["VG Info", "VG Database", "VG Availability"],
+        "VG Mappings": ["VG SMS", "VG R2RML"],
+        "Data Sources": ["Data Sources", "Data Sources (Details)", "Data Source Types"],
+        "DS Info": ["DS Info", "DS Availability", "Test DS Connection"],
+        "Refresh Metadata": ["Refresh Metadata", "Refresh Row Counts"],
+        "Users & Roles": ["Users", "User's Roles", "Roles", "Users with Role"],
+      };
+      const API_ACCEPT = {
+        j: "application/json, text/plain;q=0.9, */*;q=0.8",
+        t: "text/plain, application/json;q=0.9, */*;q=0.8",
+        r: "text/turtle, application/n-triples;q=0.9, application/ld+json;q=0.8, */*;q=0.5",
+        z: "application/zip, */*;q=0.8",
+        m: "text/plain, text/turtle;q=0.9, application/json;q=0.8, */*;q=0.5",
+      };
+      // Path variable name -> [kind, label]. The kind decides which names the variable's list offers
+      // (labVariableOptions); "text" variables get no list.
+      const API_PATH_VARS = {
+        database: ["database", "Database"], virtualGraph: ["virtualGraph", "Virtual Graph"], dataSource: ["dataSource", "Data Source"],
+        queryId: ["runningQuery", "Query ID"], processId: ["process", "Process ID"], storedQuery: ["storedQuery", "Stored query"],
+        user: ["user", "User"], role: ["role", "Role"], cache: ["cache", "Cache"],
+      };
+      // Declarative calls: method, path (with {variables} from API_PATH_VARS), accept (key of API_ACCEPT),
+      // optional params, contentType, body, confirm (asks before Run), hint (shown above the request),
+      // emptyNote (shown for an empty success response), transform (name in API_RESPONSE_TRANSFORMS).
+      const API_CALL_SPECS = {
+        "Server Readiness": { method: "GET", path: "/admin/ready", accept: "t", emptyNote: "Ready: the server answered with no body." },
+        "Server Health Check": { method: "GET", path: "/admin/healthcheck", accept: "t", emptyNote: "Healthy: the server answered with no body." },
+        "Prometheus Metrics": { method: "GET", path: "/admin/status/prometheus", accept: "t" },
+        "Running Queries": { method: "GET", path: "/admin/queries", accept: "j" },
+        "Query Details": { method: "GET", path: "/admin/queries/{queryId}", accept: "j", params: { plan: "true", verbose: "true" } },
+        "Kill Query": { method: "DELETE", path: "/admin/queries/{queryId}", accept: "j", confirm: true, emptyNote: "The query was stopped." },
+        "Processes": { method: "GET", path: "/admin/processes", accept: "j" },
+        "Kill Process": { method: "DELETE", path: "/admin/processes/{processId}", accept: "j", confirm: true },
+        "Stored Query": { method: "GET", path: "/admin/queries/stored/{storedQuery}", accept: "r" },
+        "Databases": { method: "GET", path: "/admin/databases", accept: "j" },
+        "DB Size": { method: "GET", path: "/{database}/size", accept: "t" },
+        "All DB Options": { method: "GET", path: "/admin/databases/options", accept: "j" },
+        "Open Transactions": { method: "GET", path: "/{database}/transaction", accept: "j" },
+        "DB Option Reference": { method: "GET", path: "/admin/config_properties", accept: "j" },
+        "Data Model": { method: "GET", path: "/{database}/model", accept: "m", params: { output: "text" },
+          hint: "Set output in Query Params to text, owl, shacl, sql or graphql; add \"reasoning\": true to see the model with reasoning applied." },
+        "Reasoning Schema": { method: "GET", path: "/{database}/reasoning/schema", accept: "r" },
+        "Explain Inference": { method: "POST", path: "/{database}/reasoning/explain", accept: "j", contentType: "text/turtle", body: "", transform: "proofTree",
+          hint: "Paste the statement to explain into Body, as one Turtle triple with full IRIs, for example <http://example.com/item/1> a <http://example.com/Thing> ." },
+        "Constraints": { method: "GET", path: "/{database}/icv", accept: "r" },
+        "SHACL Report": { method: "POST", path: "/{database}/icv/report", accept: "r", params: { countLimit: "100" },
+          hint: "Checks the database's data against its SHACL shapes. countLimit caps the violations reported; raise or remove it for a full report, which can take a while on a large database." },
+        "Validate Constraint": { method: "POST", path: "/{database}/icv/validate", accept: "j", contentType: "text/turtle", body: "",
+          hint: "Paste one or more constraints into Body as Turtle. The answer says whether the data satisfies them; nothing is stored." },
+        "Cached Graphs": { method: "GET", path: "/admin/cache/graphs", accept: "j" },
+        "Cache Targets": { method: "GET", path: "/admin/cache/target", accept: "j" },
+        "Cache Status": { method: "POST", path: "/admin/cache/status", accept: "j", contentType: "application/json", body: [],
+          hint: "List the caches to check in Body as a JSON array of names, for example [\"cache://orders\"]. An empty array returns nothing." },
+        "Refresh Cache": { method: "POST", path: "/admin/cache/refresh/{cache}", accept: "t", confirm: true },
+        "Consistency Check": { method: "GET", path: "/{database}/reasoning/consistency", accept: "j" },
+        "Explain Inconsistency": { method: "GET", path: "/{database}/reasoning/explain/inconsistency", accept: "j" },
+        "Virtual Graphs (Current DB)": { method: "GET", path: "/admin/virtual_graphs/list", accept: "j", transform: "vgCurrentDb" },
+        "Virtual Graphs (Details)": { method: "GET", path: "/admin/virtual_graphs/list", accept: "j" },
+        "VG Database": { method: "GET", path: "/admin/virtual_graphs/{virtualGraph}/database", accept: "t" },
+        "VG Availability": { method: "GET", path: "/admin/virtual_graphs/{virtualGraph}/available", accept: "j" },
+        "VG R2RML": { method: "GET", path: "/admin/virtual_graphs/{virtualGraph}/mappingsString/R2RML", accept: "r" },
+        "Data Sources (Details)": { method: "GET", path: "/admin/data_sources/list", accept: "j" },
+        "Data Source Types": { method: "GET", path: "/admin/data_sources/data_source_type_description", accept: "j" },
+        "DS Info": { method: "GET", path: "/admin/data_sources/{dataSource}/info", accept: "j" },
+        "DS Availability": { method: "GET", path: "/admin/data_sources/{dataSource}/available", accept: "j" },
+        "Test DS Connection": { method: "POST", path: "/admin/data_sources/{dataSource}/test_data_source", accept: "j", emptyNote: "Connection works: the data source answered." },
+        "Refresh Row Counts": { method: "POST", path: "/admin/data_sources/{dataSource}/refresh_counts", accept: "j", contentType: "application/json", body: {}, emptyNote: "Row-count estimates refreshed." },
+        "Users": { method: "GET", path: "/admin/users", accept: "j" },
+        "User's Roles": { method: "GET", path: "/admin/users/{user}/roles", accept: "j" },
+        "Roles": { method: "GET", path: "/admin/roles", accept: "j" },
+        "Users with Role": { method: "GET", path: "/admin/roles/{role}/users", accept: "j" },
+      };
+      // Response transforms run on a parsed JSON response before it is shown.
+      const API_RESPONSE_TRANSFORMS = {
+        // Explain Inference: the proof as an indented tree of statements (INFERRED / ASSERTED), one
+        // per line, with the prefix lines Stardog repeats in every node left out.
+        proofTree(parsed) {
+          const statement = (expr) => String(expr || "").split("\n").map((l) => l.trim()).filter((l) => l && !/^@prefix\s/i.test(l)).join(" ");
+          const proofs = Array.isArray(parsed?.proofs) ? parsed.proofs : [];
+          if (!proofs.length) return "No proof returned: with the database's current reasoning settings this statement is not inferred.";
+          const lines = [];
+          const walk = (node, depth) => {
+            if (!node) return;
+            const graphs = Array.isArray(node.namedGraphs) && node.namedGraphs.length ? `   (graph ${node.namedGraphs.join(", ")})` : "";
+            lines.push(`${"    ".repeat(depth)}${node.status || "?"}  ${statement(node.expression)}${graphs}`);
+            (Array.isArray(node.children) ? node.children : []).forEach((child) => walk(child, depth + 1));
+          };
+          proofs.forEach((proof, i) => { if (proofs.length > 1) lines.push(`Proof ${i + 1}`); walk(proof, proofs.length > 1 ? 1 : 0); });
+          return lines.join("\n");
+        },
+        // Virtual graphs the current database can query: its own plus those open to every database.
+        vgCurrentDb(parsed) {
+          const db = apiDatabaseDefault();
+          const list = Array.isArray(parsed?.virtual_graphs) ? parsed.virtual_graphs : [];
+          return { database: db || "(none selected)", virtual_graphs: list.filter((vg) => vg && (isAnyDatabaseAssociation(vg.database) || (db && vg.database === db))) };
+        },
+      };
+      // Catalog operations sent with POST that only read: they run without the confirmation step.
+      const API_READ_ONLY_POSTS = new Set([
+        "/admin/diagnostics", "/admin/cluster/diagnostics", "/admin/cache/status",
+        "/admin/data_sources/test_new_connection", "/admin/data_sources/{name}/test_data_source",
+        "/{db}/query", "/{db}/{txid}/query", "/{db}/query/reasoning", "/{db}/explain", "/{db}/{txid}/explain",
+        "/{db}/reasoning/explain", "/{db}/reasoning/{txid}/explain",
+        "/{db}/icv/validate", "/{db}/icv/{txid}/validate", "/{db}/icv/report", "/{db}/icv/{txid}/report",
+        "/{db}/graphql", "/{db}/graphql/{schema}", "/{db}/entityresolution", "/{db}/entityresolution/reasoning",
+        "/matcher/suggestions", "/admin/catalog/jobs/cron/is_valid", "/admin/catalog/jobs/cron/summary", "/admin/catalog/jobs/cron/next_date",
+      ]);
+      // Paths whose success response is a file to save rather than text to show.
+      const API_DOWNLOAD_PATHS = { "/admin/diagnostics": "stardog-diagnostics.zip", "/admin/logs": "stardog-logs.zip", "/admin/cluster/diagnostics": "stardog-cluster-diagnostics.zip" };
+
+      // Generated from Stardog's published OpenAPI document (version below). One entry per operation:
+      // "section|METHOD|path|summary|accept key|request content type|required query params".
+      // To refresh: fetch openapi.json from the HTTP API reference site and regenerate in the same
+      // format, keeping the section order.
+      const API_ENDPOINT_CATALOG_VERSION = "12.2.3";
+      const API_ENDPOINT_CATALOG = [
+        "Server Admin|GET|/admin/alive|Server aliveness check|||",
+        "Server Admin|POST|/admin/diagnostics|Get server diagnostics report|||",
+        "Server Admin|GET|/admin/healthcheck|Server health check|||",
+        "Server Admin|GET|/admin/logs|Get server logs||application/json|",
+        "Server Admin|GET|/admin/ready|Server readiness check|||",
+        "Server Admin|POST|/admin/shutdown|Shutdown server|||",
+        "Server Status/Metrics|GET|/admin/status|Get Server/Database metrics|j||",
+        "Server Status/Metrics|GET|/admin/status/prometheus|Get Prometheus metrics|t||",
+        "Server Status/Metrics|GET|/admin/status/prometheus/internal|Get Prometheus metrics (only accessible from a restricted cidr range)|t||",
+        "Process Monitoring|GET|/admin/processes|List Stardog processes|j||",
+        "Process Monitoring|GET|/admin/processes/{name}|Get process|j||",
+        "Process Monitoring|DELETE|/admin/processes/{name}|Kill process|j||",
+        "Queries|GET|/admin/queries|List queries|j||",
+        "Queries|GET|/admin/queries/{name}|Get query|j||",
+        "Queries|DELETE|/admin/queries/{name}|Kill query|||",
+        "Queries|GET|/admin/queries/stored|List stored queries|r||",
+        "Queries|POST|/admin/queries/stored|Add stored query||text/turtle|",
+        "Queries|PUT|/admin/queries/stored|Update stored query||text/turtle|",
+        "Queries|DELETE|/admin/queries/stored|Delete all stored queries|||",
+        "Queries|GET|/admin/queries/stored/{name}|Get stored query|r||",
+        "Queries|POST|/admin/queries/stored/{name}|Rename stored query||application/json|",
+        "Queries|DELETE|/admin/queries/stored/{name}|Delete stored query|||",
+        "DB Admin|GET|/{db}/export|Export database|r||",
+        "DB Admin|POST|/{db}/export|Export database (obfuscated)|r|text/turtle|",
+        "DB Admin|GET|/{db}/model|Generate Model|r||",
+        "DB Admin|GET|/{db}/namespaces|Get namespaces|j||",
+        "DB Admin|POST|/{db}/namespaces|Import namespaces|j|text/turtle|",
+        "DB Admin|GET|/{db}/size|Get DB Size|t||",
+        "DB Admin|GET|/admin/config_properties|Get all metadata properties|j||",
+        "DB Admin|GET|/admin/databases|List databases|j||",
+        "DB Admin|POST|/admin/databases|Create database||multipart/form-data|",
+        "DB Admin|DELETE|/admin/databases/{db}|Drop database|j||",
+        "DB Admin|PUT|/admin/databases/{db}/backup|Backup a database|j||",
+        "DB Admin|PUT|/admin/databases/{db}/offline|Offline database|j|application/json|",
+        "DB Admin|PUT|/admin/databases/{db}/online|Online database|j|application/json|",
+        "DB Admin|PUT|/admin/databases/{db}/optimize|Optimize database|j|application/json|",
+        "DB Admin|GET|/admin/databases/{db}/options|Get all DB options|j||",
+        "DB Admin|POST|/admin/databases/{db}/options|Set DB options|j|application/json|",
+        "DB Admin|PUT|/admin/databases/{db}/options|Get DB options|j|application/json|",
+        "DB Admin|POST|/admin/databases/{db}/rename|Rename database|j|text/plain|",
+        "DB Admin|POST|/admin/databases/{db}/repair|Repair database|j||",
+        "DB Admin|GET|/admin/databases/{db}/txlog|Return transaction Log|||",
+        "DB Admin|POST|/admin/databases/{db}/txlog|Replay Transaction Log|j|application/octet-stream|",
+        "DB Admin|POST|/admin/databases/{db}/verify|Verify database|j||",
+        "DB Admin|PUT|/admin/databases/backup_all|Backup all databases|j||",
+        "DB Admin|GET|/admin/databases/options|Return all databases along with their configuration options|j||",
+        "DB Admin|GET|/admin/properties|Get server properties|j||",
+        "DB Admin|POST|/admin/properties|Set server properties|j|application/json|",
+        "DB Admin|PUT|/admin/restore|Restore database|j||from",
+        "SPARQL|GET|/{db}/{txid}/explain|Explain SPARQL query (within tx)|j||query",
+        "SPARQL|POST|/{db}/{txid}/explain|Explain SPARQL query (within tx)|j|application/sparql-query|",
+        "SPARQL|GET|/{db}/{txid}/query|Perform SPARQL query (within tx)|r||query",
+        "SPARQL|POST|/{db}/{txid}/query|Perform SPARQL query (within tx)|r|application/sparql-query|",
+        "SPARQL|GET|/{db}/{txid}/update|Perform SPARQL Update query (within tx)|||update",
+        "SPARQL|POST|/{db}/{txid}/update|Perform SPARQL Update query (within tx)||application/sparql-update|",
+        "SPARQL|GET|/{db}/explain|Explain SPARQL query|j||query",
+        "SPARQL|POST|/{db}/explain|Explain SPARQL query|j|application/sparql-query|",
+        "SPARQL|GET|/{db}/query|Perform SPARQL query|r||query",
+        "SPARQL|POST|/{db}/query|Perform SPARQL query|r|application/sparql-query|",
+        "SPARQL|GET|/{db}/update|Perform SPARQL Update query|||update",
+        "SPARQL|POST|/{db}/update|Perform SPARQL Update query||application/sparql-update|",
+        "Reasoning|GET|/{db}/query/reasoning|Perform SPARQL query with reasoning enabled|r||query",
+        "Reasoning|POST|/{db}/query/reasoning|Perform SPARQL query with reasoning enabled|r|application/sparql-query|",
+        "Reasoning|POST|/{db}/reasoning/{txid}/explain|Explain inference in transaction|j|text/turtle|",
+        "Reasoning|GET|/{db}/reasoning/{txid}/explain/inconsistency|Explain inconsistency in transaction|j||",
+        "Reasoning|GET|/{db}/reasoning/consistency|Check consistency|j||",
+        "Reasoning|POST|/{db}/reasoning/explain|Explain inference|j|text/turtle|",
+        "Reasoning|GET|/{db}/reasoning/explain/inconsistency|Explain inconsistency|j||",
+        "Reasoning|GET|/{db}/reasoning/schema|Get reasoning schema|r||",
+        "Transactions|POST|/{db}/{txid}/add|Add data within a transaction||text/turtle|",
+        "Transactions|POST|/{db}/{txid}/clear|Clear database within a transaction|||",
+        "Transactions|POST|/{db}/{txid}/remove|Remove data within a transaction||text/turtle|",
+        "Transactions|POST|/{db}/{txid}/update-context|Apply a graph-level MOVE/COPY/ADD between two named graphs within a transaction|||",
+        "Transactions|GET|/{db}/transaction|List all open transactions on a database|j||",
+        "Transactions|POST|/{db}/transaction/begin|Begin a transaction|t||",
+        "Transactions|POST|/{db}/transaction/begin/{txid}|Begin a transaction with specified txid|t||",
+        "Transactions|POST|/{db}/transaction/commit/{txid}|Commit a transaction|j||",
+        "Transactions|POST|/{db}/transaction/rollback/{txid}|Rollback a transaction|||",
+        "Graph Store Protocol|GET|/{db}|GET graph|r||",
+        "Graph Store Protocol|HEAD|/{db}|HEAD graph|||",
+        "Graph Store Protocol|POST|/{db}|POST graph||text/turtle|",
+        "Graph Store Protocol|PUT|/{db}|PUT graph||text/turtle|",
+        "Graph Store Protocol|DELETE|/{db}|DELETE graph|||",
+        "Virtual Graphs|GET|/admin/virtual_graphs|List virtual graphs|j||",
+        "Virtual Graphs|POST|/admin/virtual_graphs|Add virtual graph||application/json|",
+        "Virtual Graphs|PUT|/admin/virtual_graphs/{name}|Update virtual graph||application/json|",
+        "Virtual Graphs|DELETE|/admin/virtual_graphs/{name}|Delete virtual graph|||",
+        "Virtual Graphs|GET|/admin/virtual_graphs/{name}/available|Available|j||",
+        "Virtual Graphs|GET|/admin/virtual_graphs/{name}/database|Get database|t||",
+        "Virtual Graphs|GET|/admin/virtual_graphs/{name}/info|Get virtual graph info|j||",
+        "Virtual Graphs|GET|/admin/virtual_graphs/{name}/mappingsString/{syntax}|Get mappings|r||",
+        "Virtual Graphs|POST|/admin/virtual_graphs/{name}/online|Online virtual graph|||",
+        "Virtual Graphs|GET|/admin/virtual_graphs/{name}/options|Get virtual graph options|||",
+        "Virtual Graphs|POST|/admin/virtual_graphs/import|Import file||multipart/form-data|",
+        "Virtual Graphs|POST|/admin/virtual_graphs/import_db|Import virtual graph||application/json|",
+        "Virtual Graphs|GET|/admin/virtual_graphs/list|List virtual graphs' info|j||",
+        "Data Sources|GET|/admin/data_sources|List data sources|j||",
+        "Data Sources|POST|/admin/data_sources|Add data source||application/json|",
+        "Data Sources|PUT|/admin/data_sources/{name}|Update data source||application/json|",
+        "Data Sources|DELETE|/admin/data_sources/{name}|Delete data source|||",
+        "Data Sources|GET|/admin/data_sources/{name}/available|Available|j||",
+        "Data Sources|GET|/admin/data_sources/{name}/info|Get data source info|j||",
+        "Data Sources|POST|/admin/data_sources/{name}/online|Online data source|||",
+        "Data Sources|GET|/admin/data_sources/{name}/options|Get data source options|||",
+        "Data Sources|POST|/admin/data_sources/{name}/query|Query data source||application/json|",
+        "Data Sources|POST|/admin/data_sources/{name}/refresh_counts|Refresh table row-count estimates||application/json|",
+        "Data Sources|POST|/admin/data_sources/{name}/refresh_metadata|Refresh metadata||application/json|",
+        "Data Sources|POST|/admin/data_sources/{name}/share|Share data source|||",
+        "Data Sources|POST|/admin/data_sources/{name}/test_data_source|Test an existing data source connection|||",
+        "Data Sources|GET|/admin/data_sources/data_source_type_description|Describe the supported data source types and their options|j||",
+        "Data Sources|GET|/admin/data_sources/list|List data sources' info|j||",
+        "Data Sources|POST|/admin/data_sources/test_new_connection|Test the connection for a new data source||application/json|",
+        "Data Caching|POST|/admin/cache|Create cache|t|application/json|",
+        "Data Caching|DELETE|/admin/cache/{name}|Drop cache|||",
+        "Data Caching|GET|/admin/cache/graphs|Get cached graphs|j||",
+        "Data Caching|POST|/admin/cache/refresh/{name}|Refresh cache|t||",
+        "Data Caching|POST|/admin/cache/status|Get cache status|j|application/json|",
+        "Data Caching|GET|/admin/cache/target|List cache targets|j||",
+        "Data Caching|POST|/admin/cache/target|Add cache target||application/json|",
+        "Data Caching|DELETE|/admin/cache/target/{name}|Remove cache target|||",
+        "Data Caching|DELETE|/admin/cache/target/{name}/orphan|Orphan cache target|||",
+        "Users|GET|/admin/users|List users|j||",
+        "Users|POST|/admin/users|Add user||application/json|",
+        "Users|GET|/admin/users/{user}|Get User|j||",
+        "Users|DELETE|/admin/users/{user}|Delete User|||",
+        "Users|GET|/admin/users/{user}/auto_created|User auto-created|j||",
+        "Users|GET|/admin/users/{user}/enabled|User enabled|j||",
+        "Users|PUT|/admin/users/{user}/enabled|Enable/Disable User||application/json|",
+        "Users|PUT|/admin/users/{user}/pwd|Change user's password||application/json|",
+        "Users|GET|/admin/users/{user}/roles|Get user's roles|j||",
+        "Users|POST|/admin/users/{user}/roles|Add role to user||application/json|",
+        "Users|PUT|/admin/users/{user}/roles|Set user's roles||application/json|",
+        "Users|DELETE|/admin/users/{user}/roles/{role}|Remove role from user|||",
+        "Users|GET|/admin/users/{user}/superuser|User is Superuser|j||",
+        "Users|GET|/admin/users/list|List users with attributes, roles and permissions|j||",
+        "Roles|GET|/admin/roles|List Roles|j||",
+        "Roles|POST|/admin/roles|Add role||application/json|",
+        "Roles|DELETE|/admin/roles/{role}|Delete role|||",
+        "Roles|GET|/admin/roles/{role}/users|Get users with role|j||",
+        "Roles|GET|/admin/roles/list|List Roles with their permissions|j||",
+        "Permissions|GET|/admin/permissions/check|Check User Permission|||",
+        "Permissions|GET|/admin/permissions/effective/user/{user}|Get effective user permissions|j||",
+        "Permissions|GET|/admin/permissions/role/{role}|Get role permissions|j||",
+        "Permissions|PUT|/admin/permissions/role/{role}|Add Role Permission||application/json|",
+        "Permissions|POST|/admin/permissions/role/{role}/delete|Delete Role Permission||application/json|",
+        "Permissions|GET|/admin/permissions/user/{user}|Get user permissions|j||",
+        "Permissions|PUT|/admin/permissions/user/{user}|Add User Permission||application/json|",
+        "Permissions|POST|/admin/permissions/user/{user}/delete|Delete User Permission||application/json|",
+        "Integrity Constraints / SHACL|GET|/{db}/icv|List constraints|r||",
+        "Integrity Constraints / SHACL|POST|/{db}/icv/{txid}/report|SHACL validation report in transaction|r||",
+        "Integrity Constraints / SHACL|POST|/{db}/icv/{txid}/validate|Validate constraints in transaction|j|text/turtle|",
+        "Integrity Constraints / SHACL|POST|/{db}/icv/report|SHACL validation report|r||",
+        "Integrity Constraints / SHACL|POST|/{db}/icv/validate|Validate constraints|j|text/turtle|",
+        "GraphQL|GET|/{db}/graphql|Perform GraphQL query|j||query",
+        "GraphQL|POST|/{db}/graphql|Perform GraphQL query|j|application/json|",
+        "GraphQL|GET|/{db}/graphql/{schema}|Perform GraphQL query with schema|j||query",
+        "GraphQL|POST|/{db}/graphql/{schema}|Perform GraphQL query with schema|j|application/json|",
+        "GraphQL|GET|/{db}/graphql/schemas|List schemas|j||",
+        "GraphQL|DELETE|/{db}/graphql/schemas|Clear schemas|||",
+        "GraphQL|GET|/{db}/graphql/schemas/{schema}|Get schema|||",
+        "GraphQL|POST|/{db}/graphql/schemas/{schema}|Add schema||application/graphql|",
+        "GraphQL|PUT|/{db}/graphql/schemas/{schema}|Update schema||application/graphql|",
+        "GraphQL|DELETE|/{db}/graphql/schemas/{schema}|Remove schema|||",
+        "Stored Functions|GET|/admin/functions/stored|Get Stored Functions|t||",
+        "Stored Functions|POST|/admin/functions/stored|Add Stored Function||text/plain|",
+        "Stored Functions|DELETE|/admin/functions/stored|Delete Stored Functions|||",
+        "Stored Functions|GET|/admin/functions/stored/{name}|Get Stored Function|t||",
+        "Stored Functions|DELETE|/admin/functions/stored/{name}|Delete Stored Function|||",
+        "Checkpoints|GET|/admin/checkpoint/{db}|List checkpoints|j||",
+        "Checkpoints|POST|/admin/checkpoint/{db}|Create checkpoint|j||",
+        "Checkpoints|PUT|/admin/checkpoint/{db}/{checkpoint}|Restore checkpoints|j||",
+        "Entity Resolution|POST|/{db}/entityresolution|Resolve entities|||",
+        "Entity Resolution|POST|/{db}/entityresolution/reasoning|Resolve entities with reasoning enabled|||",
+        "Schema Matcher|POST|/matcher/suggestions|Aligns the source and target data source schemas|j||",
+        "Knowledge Catalog|GET|/admin/catalog/credentials|Get credentials list|j||",
+        "Knowledge Catalog|POST|/admin/catalog/credentials|Stores username and password data|j|application/json|",
+        "Knowledge Catalog|DELETE|/admin/catalog/credentials/{key}|Remove credentials from catalog|||",
+        "Knowledge Catalog|POST|/admin/catalog/jobs/cron/is_valid|Validates cron string|j||",
+        "Knowledge Catalog|POST|/admin/catalog/jobs/cron/next_date|Returns the next scheduled date|j||",
+        "Knowledge Catalog|POST|/admin/catalog/jobs/cron/summary|Provides a cron summary|j||",
+        "Knowledge Catalog|POST|/admin/catalog/jobs/run|Runs the specified job||application/json|",
+        "Knowledge Catalog|DELETE|/admin/catalog/providers/{providerIri}|Removes a provider|||",
+        "Knowledge Catalog|POST|/admin/catalog/reload|Reloads metadata from a provider||application/json|",
+        "Knowledge Catalog|POST|/admin/catalog/reloadModel|Drops and reloads the built-in model for the catalog|||",
+        "Knowledge Catalog|GET|/admin/catalog/status|Knowledge Catalog status|j||",
+        "Cluster Admin|GET|/admin/cluster|Get cluster info|j||",
+        "Cluster Admin|GET|/admin/cluster/coordinator|Coordinator check|||",
+        "Cluster Admin|POST|/admin/cluster/diagnostics|Get cluster diagnostics report|||",
+        "Cluster Admin|PUT|/admin/cluster/promote|Promote a replica cluster to a writable primary|||",
+        "Cluster Admin|PUT|/admin/cluster/readonly|Start read only mode|||",
+        "Cluster Admin|DELETE|/admin/cluster/readonly|Stop read only mode|||",
+        "Cluster Admin|GET|/admin/cluster/readreplica|Read replica check|||",
+        "Cluster Admin|PUT|/admin/cluster/repairZk|Repair ZK transaction IDs if they don't match all Stardog nodes. All Stardog nodes must agree|||",
+        "Cluster Admin|PUT|/admin/cluster/standby/attemptSync|Attempt to sync a standby or read replica node with the cluster|||",
+        "Cluster Admin|GET|/admin/cluster/standby/pause|Get standby pause status|j||",
+        "Cluster Admin|PUT|/admin/cluster/standby/pause|Pause/Unpause standby node|||pause",
+        "Cluster Admin|GET|/admin/cluster/standby/registry|List standby nodes|j||",
+        "Cluster Admin|DELETE|/admin/cluster/standby/registry/{standbyid}|Revoke standby access|||",
+        "Cluster Admin|GET|/admin/cluster/standby/status|Get standby node status|j||",
+        "Cluster Admin|GET|/admin/cluster/status|Get cluster status|j||",
+        "Cluster Admin|POST|/admin/shutdownAll|Shutdown all nodes|||",
+        "Virtual Graphs (External Compute)|POST|/admin/virtual_graphs_compute/import|Import virtual graph||application/json|",
+        "Virtual Graphs (External Compute)|POST|/admin/virtual_graphs_compute/import_db|Import virtual graph||application/json|",
+      ];
+
+      let _apiCatalogCache = null;
+      function apiCatalogEntries() {
+        if (_apiCatalogCache) return _apiCatalogCache;
+        _apiCatalogCache = API_ENDPOINT_CATALOG.map((line, index) => {
+          const [section, method, path, summary, accept, contentType, required] = line.split("|");
+          return { index, section, method, path, summary, accept, contentType, required: required ? required.split(",") : [] };
+        });
+        return _apiCatalogCache;
+      }
+
+      // Maps a catalog path placeholder to the app's path variable, so {db} and {name} get the same
+      // database / virtual graph / data source lists as the preset calls.
+      function apiCatalogVarFor(path, placeholder) {
+        if (placeholder === "db") return "database";
+        if (placeholder === "user" || placeholder === "role") return placeholder;
+        if (placeholder === "name") {
+          if (path.startsWith("/admin/virtual_graphs/")) return "virtualGraph";
+          if (path.startsWith("/admin/data_sources/")) return "dataSource";
+          if (path.startsWith("/admin/queries/stored/")) return "storedQuery";
+          if (path.startsWith("/admin/queries/")) return "queryId";
+          if (path.startsWith("/admin/processes/")) return "processId";
+          if (/^\/admin\/cache\/(refresh\/)?\{name\}$/.test(path)) return "cache";
+        }
+        return placeholder;
+      }
+
+      function apiVariableDefault(kind) {
+        if (kind === "database") return apiDatabaseDefault();
+        if (kind === "virtualGraph") return normalizeVirtualGraphName(apiVirtualGraphDefault());
+        if (kind === "dataSource") return apiDataSourceDefault();
+        if (kind === "user") return String(state.connection?.username || "");
+        return "";
+      }
+
+      function apiVariablesForTemplate(pathTemplate) {
+        const names = [...new Set([...String(pathTemplate).matchAll(/\{([^}]+)\}/g)].map((m) => m[1]))];
+        return names.map((name) => {
+          const [kind, label] = API_PATH_VARS[name] || ["text", name.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/^./, (c) => c.toUpperCase())];
+          return { name, kind, label, value: apiVariableDefault(kind) };
+        });
+      }
+
+      function apiPresetFromSpec(spec) {
+        const variables = apiVariablesForTemplate(spec.path);
+        return {
+          method: spec.method,
+          ...(variables.length ? { pathTemplate: spec.path, variables } : { path: spec.path, variables: [] }),
+          params: spec.params ? { ...spec.params } : {},
+          accept: API_ACCEPT[spec.accept] || API_ACCEPT.j,
+          contentType: spec.contentType || "",
+          body: spec.body !== undefined ? spec.body : "",
+          headers: {},
+          ...(spec.confirm ? { confirm: true } : {}),
+          ...(spec.hint ? { hint: spec.hint } : {}),
+          ...(spec.emptyNote ? { emptyNote: spec.emptyNote } : {}),
+          ...(spec.transform ? { responseTransform: spec.transform } : {}),
+          ...(API_DOWNLOAD_PATHS[spec.path] ? { downloadAs: API_DOWNLOAD_PATHS[spec.path] } : {}),
+        };
+      }
+
+      function apiPresetFromCatalog(entry) {
+        const pathTemplate = entry.path.replace(/\{([^}]+)\}/g, (_, ph) => `{${apiCatalogVarFor(entry.path, ph)}}`);
+        const params = {};
+        entry.required.forEach((name) => { params[name] = ""; });
+        const preset = apiPresetFromSpec({ method: entry.method, path: pathTemplate, accept: entry.accept, params, contentType: /^(GET|HEAD)$/.test(entry.method) ? "" : entry.contentType });
+        preset.fromCatalog = true;
+        preset.catalogLabel = `${entry.method} ${entry.path}`;
+        if (entry.method === "POST" && API_READ_ONLY_POSTS.has(entry.path)) preset.readOnly = true;
+        if (apiRunNeedsConfirm(preset, entry.method, entry.path)) preset.confirm = true;
+        return preset;
+      }
+
+      // A call that changes the server asks before it runs: declared calls that say so, and any
+      // catalog call that is not a read (GET/HEAD, or a POST listed in API_READ_ONLY_POSTS);
+      // SPARQL Update asks even when sent with GET. The method typed into the form counts, so a read
+      // whose method is changed by hand to DELETE asks too.
+      function apiRunNeedsConfirm(config, method, path) {
+        if (!config) return false;
+        if (config.confirm) return true;
+        if (!config.fromCatalog) return false;
+        const m = String(method || "").toUpperCase();
+        if (/\/update$/.test(String(path || ""))) return true;
+        if (m === "GET" || m === "HEAD") return false;
+        return !(config.readOnly && m === "POST");
+      }
+
+      // True when a dropdown value or call name leads somewhere: a group whose calls all resolve, a
+      // declared call, a loader function, a panel, or the catalog.
+      function apiCallResolvable(id) {
+        if (!id) return false;
+        if (id === API_CATALOG_OPTION) return true;
+        const single = (call) => Boolean(API_CALL_SPECS[call] || labPresetHandlers()[call] || API_PANEL_CALLS[call]);
+        if (Object.prototype.hasOwnProperty.call(API_CALL_GROUPS, id)) {
+          const calls = API_CALL_GROUPS[id];
+          return Array.isArray(calls) && calls.length > 0 && calls.every(single);
+        }
+        return single(id);
+      }
 
       // Default severity/confidence/mode used to synthesize the example card shown in
       // the docs panel when no live finding of this kind exists. The actual values
@@ -9731,7 +10407,29 @@ return OntologyLayouts;
         if (kind === "database") return Array.from(new Set(state.ui.availableDatabases || []));
         if (kind === "virtualGraph") return Array.from(new Set((state.ui.virtualGraphInventory || []).map((item) => item.name).filter(Boolean))).sort();
         if (kind === "dataSource") return Array.from(new Set(state.ui.availableDataSources || [])).sort();
+        if (API_VARIABLE_LISTS[kind]) return Array.from(new Set(state.ui.labVariableLists?.[kind] || []));
         return [];
+      }
+
+      // Lists fetched for the path variables of the newer calls (users, roles, running queries, ...).
+      const API_VARIABLE_LISTS = {
+        user: { path: "/admin/users", pick: (j) => j?.users },
+        role: { path: "/admin/roles", pick: (j) => j?.roles },
+        runningQuery: { path: "/admin/queries", pick: (j) => (j?.queries || []).map((q) => q?.id) },
+        process: { path: "/admin/processes", pick: (j) => (Array.isArray(j) ? j : j?.processes || []).map((x) => x?.id) },
+        storedQuery: { path: "/admin/queries/stored", pick: (j) => (j?.queries || []).map((q) => q?.name) },
+        cache: { path: "/admin/cache/graphs", pick: (j) => (Array.isArray(j) ? j : j?.graphs || j?.caches || []).map((c) => (typeof c === "string" ? c : c?.name)) },
+      };
+
+      async function fetchLabVariableList(kind) {
+        const def = API_VARIABLE_LISTS[kind];
+        if (!def) return [];
+        const text = await request({ method: "GET", path: def.path, accept: "application/json" });
+        let names = [];
+        try { names = (def.pick(JSON.parse(text)) || []).filter((v) => v != null && String(v).trim()).map(String); } catch {}
+        if (!state.ui.labVariableLists) state.ui.labVariableLists = {};
+        state.ui.labVariableLists[kind] = names;
+        return names;
       }
 
       function labVariableInputId(name) {
@@ -9804,12 +10502,13 @@ return OntologyLayouts;
           await fetchAllDataSources();
           return;
         }
+        if (API_VARIABLE_LISTS[kind]) await fetchLabVariableList(kind);
       }
 
       function openLabVariableMenu(name, filterText = "") {
         const config = state.ui.labPresetConfig;
         const variable = (config?.variables || []).find((item) => item.name === name);
-        if (!variable) return;
+        if (!variable || variable.kind === "text") return;
         const menuId = labVariableMenuId(name);
         state.ui.selectorFilters[labVariableFilterKey(name)] = filterText || "";
         const options = labVariableOptions(variable.kind).map((value) => ({ type: "option", value, label: value }));
@@ -30501,8 +31200,15 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.59.0";
+      const APP_VERSION = "1.60.0";
       const RELEASE_NOTES = [
+        { version: "1.60.0", date: "2026-11-26", title: "Every Stardog HTTP API call from the API panel", items: [
+          "{*All Stardog endpoints…*} at the bottom of the [[HTTP API Explorer|aa-tool-api]] dropdown searches every operation in Stardog's HTTP API by name, path or section. Pick one and its method, path, required parameters and content types are filled in, with the same database, virtual graph and data source lists as the other calls.",
+          "Related calls share one dropdown entry and a second list beside it: {*Running Queries*} lists what is running now, shows a running query's plan and stops it; {*Users & Roles*} lists users, roles and who holds each; {*Caches*} lists cached virtual graph data, checks how fresh it is and refreshes it.",
+          "{*Reasoning*} shows the reasoning schema, checks consistency and explains an inference: paste a triple and see the tree of statements and axioms it follows from. {*Integrity Constraints*} lists the constraints, runs a SHACL validation report and tests a constraint without storing it. {*Data Model*} shows the model Stardog derives for SQL, GraphQL, SHACL or OWL.",
+          "More calls for virtual graph work: each data source's row-count estimates (which the planner uses to order joins) can be refreshed, its connection tested and its availability checked; a virtual graph's database, availability and R2RML mappings can be read.",
+          "Calls that change something on the server, such as stopping a query or any write from the full list, show a warning above the request and ask you to confirm before they run."
+        ] },
         { version: "1.59.0", date: "2026-11-25", title: "Debug Analytics shows the timeline of recorded steps", items: [
           "{*Debug Analytics*} opens the [[timeline|aa-tool-debug-analytics]] of the project's recorded steps at the bottom of the window: each point's height is the query's time and its color says whether the results kept the same number of rows. Click a point to read what changed and how it affected the plan, or load that step into the panes."
         ] },
@@ -30892,6 +31598,7 @@ ORDER BY ?table ?ordinal`;
           source: null,
           body: `<p>A request builder for the Stardog HTTP API. Pick a preset operation from the dropdown, or craft a custom request (method, path, headers, body). Responses come back with search, copy, and download, and can be loaded straight into an artifact editor.</p>
             <p>Use it to inspect what the server exposes — which virtual graphs and data sources exist, what a mapping or stored query actually contains — without leaving the workbench.</p>
+            <p>Related calls share one entry in the dropdown. Choosing such an entry (for example <em>Running Queries</em> or <em>VG Info</em>) fills in its first call and shows a second list beside the dropdown with the rest of the group. Every other operation in Stardog's HTTP API is under <em>All Stardog endpoints…</em> at the bottom: type a few words of a name or path, pick the operation, and the method, path, parameters and content types are filled in for you. Calls that change something on the server (stop a query, delete, write) show a warning above the request and ask you to confirm before they run.</p>
             <p>When the response is about something that can be edited (a database's options or namespaces, a virtual graph's options, a data source's options), a <strong>pencil</strong> button appears next to <em>Run</em> and opens an editor for it. The editor gives each option a control that fits it: a switch for yes/no values, a list for values from a fixed set, a text box for anything else, with the documented default shown beside it. The same editor opens from the <strong>gear</strong> on a row of the database, virtual graph and data source lists. Saving needs editing turned on for the live server, asks you to confirm, and reads the values back from the server afterwards. Credentials are shown as the server returns them.</p>
             <p>To create something, type a name into the filter of a database, virtual graph or data source list: a <strong>+ Create</strong> row appears when no entry has that name. A database needs only a name (full-text search is optional) and DB Controls opens next to load data. A virtual graph asks which data source it reads from and which database may query it, and its mappings are generated from the data source's tables. A data source opens the options editor on its connection type, and Stardog refuses it if it cannot reach the source. To remove one, use <strong>Delete database…</strong> in DB Controls, or <strong>Delete virtual graph…</strong> / <strong>Delete data source…</strong> in the options editor. Each asks you to type the name, and a data source that a virtual graph still uses is not removed.</p>
             ${buildApiCommandDocsHtml()}`
@@ -31678,9 +32385,7 @@ ORDER BY ?table ?ordinal`;
         groups.forEach((group) => {
           const groupLabel = group.getAttribute("label") || "";
           html += `<div class="aa-family-row"><span class="aa-family-label">${esc(groupLabel)}</span></div>`;
-          Array.from(group.querySelectorAll("option")).forEach((opt) => {
-            const value = opt.value;
-            const label = opt.textContent || value;
+          const callRow = (value, label) => {
             const rec = API_COMMAND_EDITORIAL[value] || {};
             const methodBadge = rec.method ? `<span class="aa-chip-abbr">${esc(rec.method)}</span>` : "";
             const pathHtml = rec.path ? `<code>${esc(rec.path)}</code>`
@@ -31688,9 +32393,17 @@ ORDER BY ?table ?ordinal`;
             const bodyHtml = rec.summary
               ? `<p>${rec.summary}</p>${rec.whenToUse ? `<p><strong>When to use it:</strong> ${rec.whenToUse}</p>` : ""}`
               : `<p class="aa-editorial-empty">Documentation not yet written for this command.</p>`;
-            html += `
+            return `
               <div class="aa-kind-meta"><strong>${esc(label)}</strong> ${methodBadge} ${pathHtml}</div>
               ${bodyHtml}`;
+          };
+          Array.from(group.querySelectorAll("option")).forEach((opt) => {
+            const value = opt.value;
+            const label = opt.textContent || value;
+            const calls = Object.prototype.hasOwnProperty.call(API_CALL_GROUPS, value) ? API_CALL_GROUPS[value] : null;
+            if (!calls) { html += callRow(value, label); return; }
+            html += `<p><strong>${esc(label)}</strong>: ${calls.length} calls. Choosing it fills in <em>${esc(calls[0])}</em> and shows the others in a second list beside the dropdown.</p>`;
+            calls.forEach((call) => { html += callRow(call, `${label} › ${call}`); });
           });
         });
         return html;
@@ -62111,6 +62824,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         else $("labPathInput").value = config?.path || "";
         updateLabBodyFileVisibility();
         renderServerLogsQuickControls();
+        updateApiCallNote();
         updateApiEditBtn();
       }
 
@@ -62459,10 +63173,6 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         applyLabPreset({ method: "GET", pathTemplate: "/{database}/namespaces", variables: [{ name: "database", kind: "database", label: "Database", value: apiDatabaseDefault() }], params: {}, accept: "application/json, text/plain;q=0.9, */*;q=0.8", contentType: "", body: "", headers: {} });
       }
 
-      function loadCurrentDbVgsLabTemplate() {
-        applyLabPreset({ method: "GET", path: "/admin/virtual_graphs", params: {}, accept: "application/json, text/plain;q=0.9, */*;q=0.8", contentType: "", body: "", headers: {} });
-      }
-
       function loadAllVgsLabTemplate() {
         applyLabPreset({ method: "GET", path: "/admin/virtual_graphs", params: {}, accept: "application/json, text/plain;q=0.9, */*;q=0.8", contentType: "", body: "", headers: {} });
       }
@@ -62545,33 +63255,12 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         });
       }
 
-      function loadSelectedLabPreset() {
-        const preset = $("labPresetSelect")?.value || "";
-        if (!preset) {
-          state.ui.labPresetConfig = null;
-          state.ui.labPathVariables = {};
-          renderLabPathVariables();
-          renderServerLogsQuickControls();
-          updateApiEditBtn();
-          return;
-        }
-        if (preset === "Get or Compare Permissions") {
-          $("labPresetSelect").value = "";
-          $("apiPanel")?.classList.add("hidden");
-          openEffectivePermissionsPanel();
-          return;
-        }
-        if (preset === "Test Source for Schema Drift") {
-          $("labPresetSelect").value = "";
-          $("apiPanel")?.classList.add("hidden");
-          openSchemaDriftPanel();
-          return;
-        }
-        const handlers = {
+      // Loader functions for the calls that need more than API_CALL_SPECS can describe.
+      function labPresetHandlers() {
+        return {
           "DB Options": loadDbOptionsLabTemplate,
           "Namespaces": loadNamespacesLabTemplate,
           "Stored Queries": loadStoredQueriesLabTemplate,
-          "Virtual Graphs (Current DB)": loadCurrentDbVgsLabTemplate,
           "Virtual Graphs (All)": loadAllVgsLabTemplate,
           "VG Info": loadVgInfoLabTemplate,
           "VG Options": loadVgOptionsLabTemplate,
@@ -62587,9 +63276,147 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           "Server Diagnostics": loadServerDiagnosticsLabTemplate,
           "Server Logs": loadServerLogsLabTemplate
         };
-        const handler = handlers[preset];
-        if (!handler) throw new Error(`No loader is defined for preset '${preset}'.`);
+      }
+
+      // The call a group entry stands for right now: the one picked in the second list, or the first.
+      function apiGroupCurrentCall(group) {
+        const calls = API_CALL_GROUPS[group] || [];
+        const remembered = state.ui.labGroupCall?.[group];
+        return calls.includes(remembered) ? remembered : calls[0];
+      }
+
+      // Shows the second list for a group entry and the endpoint search for the catalog entry.
+      function syncApiCallChooser(preset) {
+        const sub = $("labCallSelect");
+        const group = Object.prototype.hasOwnProperty.call(API_CALL_GROUPS, preset) ? API_CALL_GROUPS[preset] : null;
+        if (sub) {
+          if (group) {
+            const wanted = group.join("\n");
+            if (sub.dataset.group !== preset || sub.dataset.calls !== wanted) {
+              sub.innerHTML = group.map((call) => `<option value="${esc(call)}">${esc(call)}</option>`).join("");
+              sub.dataset.group = preset;
+              sub.dataset.calls = wanted;
+            }
+            sub.value = apiGroupCurrentCall(preset);
+            sub.title = `${group.length} calls in ${preset}`;
+          } else {
+            delete sub.dataset.group;
+          }
+          sub.classList.toggle("hidden", !group);
+        }
+        const isCatalog = preset === API_CATALOG_OPTION;
+        $("labCatalogWrap")?.classList.toggle("hidden", !isCatalog);
+        if (!isCatalog) $("labCatalogList")?.classList.add("hidden");
+      }
+
+      function loadApiCall(id) {
+        const spec = API_CALL_SPECS[id];
+        if (spec) { applyLabPreset(apiPresetFromSpec(spec)); return; }
+        const handler = labPresetHandlers()[id];
+        if (!handler) throw new Error(`No loader is defined for preset '${id}'.`);
         handler();
+      }
+
+      function resetLabPreset() {
+        state.ui.labPresetConfig = null;
+        state.ui.labPathVariables = {};
+        renderLabPathVariables();
+        renderServerLogsQuickControls();
+        updateApiCallNote();
+        updateApiEditBtn();
+      }
+
+      function loadSelectedLabPreset() {
+        const preset = $("labPresetSelect")?.value || "";
+        if (API_PANEL_CALLS[preset]) {
+          $("labPresetSelect").value = "";
+          syncApiCallChooser("");
+          $("apiPanel")?.classList.add("hidden");
+          API_PANEL_CALLS[preset]();
+          return;
+        }
+        syncApiCallChooser(preset);
+        if (!preset) { resetLabPreset(); return; }
+        if (preset === API_CATALOG_OPTION) {
+          resetLabPreset();
+          const input = $("labCatalogInput");
+          if (input) { input.value = ""; input.focus({ preventScroll: true }); }
+          renderApiCatalogList("");
+          return;
+        }
+        if (Object.prototype.hasOwnProperty.call(API_CALL_GROUPS, preset)) { loadApiCall(apiGroupCurrentCall(preset)); return; }
+        loadApiCall(preset);
+      }
+
+      function loadSelectedGroupCall() {
+        const group = $("labPresetSelect")?.value || "";
+        const call = $("labCallSelect")?.value || "";
+        if (!Object.prototype.hasOwnProperty.call(API_CALL_GROUPS, group) || !API_CALL_GROUPS[group].includes(call)) return;
+        if (!state.ui.labGroupCall) state.ui.labGroupCall = {};
+        state.ui.labGroupCall[group] = call;
+        loadApiCall(call);
+      }
+
+      // Selects a call wherever it lives: a dropdown entry of its own, or a call inside a group.
+      function selectApiCall(id) {
+        const select = $("labPresetSelect");
+        if (!select) return false;
+        const own = [...select.options].some((o) => o.value === id);
+        const group = own ? null : Object.keys(API_CALL_GROUPS).find((g) => API_CALL_GROUPS[g].includes(id));
+        if (!own && !group) return false;
+        if (group) { if (!state.ui.labGroupCall) state.ui.labGroupCall = {}; state.ui.labGroupCall[group] = id; }
+        select.value = own ? id : group;
+        loadSelectedLabPreset();
+        return true;
+      }
+
+      function apiCatalogMatches(filterText) {
+        const words = String(filterText || "").toLowerCase().split(/\s+/).filter(Boolean);
+        return apiCatalogEntries().filter((e) => {
+          if (!words.length) return true;
+          const hay = `${e.section} ${e.method} ${e.path} ${e.summary}`.toLowerCase();
+          return words.every((w) => hay.includes(w));
+        });
+      }
+
+      function renderApiCatalogList(filterText) {
+        const host = $("labCatalogList");
+        if (!host) return;
+        const all = apiCatalogEntries();
+        const matches = apiCatalogMatches(filterText);
+        let html = `<div class="api-catalog-count">${matches.length === all.length ? `${all.length} operations` : `${matches.length} of ${all.length} operations`} in Stardog's HTTP API ${esc(API_ENDPOINT_CATALOG_VERSION)}</div>`;
+        let section = "";
+        matches.forEach((e) => {
+          if (e.section !== section) { section = e.section; html += `<div class="api-catalog-tag">${esc(section)}</div>`; }
+          const write = !/^(GET|HEAD)$/.test(e.method) || /\/update$/.test(e.path);
+          html += `<button type="button" class="api-catalog-row" role="option" data-api-endpoint="${e.index}" title="${esc(`${e.method} ${e.path} — ${e.summary}`)}"><span class="api-catalog-method${write ? " is-write" : ""}">${esc(e.method)}</span><code>${esc(e.path)}</code><span class="api-catalog-summary">${esc(e.summary)}</span></button>`;
+        });
+        if (!matches.length) html += `<div class="muted" style="padding:4px 10px">No operation matches.</div>`;
+        host.innerHTML = html;
+        host.classList.remove("hidden");
+      }
+
+      function chooseApiCatalogEntry(index) {
+        const entry = apiCatalogEntries()[index];
+        if (!entry) return;
+        applyLabPreset(apiPresetFromCatalog(entry));
+        const input = $("labCatalogInput");
+        if (input) input.value = `${entry.method} ${entry.path}`;
+        $("labCatalogList")?.classList.add("hidden");
+      }
+
+      // A line above the request for calls that change the server.
+      function updateApiCallNote() {
+        const note = $("labCallNote");
+        if (!note) return;
+        const config = state.ui.labPresetConfig;
+        const warn = Boolean(config?.confirm);
+        const parts = [];
+        if (warn) parts.push("This call changes something on the server. Run asks you to confirm first.");
+        if (config?.hint) parts.push(config.hint);
+        note.classList.toggle("hidden", !parts.length);
+        note.classList.toggle("is-hint", !warn);
+        note.textContent = parts.join(" ");
       }
 
       function updateLabBodyFileVisibility() {
@@ -62613,6 +63440,13 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         const body = /^(GET|HEAD)$/i.test(method)
           ? null
           : ($("labBodyInput").value.trim() ? parseJson($("labBodyInput").value, $("labBodyInput").value) : null);
+        // A blank path variable would collapse the path onto its parent endpoint
+        // (…/stored/{name} with no name is …/stored/, which can address every stored query).
+        const blankVar = (state.ui.labPresetConfig?.pathTemplate ? state.ui.labPresetConfig.variables || [] : [])
+          .find((v) => !String(state.ui.labPathVariables?.[v.name] ?? "").trim());
+        if (blankVar) throw new Error(`Fill in ${blankVar.label || blankVar.name} in the path before running this call.`);
+        if (apiRunNeedsConfirm(state.ui.labPresetConfig, method, path)
+          && !window.confirm(`${method} ${path}\n\nThis call changes something on the server. Run it?`)) return;
         const downloadAs = state.ui.labPresetConfig?.downloadAs || null;
         if (downloadAs) {
           const result = await requestBinary({ method, path, params, headers, accept, contentType, body });
@@ -62641,7 +63475,11 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           if (/json/i.test(result.contentType)) {
             const parsed = JSON.parse(result.text);
             const extract = state.ui.labPresetConfig?.responseExtract;
-            if (Array.isArray(extract) && extract.length) {
+            const transform = result.ok ? API_RESPONSE_TRANSFORMS[state.ui.labPresetConfig?.responseTransform] : null;
+            if (typeof transform === "function") {
+              const out = transform(parsed);
+              rendered = typeof out === "string" ? out : JSON.stringify(out, null, 2);
+            } else if (Array.isArray(extract) && extract.length) {
               const filtered = {};
               extract.forEach((key) => { if (Object.prototype.hasOwnProperty.call(parsed, key)) filtered[key] = parsed[key]; });
               rendered = JSON.stringify(filtered, null, 2);
@@ -62650,7 +63488,8 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
             }
           }
         } catch {}
-        state.ui.apiResponseRaw = rendered || "(empty response)";
+        const emptyNote = result.ok && !String(rendered || "").trim() ? state.ui.labPresetConfig?.emptyNote : "";
+        state.ui.apiResponseRaw = rendered || (emptyNote ? `(empty response) ${emptyNote}` : "(empty response)");
         if ($("apiResponseSearch")) $("apiResponseSearch").value = "";
         renderApiResponse();
         const logLevel = result.status >= 400 ? "error" : "diagnostic";
@@ -68269,7 +69108,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
             const variableName = target.id.replace(/^labPathVar_/, "");
             const config = state.ui.labPresetConfig;
             const variable = (config?.variables || []).find((item) => item.name === variableName);
-            if (!variable) return;
+            if (!variable || variable.kind === "text") return;
             const menu = $(labVariableMenuId(variableName));
             if (menu) {
               menu.innerHTML = `<div class="muted">Loading options...</div>`;
@@ -69802,6 +70641,43 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         window.addEventListener("resize", () => applyLogPanelAutoHeight());
         on("runLabBtn", "click", () => runLabRequest().catch(handleError));
         on("labPresetSelect", "change", () => { try { loadSelectedLabPreset(); } catch (error) { handleError(error); } });
+        on("labCallSelect", "change", () => { try { loadSelectedGroupCall(); } catch (error) { handleError(error); } });
+        on("labCatalogInput", "input", (e) => renderApiCatalogList(e.target.value));
+        on("labCatalogInput", "focus", (e) => renderApiCatalogList(/^[A-Z]+ \//.test(e.target.value) ? "" : e.target.value));
+        on("labCatalogInput", "keydown", (e) => {
+          if (e.key === "Escape") { $("labCatalogList")?.classList.add("hidden"); return; }
+          if (e.key === "Enter" || e.key === "ArrowDown") {
+            const first = $("labCatalogList")?.querySelector("[data-api-endpoint]");
+            if (!first) return;
+            e.preventDefault();
+            if (e.key === "Enter") chooseApiCatalogEntry(Number(first.getAttribute("data-api-endpoint")));
+            else first.focus();
+          }
+        });
+        document.addEventListener("mousedown", (e) => {
+          const list = $("labCatalogList");
+          if (!list || list.classList.contains("hidden")) return;
+          const t = e.target instanceof Element ? e.target : null;
+          if (t && (list.contains(t) || $("labCatalogWrap")?.contains(t))) return;
+          list.classList.add("hidden");
+        }, true);
+        on("labCatalogList", "click", (e) => {
+          const row = e.target instanceof Element ? e.target.closest("[data-api-endpoint]") : null;
+          if (row) chooseApiCatalogEntry(Number(row.getAttribute("data-api-endpoint")));
+        });
+        on("labCatalogList", "keydown", (e) => {
+          const row = e.target instanceof Element ? e.target.closest("[data-api-endpoint]") : null;
+          if (!row) return;
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+            e.preventDefault();
+            const rows = [...$("labCatalogList").querySelectorAll("[data-api-endpoint]")];
+            const next = rows[rows.indexOf(row) + (e.key === "ArrowDown" ? 1 : -1)];
+            if (next) next.focus(); else if (e.key === "ArrowUp") $("labCatalogInput")?.focus();
+          } else if (e.key === "Escape") {
+            $("labCatalogList").classList.add("hidden");
+            $("labCatalogInput")?.focus();
+          }
+        });
         on("labMethodInput", "change", updateLabBodyFileVisibility);
         on("labContentTypeInput", "input", updateLabBodyFileVisibility);
         on("loadLabBodyFileBtn", "click", () => $("labBodyFileInput")?.click());
@@ -70540,7 +71416,8 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           dbcOptionMeta, dbcOptionState, dbcOptionToEditor, dbcOptionFromEditor, // DB Controls option editors
           dbcOptionMissingDefaults: (defaults = DBC_OPTION_DEFAULTS) => Object.keys(DBC_OPTION_META).filter((n) => !(n in defaults)), // every documented DB option has a default note
           ooMeta, ooToEditor, ooFromEditor, ooReadbackDiffers, ooOptionNames: (kind) => Object.keys(OO_META[kind] || {}), // virtual graph / data source option editor
-          apiEditTarget, selectorRowGearHtml, // API pencil target and the gear on list rows
+          apiEditTarget, selectorRowGearHtml,
+          API_CALL_GROUPS, API_CALL_SPECS, API_COMMAND_EDITORIAL, API_RESPONSE_TRANSFORMS, API_DROPDOWN_BUDGET, API_CATALOG_OPTION, apiCallResolvable, apiCatalogEntries, apiPresetFromCatalog, apiPresetFromSpec, apiRunNeedsConfirm, apiCatalogVarFor, selectApiCall, loadSelectedLabPreset, buildApiCommandDocsHtml,   // API helper: groups, catalog, confirmation // API pencil target and the gear on list rows
           renderSelectorMenu, ooErrText, apiVirtualGraphDefault, // the create row in list menus; the server's words for a refusal; the API panel's default graph
           ooCreateCheck: (kind, name, ds) => { // what the create form would say about this name, without touching the form
             const keep = { kind: _oo.kind, newName: _oo.newName, newDs: _oo.newDs };
