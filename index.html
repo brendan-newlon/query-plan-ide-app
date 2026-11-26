@@ -30498,8 +30498,12 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.57.0";
+      const APP_VERSION = "1.58.0";
       const RELEASE_NOTES = [
+        { version: "1.58.0", date: "2026-11-25", title: "Object suggestions and mappings copied as queries", items: [
+          "After a property of the model in a query, [[suggestions|aa-tool-typeahead]] offer a variable for its object: variables already given the property's range class first, then a new variable named after that class, or after the property when its value is a datatype.",
+          "Right-click inside a mapping's {*TO*} block and choose {*Copy as SELECT query*} to copy its patterns as a {{SELECT *}} query, with the prefixes they use, ready to paste into the query pane."
+        ] },
         { version: "1.57.0", date: "2026-11-25", title: "Preview a table's rows from the ER Diagram", items: [
           "{*View preview*} in a table's {*⋯*} menu on the [[ER Diagram|aa-tool-erd]] shows its first 25 rows, every column in the table's own order, in the [[SQL Query|aa-tool-sqlquery]] panel.",
           "Each preview opens in a tab of its own, named after the table, beside the tab with your own SQL. Switch between tables, close a tab with its ×, and scroll a long row of tabs sideways. A table previewed again shows the rows already read without querying the database again.",
@@ -30960,8 +30964,8 @@ ORDER BY ?table ?ordinal`;
           where: `Press <strong>Ctrl+Space</strong> with the caret in the query, mappings, rules, key set or SQL Query editor.`,
           loc: null,
           source: null,
-          body: `<p>A suggestion list for the word at the caret. <strong>Ctrl+Space</strong> opens it at once; it also opens by itself after three typed letters unless you switch <em>auto-suggest</em> off in the list's footer. Arrow keys move through it, <strong>Tab</strong> inserts the highlighted entry (<strong>Enter</strong> too once you have used the arrows or Ctrl+Space), <strong>Esc</strong> closes it.</p>
-            <p><strong>What it suggests, from free to costly.</strong> (1) Text and the model, nothing is queried: variables and names already in the same editor; after a subject in a query, the model's relationships and attributes, those that fit the subject's class first; after <code>a</code>, the model's classes, written with the query's prefixes (a full IRI when no prefix covers the namespace); table and column names that appear in the key sets and in mapping SQL. (2) Names returned by an earlier lookup on a data source, filtered on screen as you type. (3) A lookup on the data source itself.</p>
+          body: `<p>A suggestion list for the word at the caret. <strong>Ctrl+Space</strong> opens it at once; it also opens by itself after three typed letters, once you pause typing, unless you switch <em>auto-suggest</em> off in the list's footer. Typing quickly is never held up by it. Arrow keys move through it, <strong>Tab</strong> inserts the highlighted entry (<strong>Enter</strong> too once you have used the arrows or Ctrl+Space), <strong>Esc</strong> closes it.</p>
+            <p><strong>What it suggests, from free to costly.</strong> (1) Text and the model, nothing is queried: variables and names already in the same editor; after a subject in a query, the model's relationships and attributes, those that fit the subject's class first; after <code>a</code>, the model's classes, written with the query's prefixes (a full IRI when no prefix covers the namespace); after a property, a variable for its object: variables already given the property's range class first, then a new variable named after that class (or after the property, when its value is a datatype); table and column names that appear in the key sets and in mapping SQL. (2) Names returned by an earlier lookup on a data source, filtered on screen as you type. (3) A lookup on the data source itself.</p>
             <p><strong>The data source is only asked when you choose to.</strong> Typing never sends a query. When the names you need are not known yet, the list ends with a <em>Look up</em> row (Ctrl+Space again picks it). Choosing it makes one request that returns every table name, or the columns of every table of that source, using the metadata Stardog holds for it (no SQL is run on the source). The answer is kept for the session and the footer counts the lookups made. If the request fails, the list says so and does not ask again unless you choose <em>Retry</em>. The app waits at most 20 seconds and then abandons the request; a very large answer is not kept, and a table list is cut at 20,000 names (the list says so). Names stay for the session, so another mapping on the same data source finds them again without a request; only when a lot has piled up are the least recently used dropped, and <em>names kept · clear</em> in the list's footer forgets them all at once.</p>`
         },
         {
@@ -31153,7 +31157,8 @@ ORDER BY ?table ?ordinal`;
           source: null,
           body: `<p>The eye icon in a pane's header hides or shows that pane's content and leaves the header in place, so you can give the space to the panes you are reading.</p>
             <p>Some panes fold by themselves. When the query reads no virtual graph, the mappings and key set panes fold to their headers, since there is nothing in them to read; they open again when you open them yourself, or when new content arrives for them. Rules that do not apply to the query are folded too, and the arrow in the rules header expands them all.</p>
-            <p>Every pane has its own search box. Type to highlight matches, and use the arrows beside the box to step through them. Hovering a finding pill dims everything except the lines it refers to. Every editable pane supports multiple cursors with <strong>Ctrl+D</strong>.</p>`
+            <p>Every pane has its own search box. Type to highlight matches, and use the arrows beside the box to step through them. Hovering a finding pill dims everything except the lines it refers to. Every editable pane supports multiple cursors with <strong>Ctrl+D</strong>.</p>
+            <p><strong>A mapping as a query.</strong> Right-click inside a mapping's <code>TO { … }</code> in the mappings pane and choose <strong>Copy as SELECT query</strong>: its patterns are copied as <code>SELECT * WHERE { … }</code>, with a PREFIX line for each prefix they use, ready to paste into the query pane. Elsewhere in the pane, and with <strong>Shift</strong> held, right-click opens the browser's usual menu.</p>`
         },
         {
           id: "aa-ui-vars", group: "interface",
@@ -46005,6 +46010,122 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         menu.style.top = `${Math.max(4, Math.min(event.clientY, window.innerHeight - rect.height - 4))}px`;
       }
       // ── End run plan SQL ─────────────────────────────────────────────────────────
+
+      // ── Copy a mapping's TO { } as a SELECT query ────────────────────────────────
+      // Right-click inside a mapping's TO { ... } (the keyword, the braces or the patterns) offers "Copy as SELECT query":
+      // the patterns become the WHERE of "SELECT *", with PREFIX lines for every prefix they use, ready to paste as a query.
+      // Returns the TO section around `offset` as {kw, open, close} (offsets of the keyword, "{" and its matching "}"), or null.
+      function mappingToBlockAt(text, offset) {
+        const src = String(text || ""), re = /\bTO\s*\{/gi;
+        let m;
+        while ((m = re.exec(src))) {
+          const open = m.index + m[0].length - 1;
+          let depth = 0, i = open, close = -1;
+          while (i < src.length) {
+            const ch = src[i];
+            if (ch === "#") { const nl = src.indexOf("\n", i); i = nl < 0 ? src.length : nl; continue; }
+            if (ch === "<") { const gt = src.slice(i + 1).search(/[>\s]/); if (gt >= 0 && src[i + 1 + gt] === ">") { i += gt + 2; continue; } }
+            if (ch === '"' || ch === "'") {
+              const long = src.startsWith(ch.repeat(3), i), q = long ? ch.repeat(3) : ch;
+              let j = i + q.length;
+              while (j < src.length && !src.startsWith(q, j)) { if (src[j] === "\\") j += 1; else if (!long && src[j] === "\n") break; j += 1; }
+              i = j + q.length; continue;
+            }
+            if (ch === "{") depth += 1;
+            else if (ch === "}") { depth -= 1; if (depth === 0) { close = i; break; } }
+            i += 1;
+          }
+          if (close < 0) return null;
+          if (offset >= m.index && offset <= close + 1) return { kw: m.index, open, close };
+          re.lastIndex = close + 1;
+        }
+        return null;
+      }
+      // The TO patterns as a SELECT query. `prefixText` is the text whose PREFIX lines declare the names (the whole mappings
+      // text, which may hold more than the pane shows); standard and database prefixes are added when the patterns use them.
+      function mappingToSelectQuery(text, block, prefixText) {
+        const body = String(text).slice(block.open + 1, block.close);
+        const lines = body.split("\n");
+        while (lines.length && !lines[0].trim()) lines.shift();
+        while (lines.length && !lines[lines.length - 1].trim()) lines.pop();
+        const indent = Math.min(...lines.filter((l) => l.trim()).map((l) => l.match(/^[ \t]*/)[0].length), 1000);
+        const patterns = lines.map((l) => (l.trim() ? "  " + l.slice(Math.min(indent, l.match(/^[ \t]*/)[0].length)) : "")).join("\n");
+        const pm = buildPrefixMap(prefixText || "", text);
+        const bare = body.replace(/<[^>\s]*>|#[^\n]*|"""[\s\S]*?"""|'''[\s\S]*?'''|"(?:[^"\\\n]|\\.)*"|'(?:[^'\\\n]|\\.)*'/g, " ");
+        const used = [];
+        bare.replace(/(^|[\s,;(\[{^])([A-Za-z][\w.-]*)?:(?=[\w])/g, (all, lead, pfx) => { const k = pfx || ""; if (!used.includes(k) && pm[k]) used.push(k); return all; });
+        const head = used.map((k) => `PREFIX ${k}: <${pm[k]}>`).join("\n");
+        return (head ? head + "\n\n" : "") + "SELECT *\nWHERE {\n" + (patterns ? patterns + "\n" : "") + "}\n";
+      }
+      // Text offset in a plain text box under a viewport point: a copy of the box's text, laid out exactly like it and put
+      // over it for an instant, is asked which character is at the point.
+      function textareaOffsetAtPoint(ed, x, y) {
+        const cs = getComputedStyle(ed), mir = document.createElement("div"), r = ed.getBoundingClientRect();
+        ["font", "letterSpacing", "textTransform", "wordSpacing", "textIndent", "tabSize", "lineHeight", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft", "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth", "borderStyle", "boxSizing", "whiteSpace", "overflowWrap", "wordBreak"].forEach((k) => { mir.style[k] = cs[k]; });
+        Object.assign(mir.style, { position: "fixed", left: r.left + "px", top: r.top + "px", width: r.width + "px", height: r.height + "px", overflow: "hidden", opacity: "0", zIndex: "2147483647", pointerEvents: "auto", borderColor: "transparent" });
+        mir.textContent = ed.value + "\u200b";
+        document.body.appendChild(mir);
+        mir.scrollTop = ed.scrollTop; mir.scrollLeft = ed.scrollLeft;
+        let off = null;
+        try {
+          let node = null, o = 0;
+          if (document.caretRangeFromPoint) { const cr = document.caretRangeFromPoint(x, y); if (cr) { node = cr.startContainer; o = cr.startOffset; } }
+          else if (document.caretPositionFromPoint) { const cp = document.caretPositionFromPoint(x, y); if (cp) { node = cp.offsetNode; o = cp.offset; } }
+          if (node && mir.contains(node)) off = Math.min(ed.value.length, node.nodeType === 3 ? o : 0);
+        } finally { mir.remove(); }
+        return off;
+      }
+      function mappingsOffsetAtEvent(ev) {
+        const t = ev.target instanceof Element ? ev.target : null; if (!t) return null;
+        const c = qfCtx("sms2Mappings");
+        if (!c.editor) return null;
+        if (c.flow && !c.flow.classList.contains("hidden") && c.flow.contains(t)) return { ed: c.editor, offset: qfOffsetAtPoint(c, ev.clientX, ev.clientY) };
+        if (t === c.editor) return { ed: c.editor, offset: textareaOffsetAtPoint(c.editor, ev.clientX, ev.clientY) };
+        return null;
+      }
+      function closeMappingToMenu() { document.getElementById("mappingToCtxMenu")?.remove(); }
+      function openMappingToMenu(ev, query) {
+        closeMappingToMenu();
+        const menu = document.createElement("div");
+        menu.id = "mappingToCtxMenu";
+        menu.className = "showplan-menu plan-sql-ctx-menu";
+        menu.innerHTML = `<button type="button" class="secondary" data-mapping-to-copy title="Copy this mapping's TO patterns as a SELECT * query, with the prefixes they use, to paste into the query pane">Copy as SELECT query</button>`;
+        menu.querySelector("[data-mapping-to-copy]").addEventListener("click", () => {
+          closeMappingToMenu();
+          const ok = () => showStatusToast("Copied as a SELECT query.", "success", 2200);
+          const fail = () => {
+            // the clipboard API can be refused (no focus, permissions); fall back to a hidden text box and copy
+            const ta = document.createElement("textarea"); ta.value = query; ta.style.position = "fixed"; ta.style.opacity = "0";
+            document.body.appendChild(ta); ta.select();
+            let done = false; try { done = document.execCommand("copy"); } catch {}
+            ta.remove();
+            if (done) ok(); else showStatusToast("Could not copy to the clipboard.", "error", 3000);
+          };
+          try { navigator.clipboard.writeText(query).then(ok, fail); } catch { fail(); }
+          _mappingToLastCopy = query;
+        });
+        document.body.appendChild(menu);
+        const rect = menu.getBoundingClientRect();
+        menu.style.left = `${Math.max(4, Math.min(ev.clientX, window.innerWidth - rect.width - 4))}px`;
+        menu.style.top = `${Math.max(4, Math.min(ev.clientY, window.innerHeight - rect.height - 4))}px`;
+        return menu;
+      }
+      let _mappingToLastCopy = "";
+      // Shift + right-click keeps the browser's own menu (cut, copy, paste) everywhere.
+      document.addEventListener("contextmenu", (ev) => {
+        closeMappingToMenu();
+        if (ev.shiftKey) return;
+        const hit = mappingsOffsetAtEvent(ev);
+        if (!hit || hit.offset == null) return;
+        const block = mappingToBlockAt(hit.ed.value, hit.offset);
+        if (!block) return;
+        ev.preventDefault();
+        openMappingToMenu(ev, mappingToSelectQuery(hit.ed.value, block, state.artifacts.sms2Mappings?.working || ""));
+      }, true);
+      document.addEventListener("mousedown", (ev) => { if (!(ev.target instanceof Element && ev.target.closest("#mappingToCtxMenu"))) closeMappingToMenu(); }, true);
+      document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") closeMappingToMenu(); });
+      document.addEventListener("scroll", (ev) => { if (!(ev.target instanceof Element && ev.target.closest("#mappingToCtxMenu"))) closeMappingToMenu(); }, true);
+      // ── End copy TO as SELECT ────────────────────────────────────────────────────
 
       async function runSqlQuery() {
         if (_sqlQryRunning) return;
@@ -69768,7 +69889,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       const TA_STD_PREDICATES = [["rdf:type", "http://www.w3.org/1999/02/22-rdf-syntax-ns#type"], ["rdfs:label", "http://www.w3.org/2000/01/rdf-schema#label"], ["rdfs:comment", "http://www.w3.org/2000/01/rdf-schema#comment"], ["rdfs:subClassOf", "http://www.w3.org/2000/01/rdf-schema#subClassOf"], ["owl:sameAs", "http://www.w3.org/2002/07/owl#sameAs"]];
       const TA_KEYWORDS = /^(?:select|distinct|reduced|where|filter|bind|optional|union|minus|graph|service|group|order|by|having|limit|offset|values|from|named|prefix|base|construct|ask|describe|as|not|exists|in|mapping|to|sql|if|then)$/i;
       const TA_SQL_WORDS = /^(?:select|from|join|where|and|or|on|as|table|null|case|when|else|end|group|order|by|having|limit|inner|left|right|outer|union|distinct|with)$/i;
-      const TA = { ed: null, key: "", items: [], sel: 0, from: 0, to: 0, open: false, listed: false, byKey: false, remote: {}, remoteCalls: 0, abort: null, busy: "", posFrom: -1, last: null, tick: 0, timeoutMs: 20000, budget: 200000, fetch: null };
+      const TA = { ed: null, key: "", items: [], sel: 0, from: 0, to: 0, open: false, listed: false, byKey: false, remote: {}, remoteCalls: 0, abort: null, busy: "", posFrom: -1, last: null, tick: 0, timeoutMs: 20000, budget: 200000, fetch: null, pending: null, idleMs: 110, runs: 0, lastMs: 0 };
       // Limits on what a lookup may cost: how long the app waits, how large an answer it will read, how many table names it
       // keeps from one answer, and how many names (tables + columns, all data sources together) it holds before the least
       // recently used are dropped.
@@ -69891,12 +70012,15 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         const isType = pred === "a" || /^rdf:type$/i.test(pred || "") || pred === `<${TA_RDF_TYPE}>`;
         return { pos: expr || depth ? "expr" : pos === "object" && isType ? "class" : pos === "after" ? "expr" : pos, subj, pred, expr: Boolean(expr || depth) };
       }
+      // Every variable written as "?v a Class" (or rdf:type) in the text, with the classes given to it.
+      function taVarTypes(text, pm) {
+        const out = new Map(), re = /([?$][A-Za-z_]\w*)\s+(?:a|rdf:type)\s+(<[^>\s]*>|[^\s;,.{}()]+)/g; let m;
+        while ((m = re.exec(text))) { const f = taExpand(m[2], pm); if (f) { const l = out.get(m[1]) || []; if (!l.includes(f)) l.push(f); out.set(m[1], l); } }
+        return out;
+      }
       function taSubjectClasses(text, subj, pm) {
         if (!subj || !/^[?$]/.test(subj)) return [];
-        const re = new RegExp(subj.replace(/[$?]/g, "\\$&") + "\\s+(?:a|rdf:type)\\s+([^\\s;,.{}()]+)", "g");
-        const out = []; let m;
-        while ((m = re.exec(text))) { const f = taExpand(m[1], pm); if (f) out.push(f); }
-        return out;
+        return taVarTypes(text, pm).get(subj) || [];
       }
       function taInSqlRegion(text, caret) {
         const head = text.slice(0, caret), re = /FROM\s+SQL\s*\{/gi; let m, last = -1;
@@ -70040,6 +70164,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       }
 
       // ---- everything for one caret position; pure apart from reading app state (used by the popup and the self-test)
+      let _taWordCache = { rest: null, dotted: null, counts: null };
       function taSuggest(key, text, caret, byKey) {
         const ctx = taContext(key, text, caret), items = [];
         let q = ctx.query;
@@ -70066,6 +70191,33 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
             }
           }
         }
+        // After a property of the model, a variable for its object: variables already typed with the property's range class
+        // (or a subclass of it) first, then a new variable named after that class (or after the property, for a value).
+        const objPos = ctx.kind === "sparql" && ctx.pos === "object" && ctx.pred && (varMode || !q);
+        if (objPos) {
+          const modelText = state.artifacts.ontologyModel?.working || "";
+          if (modelText.trim()) {
+            const model = taParseModel(modelText), pm = buildPrefixMap(text);
+            const piri = taExpand(ctx.pred, pm), prop = piri && model.props.find((e) => e.iri === piri);
+            if (prop && prop.ranges.length) {
+              const rangeCls = prop.ranges.filter((r) => !/XMLSchema#|rdf-schema#Literal$|#langString$/.test(r)), rangeSet = new Set(rangeCls);
+              const fits = (cls) => cls.some((c) => Array.from(model.ancestors(c)).some((a) => rangeSet.has(a)));
+              const rest = text.slice(0, ctx.from) + " " + text.slice(ctx.to), qv = q.replace(/^[?$]/, "");
+              taVarTypes(rest, pm).forEach((cls, v) => {
+                if (v === q) return;
+                const s = taScore(qv, v.slice(1)); if (s < 0) return;
+                const ok = rangeCls.length > 0 && fits(cls);
+                items.push({ label: v, insert: v, detail: "variable · " + taCompact(cls[0], pm) + (ok ? " · fits " + ctx.pred : ""), kind: "word", from: ctx.from, to: ctx.to, score: s + (ok ? 30 : rangeCls.length ? -15 : 0) });
+              });
+              const base = rangeCls.length ? rangeCls[0].replace(/^.*[#\/]/, "") : piri.replace(/^.*[#\/]/, "").replace(/^(?:has|is)(?=[A-Z])/, "");
+              const name = "?" + base.charAt(0).toLowerCase() + base.slice(1);
+              if (/^\?[A-Za-z_]\w*$/.test(name) && name !== q && !new RegExp("\\" + name + "(?!\\w)").test(rest)) {
+                const s = taScore(qv, name.slice(1));
+                if (s >= 0) items.push({ label: name, insert: name, detail: "new variable · " + taCompact(prop.ranges[0], pm), kind: "word", from: ctx.from, to: ctx.to, score: s + 25 });
+              }
+            }
+          }
+        }
         if (ctx.kind === "sql") {
           // A finished keyword (WHERE, FROM ...) is not a name being typed: nothing to complete until something follows it.
           // With the hotkey it asks what comes next, as if a space had been typed.
@@ -70078,16 +70230,23 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         if (ctx.dotted) taSqlItems(ctx, ds, items);
         if (ctx.pad) items.forEach((i) => { if (!i.action) i.insert = " " + i.insert; });
         // words already written in this editor (variables for ?x): no query involved
-        const seen = new Set(items.map((i) => i.label)), counts = new Map();
+        // The text around the word being typed stays the same while it is typed, so its word counts are kept between calls.
+        const seen = new Set(items.map((i) => i.label));
         const rest = text.slice(0, ctx.from) + " " + text.slice(ctx.to);
-        const wre = ctx.dotted ? /[A-Za-z_][\w$]*/g : /[?$][A-Za-z_]\w*|[A-Za-z_][\w$]*(?::[\w$-]+)?|:[\w$-]+/g;
-        (rest.match(wre) || []).forEach((w) => counts.set(w, (counts.get(w) || 0) + 1));
+        let counts = _taWordCache.rest === rest && _taWordCache.dotted === ctx.dotted ? _taWordCache.counts : null;
+        if (!counts) {
+          counts = new Map();
+          const wre = ctx.dotted ? /[A-Za-z_][\w$]*/g : /[?$][A-Za-z_]\w*|[A-Za-z_][\w$]*(?::[\w$-]+)?|:[\w$-]+/g;
+          (rest.match(wre) || []).forEach((w) => counts.set(w, (counts.get(w) || 0) + 1));
+          _taWordCache = { rest, dotted: ctx.dotted, counts };
+        }
+        const wantVar = varMode || objPos;
         const needColon = ctx.kind === "sparql" && (ctx.pos === "class" || ctx.pos === "predicate");
         counts.forEach((n, w) => {
-          if (seen.has(w) || w === q || varMode !== /^[?$]/.test(w) || (needColon && !w.includes(":")) || (!varMode && w.length < 4)) return;
+          if (seen.has(w) || w === q || wantVar !== /^[?$]/.test(w) || (needColon && !w.includes(":")) || (!wantVar && w.length < 4)) return;
           if (ctx.dotted ? TA_SQL_WORDS.test(w) : TA_KEYWORDS.test(w)) return;
           const s = taScore(q, w); if (s < 0) return;
-          items.push({ label: w, insert: w, detail: varMode ? "variable in this text" : "used in this text" + (n > 1 ? ` · ${n}×` : ""), kind: "word", from: ctx.from, to: ctx.to, score: s + Math.min(10, n) });
+          items.push({ label: w, insert: w, detail: wantVar ? "variable in this text" : "used in this text" + (n > 1 ? ` · ${n}×` : ""), kind: "word", from: ctx.from, to: ctx.to, score: s + Math.min(10, n) });
         });
         items.sort((a, b) => (a.action ? 1 : 0) - (b.action ? 1 : 0) || b.score - a.score || a.label.localeCompare(b.label));
         return { ctx, items: items.slice(0, TA_MAX_ITEMS), ds };
@@ -70244,15 +70403,32 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           el.style.left = Math.max(8, left) + "px"; el.style.top = top + "px";
         }
       }
+      // Typing fast never waits on suggestions. While the list is closed, it is worked out only once typing pauses
+      // (TA.idleMs); while it is open, at most once per frame, so a burst of keys costs one update. A key that acts on the
+      // list (Tab, or an arrow or Enter while it shows) first brings it up to date, so it never acts on a stale list.
+      function taCancelPending() {
+        const p = TA.pending; if (!p) return;
+        if (p.raf) cancelAnimationFrame(p.raf); if (p.t) clearTimeout(p.t);
+        TA.pending = null;
+      }
+      function taSchedule() {
+        taCancelPending();
+        const ed = TA.ed;
+        const run = () => { TA.pending = null; if (TA.ed === ed && document.activeElement === ed) taRefresh(false); };
+        TA.pending = TA.open ? { raf: requestAnimationFrame(run) } : { t: setTimeout(run, TA.idleMs) };
+      }
+      function taFlush() { if (!TA.pending) return; taCancelPending(); taRefresh(false); }
       function taClose() {
+        taCancelPending();
         if (TA.abort) { TA.abort.abort(); TA.abort = null; }
         TA.open = false; TA.listed = false; TA.byKey = false; TA.items = []; TA.busy = ""; TA.posFrom = -1; TA.last = null;
         const el = document.getElementById("taPopup"); if (el) el.classList.add("hidden");
       }
       function taRefresh(keepSel) {
         const ed = TA.ed; if (!ed || ed.selectionStart !== ed.selectionEnd) return taClose();
-        let r;
+        let r; const t0 = performance.now();
         try { r = taSuggest(TA.key, ed.value, ed.selectionStart, TA.byKey); } catch { return taClose(); }
+        TA.runs += 1; TA.lastMs = performance.now() - t0;
         TA.last = r.ctx; TA.from = r.ctx.from; TA.to = r.ctx.to;
         if (!r.items.length && !TA.busy) return taClose();
         TA.items = r.items; if (!keepSel || TA.sel >= r.items.length) TA.sel = 0;
@@ -70274,6 +70450,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           if (idx >= 0) { TA.sel = idx; taAccept(); return; }
           return taClose();
         }
+        taCancelPending();
         TA.ed = ed; TA.key = key; TA.byKey = true; TA.listed = false; TA.sel = 0; TA.posFrom = -1; TA.busy = "";
         taRefresh(false);
         if (!TA.open) {
@@ -70287,8 +70464,12 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           if (!key) return;
           try {
             if (ev.ctrlKey && !ev.altKey && !ev.metaKey && !ev.shiftKey && ev.code === "Space") { ev.preventDefault(); ev.stopPropagation(); taHotkey(ed, key); return; }
-            if (!TA.open || TA.ed !== ed) return;
             const k = ev.key;
+            if (TA.pending && TA.ed === ed) {
+              if (TA.open || (k === "Tab" && !ev.shiftKey)) { if (["Tab", "Enter", "ArrowDown", "ArrowUp"].includes(k)) taFlush(); }
+              else if (["ArrowLeft", "ArrowRight", "ArrowDown", "ArrowUp", "Home", "End", "PageUp", "PageDown", "Enter", "Escape"].includes(k)) taCancelPending();
+            }
+            if (!TA.open || TA.ed !== ed) return;
             if (k === "ArrowDown" || k === "ArrowUp") {
               if (!TA.items.length) return taClose();
               ev.preventDefault(); ev.stopPropagation();
@@ -70310,7 +70491,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
             if (ev.data && /[\s;,(){}]/.test(ev.data)) return taClose();
             if (!TA.open) { if (!taAutoOn()) return; TA.ed = ed; TA.key = key; TA.byKey = false; TA.listed = false; TA.sel = 0; TA.posFrom = -1; }
             else if (TA.ed !== ed) return taClose();
-            taRefresh(false);
+            taSchedule();
           } catch { taClose(); }
         });
         document.addEventListener("mousedown", (ev) => { if (TA.open && !(ev.target.closest && ev.target.closest("#taPopup"))) taClose(); }, true);
@@ -70319,7 +70500,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         window.addEventListener("resize", taClose);
       }
       initTypeahead();
-      const TA_API = { suggest: taSuggest, parseModel: taParseModel, sparqlPosition: taSparqlPosition, compact: taCompact, score: taScore, context: taContext, remote: TA.remote, parseTables: taParseTables, parseColumns: taParseColumns, stats: () => ({ remoteCalls: TA.remoteCalls }), cache: { size: taCacheSize, trim: taCacheTrim, clear: taCacheClear, state: TA }, lookup: taRemoteLookup };
+      const TA_API = { suggest: taSuggest, parseModel: taParseModel, sparqlPosition: taSparqlPosition, compact: taCompact, score: taScore, context: taContext, remote: TA.remote, parseTables: taParseTables, parseColumns: taParseColumns, stats: () => ({ remoteCalls: TA.remoteCalls, runs: TA.runs, lastMs: TA.lastMs }), cache: { size: taCacheSize, trim: taCacheTrim, clear: taCacheClear, state: TA }, lookup: taRemoteLookup };
 
       init();
 
@@ -70349,6 +70530,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           state,
           sqlPreviewTable, sqlTabShow, sqlTabClose, sqlTabsReset, _sqlTabs, _sqlPreviewCache, kdTableMenu,   // SQL Query panel: result tabs and table previews
           kdModel, kdRender, kdParseArtifact, kdBuildText, kdEditEntry, kdEntryRaw, kdLayoutOrder, kdAddTable, kdArrange, kdJumpToSource, kdImpliedMenu, openKeysDiagram, runGenerateErd, toggleErdPanel, _kd, keySetsTitleHtml,   // ER Diagram key editing
+          mappingToBlockAt, mappingToSelectQuery, textareaOffsetAtPoint, getMappingToLastCopy: () => _mappingToLastCopy, // mapping TO → SELECT query copy
           typeahead: TA_API,     // typeahead engine (suggestions for a caret position)                 // read analysis findings (state.ui.mappingAnalysis)
           DEMO_SCENARIOS,        // fixture corpus to iterate
           FINDING_CONSEQUENCE_RULES, // consequence kind -> cause kinds (shared-cause suppression table)
