@@ -643,6 +643,9 @@
     .restore-findlist .fl.sev-warn .sev-dot { background: #e6c07b; }
     .restore-findlist .fl.sev-info .sev-dot { background: #9fb1cc; }
     /* Debug Analytics panel — cross-project finding leaderboard rows (renderDebugAnalytics). */
+    .debug-analytics-h { margin: 2px 0 6px; }
+    .debug-analytics-h:not(:first-child) { margin-top: 14px; }
+    .debug-analytics-lead { font-size: 0.76rem; margin: 0 0 6px; }
     .debug-analytics-leaderboard { display: grid; gap: 4px; }
     .debug-analytics-leader-row { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border: 1px solid rgba(159,177,204,0.16); border-radius: 5px; background: rgba(255,255,255,0.02); font-size: 0.8rem; }
     .debug-analytics-leader-kind { flex: 1; color: var(--ink); }
@@ -2922,7 +2925,7 @@
               <button id="publishMenuBtn" class="secondary publish-btn split-btn-toggle" type="button" title="Publish options" aria-label="Publish options">&#9662;</button>
               <div id="publishMenu" class="showplan-menu hidden">
                 <button id="restoreStateMenuItem" class="secondary" type="button" title="Browse and restore a previously published state of this project">&#8630; Restore earlier state&hellip;</button>
-                <button id="debugAnalyticsMenuItem" class="secondary" type="button" title="Per-step timeline and cross-project finding analytics from the registry">&#128202; Debug Analytics&hellip;</button>
+                <button id="debugAnalyticsMenuItem" class="secondary" type="button" title="The timeline of this project's recorded steps, and which kinds of finding were most worth fixing across every project">&#128202; Debug Analytics&hellip;</button>
               </div>
             </div>
             <div class="se-edit-wrap" id="seEditWrap">
@@ -30498,8 +30501,11 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.58.0";
+      const APP_VERSION = "1.59.0";
       const RELEASE_NOTES = [
+        { version: "1.59.0", date: "2026-11-25", title: "Debug Analytics shows the timeline of recorded steps", items: [
+          "{*Debug Analytics*} opens the [[timeline|aa-tool-debug-analytics]] of the project's recorded steps at the bottom of the window: each point's height is the query's time and its color says whether the results kept the same number of rows. Click a point to read what changed and how it affected the plan, or load that step into the panes."
+        ] },
         { version: "1.58.0", date: "2026-11-25", title: "Object suggestions and mappings copied as queries", items: [
           "After a property of the model in a query, [[suggestions|aa-tool-typeahead]] offer a variable for its object: variables already given the property's range class first, then a new variable named after that class, or after the property when its value is a datatype.",
           "Right-click inside a mapping's {*TO*} block and choose {*Copy as SELECT query*} to copy its patterns as a {{SELECT *}} query, with the prefixes they use, ready to paste into the query pane."
@@ -31093,9 +31099,9 @@ ORDER BY ?table ?ordinal`;
           where: `<strong>Debug Analytics…</strong> in the Publish button's ▾ dropdown menu (visible while testing on clones).`,
           loc: { kind: "hero", highlight: "menu", caption: "In the Publish ▾ dropdown (Test on clones only)" },
           source: null,
-          body: `<p>Cross-step and cross-project analytics read straight from the safe-write-testing registry (QPIDE_TEST_DB) — the SPARQL discovery/reporting layer over the Project/Step/Outcome data every Publish captures.</p>
-            <p><strong>Project Timeline</strong> lists every recorded step of the currently-named project (same project name as the Publish panel's <em>Project name</em> field) with that step's <em>Outcome</em> — findings resolved/introduced, and the query-time/join/union deltas versus the previous step — plus its findings-severity chip.</p>
-            <p><strong>Cross-Project Finding Leaderboard</strong> aggregates every resolved finding across every recorded project, ranked by how often each finding kind gets resolved and the average query-time change when it is — a "which issues are actually worth fixing" view.</p>
+          body: `<p>What each recorded step of your testing did, read from the history database every Publish writes to.</p>
+            <p><strong>Timeline.</strong> Opening Debug Analytics opens the timeline of the project named in the Publish panel's <em>Project name</em> field, at the bottom of the window. Each recorded step is a point: its height is the query's time (higher is slower; a step that was not timed is hollow), and its color says whether the results kept the same number of rows as the step before (green), changed it (red) or could not be compared (amber). The first step is blue, and a step with nothing measured is faded. A same row count is a good sign, not proof that the results are the same. Click a point to read what changed, how the plan and the time changed, and whether the results still match the first step; <em>Load into panes</em> puts that step's text back into the panes, after asking. The fastest step that kept the same row count is ringed. If you close the timeline, <em>Show the timeline</em> in the Debug Analytics panel opens it again.</p>
+            <p><strong>Finding leaderboard.</strong> Every finding resolved in any recorded project, grouped by kind and ranked by how often it was resolved, with the average change in query time when it was: which kinds of finding are worth fixing.</p>
             <p>Saves made while editing the live server with <em>Track changes</em> on are recorded here too, under a project named after the database and stored query.</p>`
         },
         {
@@ -59514,6 +59520,12 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         seOpenDrawer("split");
         seTimelineRefresh();   // a fresh read each time it opens: steps may have been recorded since
       }
+      // Opens the drawer's timeline, or reads it again when it is already showing.
+      function seShowTimeline() {
+        const st = seState(), el = $("seDrawer");
+        if (st.drawer.view === "timeline" && st.drawer.size !== "collapsed" && el && !el.classList.contains("hidden")) { seTimelineRefresh(); return; }
+        seToggleTimeline();
+      }
       // After the timeline is switched on: if the drawer is too short for its chart to be seen, the drawer grows
       // just enough (within its usual limit), and the timeline is scrolled into view.
       function seFitTimelineInDrawer(el) {
@@ -61697,62 +61709,37 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         if (!panel || !body) return;
         panel.classList.remove("hidden");
         if (!applyStoredPanelPosition("debugAnalyticsPanel")) positionPanelNearCenter("debugAnalyticsPanel", "publishMenuBtn");
-        body.innerHTML = `<div class="restore-empty">Loading analytics…</div>`;
-        if (!state.connection.baseUrl) { body.innerHTML = `<div class="restore-empty">Connect to Stardog to load analytics.</div>`; return; }
-        const proj = ($("publishProjectName")?.value.trim()) || "query-test";
-        const pid = _qpideShortId(proj);
-        try { await renderDebugAnalytics(pid, proj); }
-        catch (e) { body.innerHTML = `<div class="restore-empty">Couldn't load analytics: ${esc(String((e && e.message) || e))}</div>`; }
+        // The steps of this project are drawn by the compare drawer's timeline (same project, same records), which
+        // explains a step when its point is clicked and can load it into the panes; this panel keeps what only it
+        // shows, the leaderboard across every project.
+        seShowTimeline();
+        const { proj } = seTimelineProject();
+        body.innerHTML = debugAnalyticsTimelineHtml(proj) + `<h4 class="debug-analytics-h">Finding leaderboard</h4><div data-da-leaders><div class="restore-empty">Loading…</div></div>`;
+        const leaders = body.querySelector("[data-da-leaders]");
+        if (!state.connection.baseUrl) { leaders.innerHTML = `<div class="restore-empty">Connect to Stardog to read the leaderboard.</div>`; return; }
+        try { leaders.innerHTML = await renderDebugAnalytics(); }
+        catch (e) { leaders.innerHTML = `<div class="restore-empty">Couldn't read the leaderboard: ${esc(String((e && e.message) || e))}</div>`; }
+      }
+      function debugAnalyticsTimelineHtml(proj) {
+        return `<h4 class="debug-analytics-h">Timeline of <code>${esc(proj)}</code></h4>` +
+          `<p class="debug-analytics-lead">The recorded steps of this project are in the timeline at the bottom of the window. A point's height is the query's time; its color says whether the results kept the same number of rows. Click a point to read what changed and how it affected the plan.</p>` +
+          `<button type="button" class="secondary" data-da-show-timeline title="Opens the timeline of this project's recorded steps at the bottom of the window">Show the timeline</button>`;
       }
 
-      async function renderDebugAnalytics(pid, proj) {
-        const body = $("debugAnalyticsBody");
-        if (!body) return;
-        await ensureAppDb();
-        const G = _iri(QPIDE_REG), P = _iri(QPIDE_NS + "project/" + pid);
-
-        const stepRows = await _regQuery(
-          "SELECT ?at ?fs ?resolved ?introduced ?qtDelta ?jcDelta ?ucDelta ?planChanged WHERE { GRAPH " + G + " { " +
-          "?step a " + _pred("Step") + " ; " + _pred("stepOfProject") + " " + P + " ; " + _pred("stepCreatedAt") + " ?at . " +
-          "OPTIONAL { ?step " + _pred("findingsSummary") + " ?fs } " +
-          "OPTIONAL { ?step " + _pred("outcome") + " ?o . " +
-          "OPTIONAL { ?o " + _pred("findingsResolvedCount") + " ?resolved } " +
-          "OPTIONAL { ?o " + _pred("findingsIntroducedCount") + " ?introduced } " +
-          "OPTIONAL { ?o " + _pred("queryTimeMsDelta") + " ?qtDelta } " +
-          "OPTIONAL { ?o " + _pred("joinCountDelta") + " ?jcDelta } " +
-          "OPTIONAL { ?o " + _pred("unionCountDelta") + " ?ucDelta } " +
-          "OPTIONAL { ?o " + _pred("planShapeChanged") + " ?planChanged } } " +
-          "} } ORDER BY DESC(?at)");
-
+      // The leaderboard's markup. Read-only, like the timeline: it never creates the history database or asks for one.
+      async function renderDebugAnalytics() {
+        const known = qpideDbKnown();
+        if (!known) return `<div class="restore-empty">No history database has been chosen for this server yet, so nothing has been recorded.</div>`;
+        const list = await requestDetailed({ method: "GET", path: "/admin/databases", accept: "application/json, */*;q=0.8" });
+        if (!list.ok) throw new Error(`the server answered ${list.status} ${list.statusText || ""}`.trim());
+        let names = []; try { const j = JSON.parse(list.text); names = j.databases || j || []; } catch (e) { /* treated as no history database */ }
+        if (!(Array.isArray(names) && names.map(String).includes(known.name))) return `<div class="restore-empty">The history database “${esc(known.name)}” is not on this server, so nothing has been recorded.</div>`;
+        const G = _iri(QPIDE_REG);
         const leaderRows = await _regQuery(
           "SELECT ?kind (COUNT(?fo) AS ?resolvedCount) (AVG(?qtDelta) AS ?avgQtDelta) WHERE { GRAPH " + G + " { " +
           "?o a " + _pred("Outcome") + " ; " + _pred("resolvedFinding") + " ?fo . ?fo " + _pred("findingKind") + " ?kind . " +
           "OPTIONAL { ?o " + _pred("queryTimeMsDelta") + " ?qtDelta } " +
           "} } GROUP BY ?kind ORDER BY DESC(?resolvedCount)");
-
-        const timelineHtml = !stepRows.length
-          ? `<div class="restore-empty">No recorded steps yet for project <code>${esc(proj)}</code>.</div>`
-          : `<div class="restore-list">` + stepRows.map((r) => {
-              const at = r.at.value;
-              let findings = []; try { findings = JSON.parse(r.fs ? r.fs.value : "[]") || []; } catch (e) {}
-              const counts = {}; findings.forEach((f) => { counts[f.s] = (counts[f.s] || 0) + 1; });
-              const worst = counts.expensive ? "expensive" : counts.warn ? "warn" : (findings.length ? "info" : "clean");
-              const findChip = findings.length
-                ? `<span class="restore-find sev-${esc(worst)}">▲ ${findings.length} finding${findings.length > 1 ? "s" : ""}</span>`
-                : `<span class="restore-find sev-clean">✓ clean</span>`;
-              const hasOutcome = r.resolved != null || r.introduced != null;
-              const deltaBits = [];
-              if (r.resolved != null) deltaBits.push(Number(r.resolved.value) + " resolved");
-              if (r.introduced != null) deltaBits.push(Number(r.introduced.value) + " introduced");
-              if (r.qtDelta != null) { const d = Number(r.qtDelta.value); deltaBits.push((d <= 0 ? "-" : "+") + Math.abs(d).toFixed(1) + "ms"); }
-              if (r.jcDelta != null && Number(r.jcDelta.value) !== 0) deltaBits.push((Number(r.jcDelta.value) > 0 ? "+" : "") + r.jcDelta.value + " joins");
-              if (r.ucDelta != null && Number(r.ucDelta.value) !== 0) deltaBits.push((Number(r.ucDelta.value) > 0 ? "+" : "") + r.ucDelta.value + " unions");
-              if (r.planChanged && r.planChanged.value === "true") deltaBits.push("plan shape changed");
-              return `<div class="restore-item">` +
-                `<div class="restore-row"><div class="restore-when"><span class="rel">${esc(_restoreRelTime(at))}</span><span class="abs">${esc(_restoreAbsTime(at))}</span></div>` +
-                `<div class="restore-mid"><div class="restore-note${hasOutcome ? "" : " empty"}">${hasOutcome ? esc(deltaBits.join(" · ")) : "(baseline — no prior step to compare)"}</div>` +
-                `<div class="restore-badges">${findChip}</div></div></div></div>`;
-            }).join("") + `</div>`;
 
         const leaderHtml = !leaderRows.length
           ? `<div class="restore-empty">No resolved findings recorded yet across any project.</div>`
@@ -61768,11 +61755,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
               `</div>`;
             }).join("") + `</div>`;
 
-        body.innerHTML =
-          `<h4 style="margin:2px 0 6px;">Project Timeline — <code>${esc(proj)}</code></h4>` + timelineHtml +
-          `<h4 style="margin:14px 0 6px;">Cross-Project Finding Leaderboard</h4>` +
-          `<div class="muted" style="font-size:0.72rem;margin:-4px 0 6px;">Which finding kinds get resolved most often, and the average query-time change when they are — across every project.</div>` +
-          leaderHtml;
+        return `<div class="muted debug-analytics-lead">Which kinds of finding were resolved most often across every recorded project, and the average change in query time when they were.</div>` + leaderHtml;
       }
 
       // The captured text of every pane at every step of a project: { stepIri: { paneKey: { changed, text } } }.
@@ -68811,6 +68794,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         });
         on("restoreStateMenuItem", "click", () => { $("publishMenu")?.classList.add("hidden"); openRestorePanel().catch(handleError); });
         on("debugAnalyticsMenuItem", "click", () => { $("publishMenu")?.classList.add("hidden"); openDebugAnalyticsPanel().catch(handleError); });
+        $("debugAnalyticsBody")?.addEventListener("click", (e) => { if (e.target instanceof Element && e.target.closest("[data-da-show-timeline]")) seShowTimeline(); });
         on("publishProjectName", "input", () => { if (!$("publishPanel")?.classList.contains("hidden")) renderPublishPlan(); });
         on("projectSelect", "click", () => { const m = $("projectMenu"); if (m) { renderProjectMenu(); m.classList.toggle("hidden"); } });
         on("clearApiResponseBtn", "click", clearApiResponse);
@@ -70531,6 +70515,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           sqlPreviewTable, sqlTabShow, sqlTabClose, sqlTabsReset, _sqlTabs, _sqlPreviewCache, kdTableMenu,   // SQL Query panel: result tabs and table previews
           kdModel, kdRender, kdParseArtifact, kdBuildText, kdEditEntry, kdEntryRaw, kdLayoutOrder, kdAddTable, kdArrange, kdJumpToSource, kdImpliedMenu, openKeysDiagram, runGenerateErd, toggleErdPanel, _kd, keySetsTitleHtml,   // ER Diagram key editing
           mappingToBlockAt, mappingToSelectQuery, textareaOffsetAtPoint, getMappingToLastCopy: () => _mappingToLastCopy, // mapping TO → SELECT query copy
+          openDebugAnalyticsPanel, seShowTimeline, // Debug Analytics opens the drawer timeline
           typeahead: TA_API,     // typeahead engine (suggestions for a caret position)                 // read analysis findings (state.ui.mappingAnalysis)
           DEMO_SCENARIOS,        // fixture corpus to iterate
           FINDING_CONSEQUENCE_RULES, // consequence kind -> cause kinds (shared-cause suppression table)
