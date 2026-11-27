@@ -2299,7 +2299,7 @@
     .kd-side-tabs { margin:6px 8px 2px; align-self:flex-start; }
     .kd-seg { border:0; background:transparent; color:var(--muted); padding:1px 9px; border-radius:5px; cursor:pointer; font-size:0.78rem; }
     .kd-seg.is-on { background:rgba(255,255,255,0.1); color:var(--ink); }
-    .kd-filter { margin:4px 8px 6px; padding:3px 8px; border-radius:6px; border:1px solid var(--border); background:rgba(0,0,0,0.2); color:var(--ink); font-size:0.8rem; }
+    .kd-filter { width:auto; min-width:0; align-self:stretch; margin:4px 8px 6px; padding:3px 8px; border-radius:6px; border:1px solid var(--border); background:rgba(0,0,0,0.2); color:var(--ink); font-size:0.8rem; }
     .kd-tree { flex:1; min-height:0; overflow:auto; padding-bottom:10px; font-size:0.8rem; }
     .kd-tn { display:flex; align-items:center; gap:5px; padding:2px 8px; cursor:pointer; white-space:nowrap; }
     .kd-tn:hover { background:rgba(255,255,255,0.04); }
@@ -2326,6 +2326,7 @@
     #erdPanel .erd-findings-host { flex:0 1 0px; }
     /* the pills start beside the tabs; the drag handle takes the rest and gives way when they need the room, so the strip's arrow ends beside search */
     #erdPanel .erd-findings-host + .drag-handle { min-width:10px; margin-left:-8px; }
+    #erdPanel .erd-head-tabs { flex:0 1 auto; }
     .erd-finding-card { position:absolute; z-index:40; right:12px; bottom:44px; width:min(520px, calc(100% - 24px)); max-height:min(42%, 380px); overflow:auto; background:var(--panel, #141c2b); border:1px solid rgba(159,177,204,0.3); border-radius:8px; box-shadow:0 8px 28px rgba(0,0,0,0.45); padding:8px 10px 10px; }
     .erd-finding-card .erd-fc-head { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:0.74rem; color:var(--muted); }
     .erd-finding-card .erd-fc-head span { flex:1; min-width:0; }
@@ -31529,7 +31530,7 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.64.1";
+      const APP_VERSION = "1.64.2";
       const RELEASE_NOTES = [
         { version: "1.64.0", date: "2026-11-26", title: "Users & Roles Report", items: [
           "The {*Users & Roles Report*} lists every user and role on the server: each user's roles, each role's users, and the permissions of every user and role, with what grants each user permission (a direct grant or a role). Click a name to see just that user's or role's permissions.",
@@ -55776,6 +55777,23 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         const idx = _kd.findNav[kind];
         return `<span class="pill-nav-wrap severity-${esc(f.severity)} kind-${esc(kind)} has-nav${_kd.findOpen === kind ? " nav-open" : ""}" data-erd-pill-kind="${esc(kind)}"><button class="mapping-cost-driver-pill pill-nav-target" data-erd-finding-kind="${esc(kind)}" title="Show ${esc(label)} in the diagram">${esc(label)}</button>${pillNavControlsHtml(idx == null ? -1 : idx, items.length, `data-erd-nav-kind="${esc(kind)}" data-dir="-1"`, `data-erd-nav-kind="${esc(kind)}" data-dir="1"`, `Previous ${label}`, `Next ${label}`)}</span>`;
       }
+      // the pills start above the canvas, at the line between the side list and the diagram (measured; no lift once the tabs reach past it)
+      function erdAlignFindingPills() {
+        const host = $("erdFindingsHost"), vp = $("kdVp");
+        if (!host || !vp) return;
+        const v = vp.getBoundingClientRect();
+        if (!v.width) return;
+        const cur = parseFloat(host.style.marginLeft) || 0;
+        let ml = Math.max(0, v.left - (host.getBoundingClientRect().left - cur));
+        host.style.marginLeft = `${ml}px`;
+        // a short header keeps room for the widest pill between the two fades: the offset gives way first
+        const sc = host.querySelector(".pill-strip-scroll");
+        if (ml > 0 && sc && sc.scrollWidth > sc.clientWidth + 1) {
+          const need = Math.max(0, ...[...sc.children].map((p) => { const c = p.querySelector(".pill-nav-controls"); return p.getBoundingClientRect().width + (c ? c.scrollWidth - c.getBoundingClientRect().width : 0); })) + 2 * _PS_FADE_W;
+          const short = need - sc.getBoundingClientRect().width;
+          if (short > 0) host.style.marginLeft = `${Math.max(0, ml - short)}px`;
+        }
+      }
       function renderErdFindingPills() {
         const host = $("erdFindingsHost");
         if (!host || $("erdPanel")?.classList.contains("hidden")) return;
@@ -55790,6 +55808,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
           const grow = Math.max(0, ...[...scroll.querySelectorAll(".pill-nav-controls")].map((c) => c.scrollWidth - c.getBoundingClientRect().width));
           host.style.flexBasis = `${span + grow}px`;
         } else host.style.flexBasis = "";
+        erdAlignFindingPills();
         // the open card follows its finding: refreshed after a test, closed once the finding is gone
         if (_kd.findShown) {
           const f = list.find((x) => x.id === _kd.findShown);
@@ -56211,7 +56230,9 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         });
         window.addEventListener("resize", () => { if (!$("erdPanel")?.classList.contains("hidden") && _kd.model && !_kd.mode) kdDrawLines(_kd.model); });
         // the table lifted for a finding is placed for the size of the view: place it again when the view resizes
-        if ($("kdVp")) new ResizeObserver(() => { if (_kd.findFocus?.lift) kdApplyFindingFocus(true); }).observe($("kdVp"));
+        if ($("kdVp")) new ResizeObserver(() => { if (_kd.findFocus?.lift) kdApplyFindingFocus(true); erdAlignFindingPills(); }).observe($("kdVp"));
+        if ($("kdSide")) new ResizeObserver(() => erdAlignFindingPills()).observe($("kdSide"));
+        document.querySelector("#erdPanel .erd-head-tabs") && new ResizeObserver(() => erdAlignFindingPills()).observe(document.querySelector("#erdPanel .erd-head-tabs"));
       }
 
       async function kdAct(el, e) {
