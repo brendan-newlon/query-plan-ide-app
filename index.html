@@ -2094,6 +2094,38 @@
     .eff-perm-role-chip { display:inline-block; font-size:0.66rem; text-transform:uppercase; letter-spacing:0.03em; padding:1px 6px; border-radius:9px; border:1px solid var(--border); color:#9fb1cc; margin:1px 3px 1px 0; white-space:nowrap; }
     .eff-perm-role-direct { display:inline-block; margin-right:4px; font-size:0.72rem; color:var(--muted); white-space:nowrap; }
     .eff-perm-role-note { padding:3px 8px 0; font-size:0.74rem; }
+    /* Users & Roles Report */
+    #usersRolesPanel { width:min(900px, calc(100vw - 32px)); }
+    #usersRolesPanel > .grid { grid-template-columns:minmax(0, 1fr); }
+    .ur-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .ur-tabs { display:flex; gap:4px; flex-wrap:wrap; flex:1 1 auto; }
+    .ur-tab { padding:3px 10px; font-size:0.78rem; min-height:0; }
+    .ur-tab.active { background:var(--accent-soft); color:var(--accent); border-color:var(--accent); }
+    .ur-filter { flex:0 1 220px; min-width:140px; padding:3px 8px; font-size:0.78rem; }
+    .ur-summary { font-size:0.74rem; color:var(--muted); display:flex; align-items:center; gap:8px; flex-wrap:wrap; min-height:1.2em; }
+    .ur-summary .ur-warn { color:var(--warn); }
+    .ur-summary button { padding:1px 8px; min-height:0; font-size:0.74rem; }
+    .ur-progress { width:140px; height:5px; background:rgba(159,177,204,0.14); border-radius:3px; overflow:hidden; }
+    .ur-progress > span { display:block; height:100%; background:var(--accent); }
+    .ur-results { overflow:auto; max-height:60vh; }
+    .ur-results .eff-perm-table td { max-width:320px; }
+    .ur-subcontrols { font-size:0.76rem; min-height:0; }
+    .ur-subcontrols:not(:has(> :not(.hidden))) { display:none; }
+    .ur-chip { display:inline-flex; align-items:center; gap:4px; padding:1px 4px 1px 8px; border:1px solid var(--accent); border-radius:10px; color:var(--accent); background:var(--accent-soft); }
+    .ur-chip-x { padding:0 5px; min-height:0; border:0; background:transparent; color:inherit; font-size:0.9rem; line-height:1; cursor:pointer; }
+    .ur-check { display:inline-flex; align-items:center; gap:5px; color:var(--muted); cursor:pointer; white-space:nowrap; flex:0 0 auto; }
+    .ur-check input { width:auto; min-height:0; margin:0; }
+    .ur-sort { all:unset; cursor:pointer; white-space:nowrap; }
+    .ur-sort:hover, .ur-sort:focus-visible { color:var(--accent); }
+    .ur-link { all:unset; cursor:pointer; color:var(--accent); }
+    .ur-link:hover, .ur-link:focus-visible { text-decoration:underline; }
+    .ur-results td.ur-repeat, .ur-results td.ur-repeat .ur-link { color:rgba(223,232,248,0.32); }
+    .ur-results td.ur-derived { font-style:italic; }
+    .ur-results tr.ur-covered td:not(:first-child) { color:var(--muted); }
+    .ur-none { color:var(--muted); font-style:italic; }
+    .ur-more { display:flex; align-items:center; gap:8px; padding:6px 2px; font-size:0.74rem; color:var(--muted); }
+    .ur-more:empty { display:none; }
+    .ur-more button { padding:1px 10px; min-height:0; font-size:0.74rem; }
     #sqlQueryPanelDsMenu { min-width:200px; }
     #aboutAnalysisPanel { width: min(1020px, calc(100vw - 8px)); max-width: 1020px; }
     .app-version { display:inline-block; margin-left:10px; padding:1px 8px; border:1px solid rgba(120,160,210,0.5); border-radius:10px; font-family:var(--mono); font-size:0.78rem; color:#cfe0f5; vertical-align:middle; user-select:text; }
@@ -3583,6 +3615,31 @@
               </div>
             </div>
             <div id="effPermResults"><div class="sql-qry-info">Select a username above to look up their effective permissions.</div></div>
+          </div>
+        </section>
+
+        <section class="panel floating-panel hidden" id="usersRolesPanel">
+          <div class="panel-head">
+            <div class="eff-perm-toolbar ur-toolbar">
+              <h2>Users &amp; Roles Report</h2>
+            </div>
+          </div>
+          <div class="grid" style="gap:6px;">
+            <div class="ur-controls">
+              <div class="ur-tabs" role="tablist" aria-label="Table">
+                <button type="button" class="secondary ur-tab" role="tab" data-ur-view="users">Users</button>
+                <button type="button" class="secondary ur-tab" role="tab" data-ur-view="roles">Roles</button>
+                <button type="button" class="secondary ur-tab" role="tab" data-ur-view="userPermissions">User permissions</button>
+                <button type="button" class="secondary ur-tab" role="tab" data-ur-view="rolePermissions">Role permissions</button>
+              </div>
+              <input id="urFilter" class="ur-filter" type="search" placeholder="Filter rows" title="Show only rows that contain all of these words" spellcheck="false" autocomplete="off" aria-label="Filter rows">
+            </div>
+            <div class="ur-controls ur-subcontrols">
+              <span id="urHolderChip" class="ur-chip hidden"></span>
+              <label id="urCoveredWrap" class="ur-check hidden" title="Hide permissions that a broader permission of the same user or role already grants"><input type="checkbox" id="urHideCovered"> Hide covered permissions</label>
+            </div>
+            <div id="urSummary" class="ur-summary"></div>
+            <div id="urResults" class="ur-results"><div class="sql-qry-info">Connect to Stardog, then open this report to read every user and role on the server.</div></div>
           </div>
         </section>
 
@@ -8164,6 +8221,11 @@ return OntologyLayouts;
           whenToUse: "Use after a change (or a suspected change) to the underlying relational schema, to confirm every table and column the loaded SMS2 mappings depend on still exists and is queryable — before relying on query results that assume the mappings are accurate.",
           opensPanel: "schemaDriftPanel",
         },
+        "Users & Roles Report": {
+          summary: "Opens a panel with four tables of the whole server: <em>Users</em> (each user's roles, and whether they are a superuser and enabled), <em>Roles</em> (each role's users and how many permissions it has), <em>User permissions</em> (each user's effective permissions and what grants each one: a direct grant or a role) and <em>Role permissions</em>. A permission is shown as its action, resource type and resource, one per row. Click a user or role name to see just that user's or role's permissions. Stardog stores a grant of ALL as its seven separate actions, so where all seven are held on one resource the table shows one ALL row, in italics. A superuser, or ALL on every resource, is a single row. A permission that a broader one of the same user or role already grants names it under <em>Covered by</em>, and <em>Hide covered permissions</em> leaves those out. Filter the rows, sort by any column, and the download saves exactly the rows shown, in that order, as CSV.",
+          whenToUse: "Use for an access review or audit, to hand a customer's administrators a spreadsheet of who can do what, or to find users with no roles and roles with more access than intended.",
+          opensPanel: "usersRolesPanel",
+        },
         "Get or Compare Permissions": {
           summary: "Opens a dedicated panel to look up a user's or role's effective/explicit permissions, or to compare two side by side.",
           whenToUse: "Use when diagnosing an access-denied error, auditing what a role can actually do, or comparing permissions between two users/roles before a migration.",
@@ -8180,7 +8242,7 @@ return OntologyLayouts;
       // labPresetHandlers(), then the panel openers in API_PANEL_CALLS. Each call needs an
       // API_COMMAND_EDITORIAL entry; the About panel lists every grouped call.
       const API_CATALOG_OPTION = "All Stardog Endpoints";
-      const API_PANEL_CALLS = { "Get or Compare Permissions": () => openEffectivePermissionsPanel(), "Test Source for Schema Drift": () => openSchemaDriftPanel() };
+      const API_PANEL_CALLS = { "Get or Compare Permissions": () => openEffectivePermissionsPanel(), "Test Source for Schema Drift": () => openSchemaDriftPanel(), "Users & Roles Report": () => openUsersRolesPanel() };
       // At most this many entries in the main dropdown; a new call joins a group or the catalog.
       const API_DROPDOWN_BUDGET = 26;
       const API_CALL_GROUPS = {
@@ -8198,7 +8260,7 @@ return OntologyLayouts;
         "Data Sources": ["Data Sources", "Data Sources (Details)", "Data Source Types"],
         "DS Info": ["DS Info", "DS Availability", "Test DS Connection"],
         "Refresh Metadata": ["Refresh Metadata", "Refresh Row Counts"],
-        "Users & Roles": ["Users", "User's Roles", "Roles", "Users with Role"],
+        "Users & Roles": ["Users", "User's Roles", "Roles", "Users with Role", "Users & Roles Report"],
       };
       const API_ACCEPT = {
         j: "application/json, text/plain;q=0.9, */*;q=0.8",
@@ -31465,8 +31527,14 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.63.0";
+      const APP_VERSION = "1.64.0";
       const RELEASE_NOTES = [
+        { version: "1.64.0", date: "2026-11-26", title: "Users & Roles Report", items: [
+          "The {*Users & Roles Report*} lists every user and role on the server: each user's roles, each role's users, and the permissions of every user and role, with what grants each user permission (a direct grant or a role). Click a name to see just that user's or role's permissions.",
+          "Each permission is one row of action, resource type and resource. Seven actions held on one resource show as one {{ALL}} row; a permission a broader one already grants names it under {*Covered by*} and can be hidden.",
+          "Filter and sort any table, then download exactly the rows shown as CSV.",
+          "Open it from the {*Users & Roles*} calls in the API panel, or from the ☰ menu of the Get or Compare Permissions panel."
+        ] },
         { version: "1.63.0", date: "2026-11-26", title: "Findings in the ER Diagram", items: [
           "Finding pills in the ER Diagram header list problems with unique keys, foreign keys and functional dependencies, whatever query they bear on, including questions about the data that no query depends on.",
           "The arrows on a pill step through its findings: the table comes forward, enlarged, the key, its columns or the foreign key line flash, and the finding's card opens beside it, with what to test or change.",
@@ -41654,7 +41722,7 @@ acme:temperature rdfs:range xsd:string .`
 
       async function tourResetToBaseline(demoName = "01 · Missing Unique Keys") {
         ["querySourceMapPanel", "investigatePanel", "aboutAnalysisPanel", "releaseNotesPanel", "apiPanel",
-         "effectivePermissionsPanel", "schemaDriftPanel", "snapshotPanel", "erdPanel", "validationSqlPanel",
+         "effectivePermissionsPanel", "schemaDriftPanel", "usersRolesPanel", "snapshotPanel", "erdPanel", "validationSqlPanel",
          "sqlQueryPanel", "reasoningPanel", "hamburgerDropdown", "storedQueryMenu", "showPlanMenu"]
           .forEach((id) => document.getElementById(id)?.classList.add("hidden"));
         if (document.body.classList.contains("investigate-mode")) document.getElementById("investigateModeBtn")?.click();
@@ -41736,7 +41804,7 @@ acme:temperature rdfs:range xsd:string .`
         const _naturalH = document.documentElement.style.getPropertyValue("--left-panel-natural-h");
         if (_naturalH) document.documentElement.style.setProperty("--left-panel-h", _naturalH);
         ["querySourceMapPanel", "investigatePanel", "aboutAnalysisPanel", "releaseNotesPanel", "apiPanel",
-         "effectivePermissionsPanel", "schemaDriftPanel", "snapshotPanel", "erdPanel", "validationSqlPanel",
+         "effectivePermissionsPanel", "schemaDriftPanel", "usersRolesPanel", "snapshotPanel", "erdPanel", "validationSqlPanel",
          "sqlQueryPanel", "reasoningPanel", "hamburgerDropdown", "storedQueryMenu", "showPlanMenu"]
           .forEach((id) => document.getElementById(id)?.classList.add("hidden"));
         document.getElementById("connection")?.classList.remove("hidden");
@@ -41764,7 +41832,7 @@ acme:temperature rdfs:range xsd:string .`
           body: "This walks through the workbench end to end — connecting, loading a query, the layout, and the core tools. Jump to any topic with the tabs on the left of this panel, or use Back / Next. Demo data stands in for a live connection partway through.",
           before: async () => {
             ["querySourceMapPanel", "investigatePanel", "aboutAnalysisPanel", "releaseNotesPanel", "apiPanel", "effectivePermissionsPanel",
-             "schemaDriftPanel", "snapshotPanel", "erdPanel", "validationSqlPanel", "sqlQueryPanel", "reasoningPanel"]
+             "schemaDriftPanel", "usersRolesPanel", "snapshotPanel", "erdPanel", "validationSqlPanel", "sqlQueryPanel", "reasoningPanel"]
               .forEach((id) => document.getElementById(id)?.classList.add("hidden"));
             if (state.ui.demoMode) exitDemoMode();
             $("connection")?.classList.remove("hidden");
@@ -44743,6 +44811,7 @@ acme:temperature rdfs:range xsd:string .`
           ["sparqlResultsPanel", "Query Results"],
           ["effectivePermissionsPanel", "Get or Compare Permissions"],
           ["schemaDriftPanel", "Test Source for Schema Drift"],
+          ["usersRolesPanel", "Users & Roles Report"],
           ["investigatePanel", "Investigate"]
         ];
         panels.forEach(([panelId, title]) => {
@@ -44813,10 +44882,13 @@ acme:temperature rdfs:range xsd:string .`
                   <div id="effPermMenu" class="dropdown-menu hidden">
                     <button type="button" class="secondary dropdown-action" id="effPermShowAllToggle">Show All Permissions</button>
                     <button type="button" class="secondary dropdown-action" id="effPermDiffToggle" disabled>Show Diff</button>
-                    <button type="button" class="secondary dropdown-action" id="effPermUsersRolesCsv" title="Download every user and the roles each has, as CSV (one role per row)">Download CSV: users and roles</button>
-                    <button type="button" class="secondary dropdown-action" id="effPermRolesPermsCsv" title="Download every role and its permissions, as CSV (one permission per row)">Download CSV: roles and permissions</button>
+                    <button type="button" class="secondary dropdown-action" id="effPermOpenReport" title="Every user and role on the server in tables you can download as CSV">Users &amp; Roles Report…</button>
                   </div>
                 </div>`;
+            } else if (panelId === "usersRolesPanel") {
+              extraControls = `
+                <button type="button" id="urRefreshBtn" class="secondary icon-btn" title="Read the users and roles from the server again" aria-label="Read again">&#8635;</button>
+                <button type="button" id="urDownloadBtn" class="secondary icon-btn" title="Download the rows shown as CSV" aria-label="Download CSV" disabled>${_PANEL_DOWNLOAD_SVG}</button>`;
             } else if (panelId === "queryLogPanel") {
               extraControls = `
                 <span class="ql-picked" id="qlPicked"></span>
@@ -44847,7 +44919,7 @@ acme:temperature rdfs:range xsd:string .`
                               (panelId === "dbControlsPanel" || panelId === "objOptionsPanel") ? head.querySelector(".db-controls-toolbar") :
                               panelId === "remoteExplainPanel" ? head.querySelector(".rex-toolbar") :
                               panelId === "sparqlResultsPanel" ? head.querySelector(".sparql-results-toolbar") :
-                              panelId === "effectivePermissionsPanel" ? head.querySelector(".eff-perm-toolbar") :
+                              (panelId === "effectivePermissionsPanel" || panelId === "usersRolesPanel") ? head.querySelector(".eff-perm-toolbar") :
                               (panelId === "querySourceMapPanel" || panelId === "ontologyGraphPanel") ? head.querySelector(".qsm-toolbar") : null;
             if (inlineHost) inlineHost.appendChild(controls);
             else head.appendChild(controls);
@@ -47550,6 +47622,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         $("effPermUser1Menu")?.classList.add("hidden");
         $("effPermUser2Menu")?.classList.add("hidden");
         if (typeof _renderEffPermResults === "function") _renderEffPermResults();
+        if (typeof resetUsersRolesReport === "function") resetUsersRolesReport();
       }
 
       async function fetchEffPermUserOptions(force = false) {
@@ -47871,64 +47944,511 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         return lines.join("\n");
       }
 
-      // CSV text for the two whole-server exports in the permissions panel menu. Pure, so the
-      // self-test can drive it: one user per role (users sorted, then roles), one permission
-      // per row. A user with no roles / a role with no permissions still gets one row, with
-      // the last column empty, so nobody silently disappears from the file.
-      function _buildUsersRolesCsv(userRoles) {
-        const lines = ["user,role"];
-        [...userRoles].sort((a, b) => String(a.user).localeCompare(String(b.user))).forEach(({ user, roles }) => {
-          const sorted = [...roles].sort((a, b) => String(a).localeCompare(String(b)));
-          if (!sorted.length) lines.push(`${_csvField(user)},`);
-          sorted.forEach((r) => lines.push(`${_csvField(user)},${_csvField(r)}`));
-        });
-        return lines.join("\n");
+      // ── Users & Roles Report (API panel → Users & Roles group, or the ☰ menu above) ──
+      // Four whole-server tables: users (roles, superuser, enabled), roles (users, permission
+      // count), each user's effective permissions with what grants each one, and each role's
+      // permissions. Names are links that open the matching permission table narrowed to that
+      // user or role. A filter, a "covered" toggle and column sorting shape the table, and the
+      // CSV download is exactly the rows and order on screen.
+      // Everything comes from two requests, GET /admin/users/list and GET /admin/roles/list
+      // (Stardog 12.2: users carry enabled, superuser, roles and effective permissions, each
+      // flagged `explicit`; roles carry their permissions). Servers without those two calls get
+      // the older per-name walk, one request at a time, with a progress bar and Cancel.
+      //
+      // A permission is three columns (Action, Resource type, Resource), one permission per row.
+      // Stardog stores a grant of ALL as its seven actions and never returns ALL itself, so the
+      // seven actions held on one resource are folded into one ALL row (marked as derived). A
+      // permission that a broader one of the same holder also grants (READ db mixdemo under
+      // READ db *) names that broader permission in "Covered by" and can be hidden. ALL on every
+      // resource of every type, and a superuser, are a single row: everything else is inside it.
+      // A permission's resource list is a path (named-graph: [db, graph]), so it is joined with
+      // "\" the way Stardog's command-line tools print it, never split into separate resources.
+
+      const UR_ALL_ACTIONS = ["READ", "WRITE", "CREATE", "DELETE", "GRANT", "REVOKE", "EXECUTE"];
+      const UR_VIEWS = {
+        users: { file: "users", columns: ["User", "Roles", "Superuser", "Enabled"], holder: "user" },
+        roles: { file: "roles", columns: ["Role", "Users", "Permissions"], holder: "role" },
+        userPermissions: { file: "user_permissions", columns: ["User", "Action", "Resource type", "Resource", "Granted by", "Covered by"], holder: "user", permissions: true },
+        rolePermissions: { file: "role_permissions", columns: ["Role", "Action", "Resource type", "Resource", "Covered by"], holder: "role", permissions: true },
+      };
+      // Rows put in the page at first and per "Show more"; a table of thousands of rows takes
+      // seconds to lay out, while the filter and the CSV always work on every row.
+      const UR_PAGE_ROWS = 200;
+      const UR_MORE_ROWS = 500;
+
+      function _urNormPerm(p) {
+        const res = Array.isArray(p?.resource) ? p.resource.map(String) : [String(p?.resource ?? "")];
+        return {
+          action: String(p?.action ?? "").toUpperCase(),
+          resource_type: String(p?.resource_type ?? ""),
+          resource: res.join("\\"),
+          explicit: typeof p?.explicit === "boolean" ? p.explicit : undefined,
+        };
       }
 
-      function _buildRolesPermissionsCsv(rolePerms) {
-        const lines = ["role,action,resource_type,resource"];
-        [...rolePerms].sort((a, b) => String(a.role).localeCompare(String(b.role))).forEach(({ role, rows }) => {
-          const sorted = _effPermSortRows(rows, { field: "resource_type", dir: "asc" });
-          if (!sorted.length) lines.push(`${_csvField(role)},,,`);
-          sorted.forEach((p) => lines.push([role, p.action, p.resource_type, (p.resource || []).join(", ")].map(_csvField).join(",")));
-        });
-        return lines.join("\n");
+      function _urPermKey(p) { return `${p.action}\u0001${p.resource_type}\u0001${p.resource}`; }
+
+      // True when permission a grants everything permission b grants.
+      function _urCovers(a, b) {
+        if (a.action !== "ALL" && a.action !== b.action) return false;
+        if (a.resource_type !== "*" && a.resource_type !== b.resource_type) return false;
+        if (a.resource === "*" || a.resource === b.resource) return true;
+        if (a.resource.endsWith("\\*")) return b.resource.startsWith(a.resource.slice(0, -1));
+        return false;
       }
 
-      let _effPermBulkBusy = false;
-      // Walks the server's users (or roles) one request at a time, so a shared server only
-      // ever sees a single admin call in flight, then downloads the CSV.
-      async function downloadPermissionsCsv(kind) {
-        if (_effPermBulkBusy) { showStatusToast("An export is already running.", "info", 2000); return; }
-        if (!state.connection?.baseUrl) { showStatusToast("Connect to Stardog first.", "error", 3000); return; }
-        _effPermBulkBusy = true;
-        try {
-          const isUsers = kind === "usersRoles";
-          const names = isUsers ? await fetchEffPermUserOptions(true) : await fetchEffPermRoleOptions(true);
-          const noun = isUsers ? "user" : "role";
-          if (!names.length) { showStatusToast(`The server lists no ${noun}s to export.`, "info", 4000); return; }
-          if (!isUsers) state.ui.effPermRolePermsCache = {}; // read every role afresh, not from earlier lookups
-          const collected = [];
-          const failed = [];
-          for (let i = 0; i < names.length; i++) {
-            if (i % 10 === 0) showStatusToast(`Reading ${noun} ${i + 1} of ${names.length}…`, "info", 2500);
-            try {
-              if (isUsers) collected.push({ user: names[i], roles: await fetchEffPermUserRoles(names[i]) });
-              else collected.push({ role: names[i], rows: await fetchRolePermissionsCached(names[i]) });
-            } catch (e) {
-              failed.push(names[i]);
-              log("debug", `[permissions-csv] ${noun}=${names[i]} failed: ${String((e && e.message) || e).slice(0, 200)}`);
-            }
-          }
-          if (!collected.length) { showStatusToast(`Could not read any ${noun}s from the server.`, "error", 4000); return; }
-          const text = isUsers ? _buildUsersRolesCsv(collected) : _buildRolesPermissionsCsv(collected);
-          download(new Blob([text], { type: "text/csv" }), isUsers ? "users_and_roles.csv" : "roles_and_permissions.csv");
-          showStatusToast(failed.length
-            ? `Downloaded ${collected.length} ${noun}s; ${failed.length} could not be read (${failed.slice(0, 3).join(", ")}${failed.length > 3 ? ", …" : ""}).`
-            : `Downloaded ${collected.length} ${noun}s.`, failed.length ? "warn" : "success", 4000);
-        } finally {
-          _effPermBulkBusy = false;
+      function _urIsEverything(p) { return p.action === "ALL" && p.resource_type === "*" && p.resource === "*"; }
+
+      function _urFormatPerm(p) { return `${p.action} ${p.resource_type} ${p.resource}`; }
+
+      function _urActionRank(a) { const i = UR_ALL_ACTIONS.indexOf(a); return a === "ALL" ? -1 : i < 0 ? 99 : i; }
+      function _urComparePerm(a, b) {
+        return a.resource_type.localeCompare(b.resource_type) || a.resource.localeCompare(b.resource) || (_urActionRank(a.action) - _urActionRank(b.action)) || a.action.localeCompare(b.action);
+      }
+
+      // One holder's permissions as [{ perm, coveredBy }], sorted by resource then action:
+      // duplicates removed, all seven actions on one resource folded into a derived ALL, and
+      // each permission that a broader one also grants given that broader one as coveredBy.
+      // ALL on every resource of every type is returned alone.
+      function _urHolderPermissions(perms) {
+        const byKey = new Map();
+        (perms || []).forEach((p) => { if (!byKey.has(_urPermKey(p))) byKey.set(_urPermKey(p), p); });
+        let list = [...byKey.values()];
+        const groups = new Map();
+        list.forEach((p) => {
+          const k = `${p.resource_type}\u0001${p.resource}`;
+          if (!groups.has(k)) groups.set(k, new Set());
+          groups.get(k).add(p.action);
+        });
+        groups.forEach((actions, k) => {
+          if (actions.has("ALL") || !UR_ALL_ACTIONS.every((a) => actions.has(a))) return;
+          const [resource_type, resource] = k.split("\u0001");
+          list = list.filter((p) => !(p.resource_type === resource_type && p.resource === resource && UR_ALL_ACTIONS.includes(p.action)));
+          list.push({ action: "ALL", resource_type, resource, derived: true });
+        });
+        const everything = list.find(_urIsEverything);
+        if (everything) return [{ perm: everything, coveredBy: null }];
+        const strictlyCovers = (q, p) => q !== p && _urCovers(q, p) && !_urCovers(p, q);
+        const tops = list.filter((p) => !list.some((q) => strictlyCovers(q, p))).sort(_urComparePerm);
+        return list.sort(_urComparePerm).map((perm) => ({ perm, coveredBy: tops.includes(perm) ? null : (tops.find((t) => _urCovers(t, perm)) || null) }));
+      }
+
+      // What grants a user's permission: "Direct" for the user's own grant, plus each of the
+      // user's roles whose permissions cover it. A derived ALL takes the sources that cover all
+      // seven of its actions.
+      function _urGrantedBy(perm, explicitByKey, roles, rolePerms) {
+        const parts = perm.derived ? UR_ALL_ACTIONS.map((action) => ({ ...perm, action, derived: false })) : [perm];
+        const sources = [];
+        if (parts.every((q) => explicitByKey.get(_urPermKey(q)) === true)) sources.push({ text: "Direct", kind: null });
+        [...new Set(roles || [])].sort((a, b) => a.localeCompare(b)).forEach((role) => {
+          const rp = rolePerms.get(role) || [];
+          if (parts.every((q) => rp.some((r) => _urCovers(r, q)))) sources.push({ text: role, kind: "role" });
+        });
+        // A server that leaves out `explicit` (older per-user reads): a permission no role grants is the user's own.
+        if (!sources.length && parts.every((q) => explicitByKey.get(_urPermKey(q)) === undefined)) sources.push({ text: "Direct", kind: null });
+        return sources;
+      }
+
+      // Pure: data = { users: [{ name, enabled, superuser, roles, permissions }], roles: [{ name, permissions }] }
+      // (permissions already normalized). Returns { columns, rows } where each row is
+      // { cells: string[], links: { [column]: [{ text, kind }] }, derived, covered, superuser, empty }.
+      // cells are what the CSV holds; links mark the names the panel shows as links.
+      function buildUsersRolesReport(view, data) {
+        const def = UR_VIEWS[view];
+        const users = [...(data?.users || [])].sort((a, b) => a.name.localeCompare(b.name));
+        const roles = [...(data?.roles || [])].sort((a, b) => a.name.localeCompare(b.name));
+        const rows = [];
+        const list = (items, kind) => items.map((text) => ({ text, kind }));
+        const join = (items) => items.map((x) => x.text).join(", ");
+        const push = (cells, links = {}, flags = {}) => rows.push({ cells, links, derived: false, covered: false, superuser: false, empty: false, ...flags });
+        const yesNo = (v) => (v === true ? "Yes" : v === false ? "No" : "");
+        if (view === "users") {
+          users.forEach((u) => {
+            const rs = list([...new Set(u.roles || [])].sort((a, b) => a.localeCompare(b)), "role");
+            push([u.name, join(rs), yesNo(u.superuser), yesNo(u.enabled)], { 0: list([u.name], "user"), 1: rs });
+          });
+        } else if (view === "roles") {
+          roles.forEach((r) => {
+            const us = list(users.filter((u) => (u.roles || []).includes(r.name)).map((u) => u.name), "user");
+            push([r.name, join(us), String(_urHolderPermissions(r.permissions).length)], { 0: list([r.name], "role"), 1: us });
+          });
+        } else if (view === "rolePermissions") {
+          roles.forEach((r) => {
+            const name = { 0: list([r.name], "role") };
+            const perms = _urHolderPermissions(r.permissions);
+            if (!perms.length) push([r.name, "", "", "", ""], name, { empty: true });
+            perms.forEach(({ perm, coveredBy }) => push([r.name, perm.action, perm.resource_type, perm.resource, coveredBy ? _urFormatPerm(coveredBy) : ""], name,
+              { derived: !!perm.derived, covered: !!coveredBy }));
+          });
+        } else if (view === "userPermissions") {
+          const rolePerms = new Map(roles.map((r) => [r.name, r.permissions || []]));
+          users.forEach((u) => {
+            const name = { 0: list([u.name], "user") };
+            if (u.superuser) { push([u.name, "ALL", "*", "*", "Superuser", ""], name, { superuser: true }); return; }
+            const explicitByKey = new Map((u.permissions || []).map((p) => [_urPermKey(p), p.explicit]));
+            const perms = _urHolderPermissions(u.permissions);
+            if (!perms.length) push([u.name, "", "", "", "", ""], name, { empty: true });
+            perms.forEach(({ perm, coveredBy }) => {
+              const via = _urGrantedBy(perm, explicitByKey, u.roles, rolePerms);
+              push([u.name, perm.action, perm.resource_type, perm.resource, join(via), coveredBy ? _urFormatPerm(coveredBy) : ""], { ...name, 4: via },
+                { derived: !!perm.derived, covered: !!coveredBy });
+            });
+          });
         }
+        return { columns: def ? def.columns.slice() : [], rows };
+      }
+
+      // A cell starting with = + - @ would run as a formula in a spreadsheet; a leading ' keeps it text.
+      function _urCsvCell(v) { const t = String(v ?? ""); return _csvField(/^[=+\-@\t\r]/.test(t) ? "'" + t : t); }
+
+      function _urCsvText(report) {
+        return [report.columns, ...report.rows.map((r) => r.cells)].map((r) => r.map(_urCsvCell).join(",")).join("\n");
+      }
+
+      function _urParseUsersList(text) {
+        const parsed = JSON.parse(text);
+        const list = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.users) ? parsed.users : null;
+        if (!list) throw new Error("The server's user list was not in a recognized format.");
+        return list.map((u) => ({
+          name: String(u.username ?? u.name ?? ""),
+          enabled: typeof u.enabled === "boolean" ? u.enabled : undefined,
+          superuser: u.superuser === true,
+          roles: Array.isArray(u.roles) ? u.roles.map(String) : [],
+          permissions: (Array.isArray(u.permissions) ? u.permissions : []).map(_urNormPerm),
+        }));
+      }
+
+      function _urParseRolesList(text) {
+        const parsed = JSON.parse(text);
+        const list = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.roles) ? parsed.roles : null;
+        if (!list) throw new Error("The server's role list was not in a recognized format.");
+        return list.map((r) => ({
+          name: String(r.rolename ?? r.name ?? ""),
+          permissions: (Array.isArray(r.permissions) ? r.permissions : []).map(_urNormPerm),
+        }));
+      }
+
+      function _urIsMissingEndpoint(error) { return /^HTTP 40[45]\b/.test(String(error?.message || "")); }
+
+      let _urLoadGen = 0;
+      let _urAbort = null;
+
+      function _urSetProgress(done, total, noun) {
+        const st = state.ui.ur || (state.ui.ur = {});
+        st.progress = { done, total, noun };
+        renderUsersRolesReport();
+      }
+
+      // Older servers: list names, then read each user and role one request at a time.
+      async function _urLoadByName(signal, gen, knownUsers = null) {
+        const listText = async (path, key) => {
+          const parsed = JSON.parse(await request({ method: "GET", path, accept: "application/json", abortSignal: signal }));
+          return (Array.isArray(parsed) ? parsed : Array.isArray(parsed?.[key]) ? parsed[key] : []).map(String);
+        };
+        const userNames = knownUsers ? [] : await listText("/admin/users", "users");
+        const roleNames = await listText("/admin/roles", "roles");
+        const total = userNames.length + roleNames.length;
+        const users = knownUsers ? knownUsers.slice() : [];
+        const roles = [];
+        const failed = [];
+        let done = 0;
+        for (const name of userNames) {
+          if (gen !== _urLoadGen) return null;
+          _urSetProgress(done, total, "user " + name);
+          try {
+            const u = JSON.parse(await request({ method: "GET", path: "/admin/users/" + encodeURIComponent(name), accept: "application/json", abortSignal: signal }));
+            users.push({ name, enabled: typeof u.enabled === "boolean" ? u.enabled : undefined, superuser: u.superuser === true,
+              roles: Array.isArray(u.roles) ? u.roles.map(String) : [], permissions: (Array.isArray(u.permissions) ? u.permissions : []).map(_urNormPerm) });
+          } catch (e) {
+            if (e?.name === "AbortError") throw e;
+            failed.push(name);
+            log("debug", `[users-roles-report] user=${name} failed: ${String((e && e.message) || e).slice(0, 200)}`);
+          }
+          done++;
+        }
+        for (const name of roleNames) {
+          if (gen !== _urLoadGen) return null;
+          _urSetProgress(done, total, "role " + name);
+          try {
+            const text = await request({ method: "GET", path: "/admin/permissions/role/" + encodeURIComponent(name), accept: "application/json", abortSignal: signal });
+            const parsed = JSON.parse(text);
+            const list = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.permissions) ? parsed.permissions : [];
+            roles.push({ name, permissions: list.map(_urNormPerm) });
+          } catch (e) {
+            if (e?.name === "AbortError") throw e;
+            failed.push(name);
+            log("debug", `[users-roles-report] role=${name} failed: ${String((e && e.message) || e).slice(0, 200)}`);
+          }
+          done++;
+        }
+        return { users, roles, failed };
+      }
+
+      async function loadUsersRolesReport(force = false) {
+        const st = state.ui.ur || (state.ui.ur = {});
+        if (!state.connection?.baseUrl) { st.error = "Connect to Stardog first, then open this report again."; st.data = null; renderUsersRolesReport(); return; }
+        if (st.data && !force) { renderUsersRolesReport(); return; }
+        const gen = ++_urLoadGen;
+        _urAbort?.abort();
+        const ctl = new AbortController();
+        _urAbort = ctl;
+        st.loading = true; st.error = null; st.progress = null; st.loadStarted = performance.now();
+        renderUsersRolesReport();
+        // Spinner text appears only if the read takes longer than a moment.
+        setTimeout(() => { if (gen === _urLoadGen && state.ui.ur?.loading) renderUsersRolesReport(); }, 300);
+        try {
+          let data;
+          // Each list call that the server lacks is replaced by reading names one at a time.
+          const listOrNull = async (path, parse) => {
+            try { return parse(await request({ method: "GET", path, accept: "application/json", abortSignal: ctl.signal })); } catch (e) {
+              if (!_urIsMissingEndpoint(e)) throw e;
+              log("debug", `[users-roles-report] ${path} unavailable (${String(e.message).split("\n")[0]}); reading names one at a time`);
+              return null;
+            }
+          };
+          const users = await listOrNull("/admin/users/list", _urParseUsersList);
+          const roles = users ? await listOrNull("/admin/roles/list", _urParseRolesList) : null;
+          data = users && roles ? { users, roles, failed: [] } : await _urLoadByName(ctl.signal, gen, users);
+          if (gen !== _urLoadGen || !data) return;
+          // A user or role the table was narrowed to that is no longer on the server is let go.
+          if (st.holder && !(st.holder.kind === "role" ? data.roles : data.users).some((x) => x.name === st.holder.name)) st.holder = null;
+          st.data = data;
+          st.loadedAt = new Date();
+          st.loadMs = performance.now() - st.loadStarted;
+        } catch (e) {
+          if (gen !== _urLoadGen) return;
+          st.error = e?.name === "AbortError" ? "cancelled" : (summarizeSchemaDriftError(String(e?.message || e)) || "The server did not answer.");
+        } finally {
+          if (gen === _urLoadGen) { st.loading = false; st.progress = null; if (_urAbort === ctl) _urAbort = null; renderUsersRolesReport(); }
+        }
+      }
+
+      function cancelUsersRolesReport() {
+        _urLoadGen++;
+        _urAbort?.abort();
+        _urAbort = null;
+        const st = state.ui.ur || (state.ui.ur = {});
+        st.loading = false; st.progress = null;
+        if (!st.data) st.error = "cancelled";
+        renderUsersRolesReport();
+      }
+
+      function _urCurrentView() {
+        const v = state.ui.ur?.view;
+        return UR_VIEWS[v] ? v : "users";
+      }
+
+      // The holder the table is narrowed to (set by clicking a name), when it fits this view.
+      function _urActiveHolder(view) {
+        const h = state.ui.ur?.holder;
+        return h && UR_VIEWS[view].permissions && h.kind === UR_VIEWS[view].holder ? h : null;
+      }
+
+      // One collator for every comparison: localeCompare with options builds a new one per call.
+      const _urCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+      // The table exactly as shown: holder, "covered" toggle, filter words and sort applied.
+      // The CSV download uses the same rows in the same order.
+      function _urFilteredReport() {
+        const st = state.ui.ur || {};
+        const view = _urCurrentView();
+        // Built once per view and data set; filtering and sorting only re-select rows.
+        if (!st._built || st._built.data !== st.data || st._built.view !== view)
+          st._built = { data: st.data, view, report: buildUsersRolesReport(view, st.data || {}) };
+        const report = st._built.report;
+        const holder = _urActiveHolder(view);
+        const hideCovered = UR_VIEWS[view].permissions && st.hideCovered === true;
+        const sort = st.sort?.view === view ? st.sort : null;
+        // The selected rows are kept until the table, holder, filter, toggle or sort changes.
+        const key = [holder?.name, hideCovered, st.filter, sort?.col, sort?.dir].join("\u0001");
+        if (st._selected && st._selected.report === report && st._selected.key === key) return st._selected.result;
+        const words = String(st.filter || "").toLowerCase().split(/\s+/).filter(Boolean);
+        let rows = report.rows.filter((r) => (!holder || r.cells[0] === holder.name)
+          && (!hideCovered || !r.covered)
+          && (!words.length || ((line) => words.every((w) => line.includes(w)))(r._text ??= (r.cells.join(" ") + (r.empty ? " no permissions" : "")).toLowerCase())));
+        if (sort && sort.col < report.columns.length) {
+          const dir = sort.dir === "desc" ? -1 : 1;
+          rows = rows.map((r, i) => [r, i]).sort((x, y) => (dir * _urCollator.compare(x[0].cells[sort.col], y[0].cells[sort.col])) || (x[1] - y[1])).map((x) => x[0]);
+        }
+        const result = { columns: report.columns, rows, total: report.rows.length, holder, sort };
+        st._selected = { report, key, result };
+        return result;
+      }
+
+      function _urFileName(view, holder) {
+        const base = UR_VIEWS[view].file;
+        if (!holder) return base + ".csv";
+        const safe = holder.name.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "") || "selection";
+        return `${base}_${safe}.csv`;
+      }
+
+      function _urLinkHtml(item) {
+        return item.kind ? `<button type="button" class="ur-link" data-ur-kind="${item.kind}" data-ur-name="${esc(item.text)}" title="Show the permissions of ${item.kind} ${esc(item.text)}">${esc(item.text)}</button>` : esc(item.text);
+      }
+
+      function renderUsersRolesReport() {
+        const panel = $("usersRolesPanel");
+        if (!panel) return;
+        const st = state.ui.ur || {};
+        const view = _urCurrentView();
+        const def = UR_VIEWS[view];
+        panel.querySelectorAll("[data-ur-view]").forEach((b) => {
+          const on = b.dataset.urView === view;
+          b.classList.toggle("active", on);
+          b.setAttribute("aria-selected", on ? "true" : "false");
+        });
+        const coveredWrap = $("urCoveredWrap");
+        if (coveredWrap) coveredWrap.classList.toggle("hidden", !def.permissions);
+        if ($("urHideCovered")) $("urHideCovered").checked = st.hideCovered === true;
+        if ($("urFilter") && $("urFilter").value !== (st.filter || "")) $("urFilter").value = st.filter || "";
+        const holder = _urActiveHolder(view);
+        const chip = $("urHolderChip");
+        if (chip) {
+          chip.classList.toggle("hidden", !holder);
+          chip.innerHTML = holder ? `<span>${holder.kind === "user" ? "User" : "Role"}: <b>${esc(holder.name)}</b></span><button type="button" class="ur-chip-x" data-ur-clear-holder title="Show every ${holder.kind}" aria-label="Show every ${holder.kind}">&times;</button>` : "";
+        }
+        const summary = $("urSummary");
+        const results = $("urResults");
+        const dl = $("urDownloadBtn");
+        const refresh = $("urRefreshBtn");
+        if (refresh) refresh.disabled = !!st.loading;
+        if (st.loading) {
+          if (dl) dl.disabled = true;
+          const p = st.progress;
+          const waited = performance.now() - (st.loadStarted || 0);
+          if (summary) summary.innerHTML = p
+            ? `<span>Reading ${esc(p.noun)} (${p.done + 1} of ${p.total})…</span><span class="ur-progress"><span style="width:${(100 * p.done / Math.max(1, p.total))}%"></span></span><span>This server needs one request per user and role, so this can take a minute.</span><button type="button" class="secondary" data-ur-cancel>Cancel</button>`
+            : (waited >= 300 ? `<span>Reading users and roles from the server…</span><button type="button" class="secondary" data-ur-cancel>Cancel</button>` : "");
+          return;
+        }
+        if (st.error && !st.data) {
+          if (dl) dl.disabled = true;
+          if (summary) summary.innerHTML = "";
+          if (results) results.innerHTML = st.error === "cancelled"
+            ? `<div class="sql-qry-info">Cancelled. Use the refresh button to read the server again.</div>`
+            : `<div class="sql-qry-info ur-warn">${esc(st.error)}</div>`;
+          return;
+        }
+        if (!st.data) { if (dl) dl.disabled = true; return; }
+        const report = _urFilteredReport();
+        // A different table (view, user or role, filter, toggle or sort) starts again at the first page.
+        const shownKey = [view, holder?.name, st.filter, st.hideCovered, report.sort?.col, report.sort?.dir].join("\u0001");
+        if (st._shownKey !== shownKey || st._shownData !== st.data) { st._shownKey = shownKey; st._shownData = st.data; st.showRows = UR_PAGE_ROWS; }
+        const shown = report.rows.slice(0, st.showRows);
+        const narrowed = report.rows.length !== report.total;
+        if (dl) { dl.disabled = !report.rows.length; dl.title = `Download the ${report.rows.length.toLocaleString()} ${report.rows.length === 1 ? "row" : "rows"} shown as CSV`; }
+        const plural = (n, noun) => `${n.toLocaleString()} ${noun}${n === 1 ? "" : "s"}`;
+        const parts = [`<span>${plural(st.data.users.length, "user")}, ${plural(st.data.roles.length, "role")} on the server</span>`];
+        parts.push(`<span>${narrowed ? `${report.rows.length.toLocaleString()} of ${plural(report.total, "row")}` : plural(report.total, "row")}</span>`);
+        if (st.data.failed?.length) parts.push(`<span class="ur-warn">Could not read: ${esc(st.data.failed.slice(0, 5).join(", "))}${st.data.failed.length > 5 ? ", …" : ""}</span>`);
+        if (st.loadedAt) parts.push(`<span>Read at ${esc(st.loadedAt.toLocaleTimeString())}</span>`);
+        if (summary) summary.innerHTML = parts.join("<span>·</span>");
+        if (!results) return;
+        const head = report.columns.map((c, i) => {
+          const s = report.sort && report.sort.col === i ? report.sort.dir : "";
+          return `<th><button type="button" class="ur-sort" data-ur-sort="${i}" title="Sort by ${esc(c)}"${s ? ` aria-sort="${s === "desc" ? "descending" : "ascending"}"` : ""}>${esc(c)}${s ? (s === "desc" ? " ▾" : " ▴") : ""}</button></th>`;
+        }).join("");
+        if (!shown.length) {
+          results.innerHTML = `<table class="eff-perm-table"><thead><tr>${head}</tr></thead></table><div class="sql-qry-info">${narrowed ? "No rows match." : "Nothing to show."}</div>`;
+          return;
+        }
+        results.innerHTML = `<table class="eff-perm-table"><thead><tr>${head}</tr></thead><tbody>${_urRowsHtml(report, 0, shown.length)}</tbody></table><div class="ur-more"></div>`;
+        _urRenderMore(report, shown.length);
+      }
+
+      // Table rows start..end of the report as HTML. The holder's name is dimmed where it
+      // repeats, so each user or role reads as one block.
+      function _urRowsHtml(report, start, end) {
+        const def = UR_VIEWS[_urCurrentView()];
+        const groupByName = !report.sort || report.sort.col === 0;
+        return report.rows.slice(start, end).map((row, k) => {
+          const i = start + k;
+          const prev = i > 0 ? report.rows[i - 1] : null;
+          const rowCls = [row.covered ? "ur-covered" : "", row.empty ? "ur-empty" : ""].filter(Boolean).join(" ");
+          const cells = row.cells.map((cell, c) => {
+            const cls = [];
+            let title = "";
+            let html = row.links[c] ? row.links[c].map(_urLinkHtml).join(", ") : esc(cell);
+            if (c === 0 && groupByName && prev && prev.cells[0] === cell) cls.push("ur-repeat");
+            if (def.permissions && c === 1) {
+              if (row.empty) html = `<span class="ur-none">No permissions</span>`;
+              else if (row.superuser) { cls.push("ur-derived"); title = "A superuser can do everything on the server"; }
+              else if (row.derived) { cls.push("ur-derived"); title = "Stardog stores ALL as its seven actions; all seven are held on this resource"; }
+            }
+            return `<td${cls.length ? ` class="${cls.join(" ")}"` : ""}${title ? ` title="${esc(title)}"` : ""}>${html}</td>`;
+          }).join("");
+          return `<tr${rowCls ? ` class="${rowCls}"` : ""}>${cells}</tr>`;
+        }).join("");
+      }
+
+      function _urRenderMore(report, shownCount) {
+        const more = $("urResults")?.querySelector(".ur-more");
+        if (!more) return;
+        const rest = report.rows.length - shownCount;
+        more.innerHTML = rest > 0
+          ? `<button type="button" class="secondary" data-ur-more>Show ${Math.min(UR_MORE_ROWS, rest).toLocaleString()} more</button><span>${rest.toLocaleString()} more ${rest === 1 ? "row" : "rows"} not shown; the CSV has all of them.</span>`
+          : "";
+      }
+
+      // Adds the next rows under the ones already shown, without redrawing them.
+      function showMoreUsersRolesRows() {
+        const st = state.ui.ur || {};
+        const tbody = $("urResults")?.querySelector("tbody");
+        if (!st.data || !tbody) return;
+        const report = _urFilteredReport();
+        const from = Math.min(st.showRows || 0, report.rows.length);
+        st.showRows = Math.min(from + UR_MORE_ROWS, report.rows.length);
+        tbody.insertAdjacentHTML("beforeend", _urRowsHtml(report, from, st.showRows));
+        _urRenderMore(report, st.showRows);
+      }
+
+      function setUsersRolesView(view, holder = null) {
+        if (!UR_VIEWS[view]) return;
+        const st = state.ui.ur || (state.ui.ur = {});
+        st.view = view;
+        st.holder = holder;
+        // A new user or role starts with the whole of their permissions in view.
+        if (holder) st.filter = "";
+        renderUsersRolesReport();
+        if ($("urResults")) $("urResults").scrollTop = 0;
+      }
+
+      function sortUsersRolesReport(col) {
+        const st = state.ui.ur || (state.ui.ur = {});
+        const view = _urCurrentView();
+        const cur = st.sort?.view === view && st.sort.col === col ? st.sort.dir : "";
+        // Ascending, then descending, then back to the default order.
+        st.sort = cur === "asc" ? { view, col, dir: "desc" } : cur === "desc" ? null : { view, col, dir: "asc" };
+        renderUsersRolesReport();
+      }
+
+      function downloadUsersRolesReportCsv() {
+        const st = state.ui.ur || {};
+        if (!st.data) return;
+        const report = _urFilteredReport();
+        download(new Blob([_urCsvText(report)], { type: "text/csv" }), _urFileName(_urCurrentView(), report.holder));
+      }
+
+      function openUsersRolesPanel() {
+        const panel = $("usersRolesPanel");
+        if (!panel) return;
+        const wasHidden = panel.classList.contains("hidden");
+        panel.classList.remove("hidden");
+        if (wasHidden && !applyStoredPanelPosition("usersRolesPanel")) positionPanelNearCenter("usersRolesPanel", "toggleApiBtn");
+        renderUsersRolesReport();
+        if (!state.ui.ur?.data && !state.ui.ur?.loading) loadUsersRolesReport(false).catch(handleError);
+      }
+
+      function resetUsersRolesReport() {
+        _urLoadGen++;
+        _urAbort?.abort();
+        _urAbort = null;
+        state.ui.ur = { view: state.ui.ur?.view, filter: state.ui.ur?.filter, hideCovered: state.ui.ur?.hideCovered, sort: state.ui.ur?.sort };
+        const results = $("urResults");
+        if (results) results.innerHTML = `<div class="sql-qry-info">Connect to Stardog, then open this report to read every user and role on the server.</div>`;
+        if ($("urSummary")) $("urSummary").innerHTML = "";
+        if ($("urDownloadBtn")) $("urDownloadBtn").disabled = true;
+        if ($("usersRolesPanel") && !$("usersRolesPanel").classList.contains("hidden") && state.connection?.baseUrl) loadUsersRolesReport(true).catch(handleError);
       }
 
       function _buildSqlQryCsv() {
@@ -63782,7 +64302,8 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       function apiGroupCurrentCall(group) {
         const calls = API_CALL_GROUPS[group] || [];
         const remembered = state.ui.labGroupCall?.[group];
-        return calls.includes(remembered) ? remembered : calls[0];
+        // A call that opens its own panel is never the group's default: picking the group shows a request.
+        return calls.includes(remembered) && !API_PANEL_CALLS[remembered] ? remembered : (calls.find((c) => !API_PANEL_CALLS[c]) || calls[0]);
       }
 
       // Shows the second list for a group entry and the endpoint search for the catalog entry.
@@ -63852,6 +64373,13 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         const group = $("labPresetSelect")?.value || "";
         const call = $("labCallSelect")?.value || "";
         if (!Object.prototype.hasOwnProperty.call(API_CALL_GROUPS, group) || !API_CALL_GROUPS[group].includes(call)) return;
+        if (API_PANEL_CALLS[call]) {
+          // Opens its panel in place of the API panel; the list goes back to the call it showed before.
+          $("labCallSelect").value = apiGroupCurrentCall(group);
+          $("apiPanel")?.classList.add("hidden");
+          API_PANEL_CALLS[call]();
+          return;
+        }
         if (!state.ui.labGroupCall) state.ui.labGroupCall = {};
         state.ui.labGroupCall[group] = call;
         loadApiCall(call);
@@ -63864,6 +64392,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         const own = [...select.options].some((o) => o.value === id);
         const group = own ? null : Object.keys(API_CALL_GROUPS).find((g) => API_CALL_GROUPS[g].includes(id));
         if (!own && !group) return false;
+        if (group && API_PANEL_CALLS[id]) { $("apiPanel")?.classList.add("hidden"); API_PANEL_CALLS[id](); return true; }
         if (group) { if (!state.ui.labGroupCall) state.ui.labGroupCall = {}; state.ui.labGroupCall[group] = id; }
         select.value = own ? id : group;
         loadSelectedLabPreset();
@@ -70203,8 +70732,22 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         });
         on("effPermShowAllToggle", "click", () => _toggleEffPermShowAll());
         initQueryLogPanel();
-        on("effPermUsersRolesCsv", "click", () => { $("effPermMenu")?.classList.add("hidden"); downloadPermissionsCsv("usersRoles").catch(handleError); });
-        on("effPermRolesPermsCsv", "click", () => { $("effPermMenu")?.classList.add("hidden"); downloadPermissionsCsv("rolesPermissions").catch(handleError); });
+        on("effPermOpenReport", "click", () => { $("effPermMenu")?.classList.add("hidden"); openUsersRolesPanel(); });
+        on("urRefreshBtn", "click", () => { loadUsersRolesReport(true).catch(handleError); });
+        on("urDownloadBtn", "click", () => { try { downloadUsersRolesReportCsv(); } catch (error) { handleError(error); } });
+        on("urFilter", "input", () => { (state.ui.ur || (state.ui.ur = {})).filter = $("urFilter").value; renderUsersRolesReport(); });
+        on("urHideCovered", "change", () => { (state.ui.ur || (state.ui.ur = {})).hideCovered = $("urHideCovered").checked; renderUsersRolesReport(); });
+        $("usersRolesPanel")?.addEventListener("click", (event) => {
+          const tab = event.target.closest("[data-ur-view]");
+          if (tab) { setUsersRolesView(tab.dataset.urView); return; }
+          const link = event.target.closest("[data-ur-kind]");
+          if (link) { setUsersRolesView(link.dataset.urKind === "role" ? "rolePermissions" : "userPermissions", { kind: link.dataset.urKind, name: link.dataset.urName }); return; }
+          const sort = event.target.closest("[data-ur-sort]");
+          if (sort) { sortUsersRolesReport(Number(sort.dataset.urSort)); return; }
+          if (event.target.closest("[data-ur-more]")) { showMoreUsersRolesRows(); return; }
+          if (event.target.closest("[data-ur-clear-holder]")) { (state.ui.ur || (state.ui.ur = {})).holder = null; renderUsersRolesReport(); return; }
+          if (event.target.closest("[data-ur-cancel]")) cancelUsersRolesReport();
+        });
         on("effPermResults", "click", (e) => {
           const diffTh = e.target.closest("[data-eff-perm-diff-sort]");
           if (diffTh) {
@@ -70574,6 +71117,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
             else if (!applyStoredPanelPosition("sparqlResultsPanel")) positionPanelNearCenter("sparqlResultsPanel", "executeSparqlQueryBtn");
           }
           if (!$("effectivePermissionsPanel")?.classList.contains("hidden") && !applyStoredPanelPosition("effectivePermissionsPanel")) positionPanelNearCenter("effectivePermissionsPanel", "toggleApiBtn");
+          if (!$("usersRolesPanel")?.classList.contains("hidden") && !applyStoredPanelPosition("usersRolesPanel")) positionPanelNearCenter("usersRolesPanel", "toggleApiBtn");
           if (!$("querySourceMapPanel")?.classList.contains("hidden")) {
             if(_QSM._maximized){ const p=$("querySourceMapPanel"); if(p){ p.style.width=window.innerWidth+"px"; p.style.height=window.innerHeight+"px"; } _qsmFit(); }
             else if(!applyStoredPanelPosition("querySourceMapPanel")) positionPanelNearCenter("querySourceMapPanel","querySourceMapMenuItem");
@@ -71936,7 +72480,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           sparqlFormatScoped, sparqlEnterInsertion, sparqlCloseBraceInsertion, // scoped ✨ and typing indentation
           organizeSparqlBySource, parseScopedQueryPatterns, refreshFindingsAfterTextMove, normalizePlanForCompare, comparePlanTexts, planCheckAfterRewrite, planCheckMessage, _orgCanon, _orgBuildSources, _orgMapsTerm, // Organize query by data source (pure rewrite, its equivalence check, source lookup)
           rewriteWriteQueryAsSelect, rewriteSelectAsWriteQuery, writeRewriteKind, // INSERT ⇄ SELECT rewrite (pure text functions)
-          _buildUsersRolesCsv, _buildRolesPermissionsCsv, // permissions CSV exports (pure builders)
+          buildUsersRolesReport, _urCsvText, _urNormPerm, _urParseUsersList, _urParseRolesList, _urFilteredReport, // Users & Roles Report (builders; the filtered table the CSV saves)
           showProfileResultsInSparqlPanel, AA_TOOL_OPEN, FEATURE_DOCS, // profile results → SPARQL result panel; About app "open this tool" links
           mappingSectionFormatPlan, // SMS2 TO / WHERE section tidy
           extractRulesFromModel, reasoningAxiomText, buildOntologyHierarchyIndex, // model → rules + reasoning axioms split; hierarchy lookups
