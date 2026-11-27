@@ -1296,6 +1296,7 @@
     .sq-iri     { color:#56b6c2; }                    /* full IRIs: <http://...> */
     .sq-prefix  { color:#f8c97a; }                    /* prefixed names: rdf:type ups:Foo */
     .sq-string  { color:#98c379; }                    /* string literals: "hello" */
+    .sq-tpl-col { color:#dfe8f8; }                    /* column name inside TEMPLATE("…{col}…"): plain text, like the SQL block */
     .sq-num     { color:#d19a66; }                    /* numbers: 42 3.14 */
     .sq-bool    { color:#d19a66; font-weight:600; }   /* booleans: true false */
     .sq-comment { color:#5c7a8a; font-style:italic; } /* comments: # ... */
@@ -16669,7 +16670,11 @@ return OntologyLayouts;
       }
 
       // ── SPARQL syntax highlighting ─────────────────────────────────────────
+      // The string handed to TEMPLATE(...): each {name} inside it is a column of the mapping's SQL,
+      // so the name is drawn in the same plain text color a column has in the SQL block.
+      const TEMPLATE_STRING_PATTERN = [/(?<=\bTEMPLATE\s*\(\s*)(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/gi, "sq-tpl"];
       const SPARQL_PATTERNS = [
+        TEMPLATE_STRING_PATTERN,
         // Priority 0 — string literals (must beat everything else so # inside a string isn't a comment)
         [/"""[\s\S]*?"""|'''[\s\S]*?'''/g,              "sq-string"], // triple-quoted
         [/"(?:[^"\\]|\\.)*"/g,                           "sq-string"], // double-quoted
@@ -16719,6 +16724,20 @@ return OntologyLayouts;
         return html || "&nbsp;";
       }
 
+      // A TEMPLATE string: literal text stays string-colored, the name inside each {…} is a column.
+      function templateStringHtml(text, search) {
+        let html = "", last = 0, m;
+        const re = /\{([^{}]*)\}/g;
+        const lit = (s) => (s ? `<span class="sq-string">${markMatchesHtml(s, search)}</span>` : "");
+        while ((m = re.exec(text)) !== null) {
+          html += lit(text.slice(last, m.index) + "{");
+          html += m[1] ? `<span class="sq-tpl-col">${markMatchesHtml(m[1], search)}</span>` : "";
+          html += lit("}");
+          last = m.index + m[0].length;
+        }
+        return html + lit(text.slice(last));
+      }
+
       function applyPatterns(src, patterns, search = "") {
         if (!src || !src.trim()) return markMatchesHtml(src || "", search);
         const segments = [];
@@ -16741,7 +16760,9 @@ return OntologyLayouts;
         let html = "", pos = 0;
         for (const seg of kept) {
           if (seg.start > pos) html += markMatchesHtml(src.slice(pos, seg.start), search);
-          html += `<span class="${seg.type}">${markMatchesHtml(src.slice(seg.start, seg.end), search)}</span>`;
+          html += seg.type === "sq-tpl"
+            ? templateStringHtml(src.slice(seg.start, seg.end), search)
+            : `<span class="${seg.type}">${markMatchesHtml(src.slice(seg.start, seg.end), search)}</span>`;
           pos = seg.end;
         }
         // Nothing is appended when no text is left after the last token: markMatchesHtml gives a
@@ -16776,6 +16797,7 @@ return OntologyLayouts;
 
       // Turtle/TTL patterns — also used for inference rules (SRS) and SMS2 mappings
       const TURTLE_PATTERNS = [
+        TEMPLATE_STRING_PATTERN,
         // Priority 0 — string literals (beat everything so # inside a string isn't a comment)
         [/"""[\s\S]*?"""|'''[\s\S]*?'''/g,               "sq-string"],
         [/"(?:[^"\\]|\\.)*"/g,                            "sq-string"],
@@ -31530,7 +31552,7 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.64.2";
+      const APP_VERSION = "1.64.3";
       const RELEASE_NOTES = [
         { version: "1.64.0", date: "2026-11-26", title: "Users & Roles Report", items: [
           "The {*Users & Roles Report*} lists every user and role on the server: each user's roles, each role's users, and the permissions of every user and role, with what grants each user permission (a direct grant or a role). Click a name to see just that user's or role's permissions.",
@@ -72488,6 +72510,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
       if (/[?&]selftest\b/.test(location.search)) {
         window.__APP_TESTHOOKS__ = {
           state,
+          highlightTurtleHtml, highlightSparqlHtml,   // pane syntax coloring (TEMPLATE column names)
           sqlPreviewTable, sqlTabShow, sqlTabClose, sqlTabsReset, _sqlTabs, _sqlPreviewCache, kdTableMenu,   // SQL Query panel: result tabs and table previews
           kdModel, kdRender, renderFunctionalDependenciesWarningsHeaderPill, erdFindingList, renderErdFindingPills, erdNavigateFinding, erdFindingTarget, kdRevealFinding, erdCloseFindingCard, kdClearFindingFocus, _pillStripRevealPill, findAnyMappingFinding, kdParseArtifact, kdBuildText, kdEditEntry, kdEntryRaw, kdLayoutOrder, kdAddTable, kdArrange, kdJumpToSource, kdImpliedMenu, openKeysDiagram, runGenerateErd, toggleErdPanel, _kd, keySetsTitleHtml,   // ER Diagram key editing
           mappingToBlockAt, mappingToSelectQuery, textareaOffsetAtPoint, getMappingToLastCopy: () => _mappingToLastCopy, // mapping TO → SELECT query copy
