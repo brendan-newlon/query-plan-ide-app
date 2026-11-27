@@ -2289,6 +2289,17 @@
     .erd-head-tabs { display:flex; align-items:flex-end; gap:10px; min-width:0; }
     .erd-head-tabs .val-sql-tabs { border-bottom:none; }
     .erd-status { color:var(--muted); font-size:0.74rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+    /* finding pills in the ER Diagram header: as wide as the pills (set from their measured width), narrower
+       only when the header has no more room, so the strip ends at the search button and its scroll arrow sits beside it */
+    #erdPanel .erd-findings-host { flex:0 1 0px; }
+    .erd-finding-card { position:absolute; z-index:40; right:12px; bottom:44px; width:min(520px, calc(100% - 24px)); max-height:min(42%, 380px); overflow:auto; background:var(--panel, #141c2b); border:1px solid rgba(159,177,204,0.3); border-radius:8px; box-shadow:0 8px 28px rgba(0,0,0,0.45); padding:8px 10px 10px; }
+    .erd-finding-card .erd-fc-head { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:0.74rem; color:var(--muted); }
+    .erd-finding-card .erd-fc-head span { flex:1; min-width:0; }
+    .erd-finding-card .erd-fc-close { padding:0 6px; line-height:1.4; }
+    .kd-row.nav-jump-highlight, .kd-chip.nav-jump-highlight { outline:2px solid rgba(55,198,163,0.85); outline-offset:1px; box-shadow:0 0 0 4px rgba(55,198,163,0.25); background-color:rgba(55,198,163,0.16); }
+    .kd-row.nav-jump-highlight-fade, .kd-chip.nav-jump-highlight-fade { outline:2px solid transparent; outline-offset:1px; box-shadow:none; transition:outline-color 1.2s, box-shadow 1.2s, background-color 1.2s; }
+    #kdLines g.nav-jump-highlight path.kd-fk { stroke:#37c6a3; stroke-width:4; }
+    #kdLines g.nav-jump-highlight-fade path.kd-fk { transition:stroke 1.2s, stroke-width 1.2s; }
     #kdRefreshBtn.is-stop svg { display:none; }
     #kdRefreshBtn.is-stop::before { content:"A0"; font-size:0.8rem; line-height:14px; }
     .kd-note { padding:3px 10px; color:var(--muted); font-size:0.76rem; font-style:italic; white-space:normal; }
@@ -2351,6 +2362,9 @@
     .kd-chips.is-crowd:hover .kd-pop { display:inline-flex; }
     .kd-chips.is-crowd:hover > .kd-chip { opacity:0.35; }
     .kd-cv.is-editing svg.kd-lines { opacity:0; }
+    /* a finding shown from the header pills: its table (both tables and the line, for a foreign key) stays, the rest fade */
+    .kd-cv.is-finding .kd-card { opacity:0.07; pointer-events:none; }
+    .kd-cv.is-finding svg.kd-lines g { opacity:0.07; transition:opacity .25s; }
     .kd-cv.is-editing .kd-card { opacity:0.07; pointer-events:none; }
     .kd-cv.is-editing .kd-card.is-focus { opacity:1; pointer-events:auto; z-index:10; box-shadow:0 20px 50px rgba(0,0,0,0.6), 0 0 0 1.5px rgba(55,198,163,0.55); }
     .kd-cv.is-editing .kd-card.is-focus .kd-port, .kd-cv.is-editing .kd-card.is-focus .kd-chips, .kd-cv.is-editing .kd-card.is-focus .kd-card-foot { display:none; }
@@ -3373,6 +3387,7 @@
                 <span class="erd-status" id="erdStatusBadge">no diagram</span>
               </div>
               <div class="drag-handle" data-drag-handle="erdPanel" title="Drag window"></div>
+              <span id="erdFindingsHost" class="pill-strip-host erd-findings-host"></span>
               <div class="api-status-actions">
                 <div style="display:flex;align-items:center;gap:4px;">
                   <div class="pane-search-cluster" id="erdSearchCluster">
@@ -7127,6 +7142,7 @@ return OntologyLayouts;
         uniqueKeys: [
           "predicted-missing-unique-keys",
           "predicted-odd-foreign-key",
+          "validation-invalid-foreign-key",
           "predicted-invalid-functional-dependency",
           "predicted-odd-functional-dependency",
           "predicted-functional-dependency-candidate",
@@ -7189,6 +7205,7 @@ return OntologyLayouts;
         "predicted-nonstandard-prefix": "Non-standard prefix",
         "predicted-missing-unique-keys": "Missing unique keys",
         "predicted-odd-foreign-key": "Odd foreign key",
+        "validation-invalid-foreign-key": "Foreign key does not hold",
         "predicted-invalid-functional-dependency": "Invalid functional dependency",
         "predicted-odd-functional-dependency": "Odd functional dependency",
         "predicted-functional-dependency-candidate": "Functional dependency candidate",
@@ -7309,8 +7326,9 @@ return OntologyLayouts;
         "predicted-missing-unique-keys": "Without a unique.key.sets entry for this table, Stardog can't prove uniqueness, so it may leave DISTINCT in the plan or skip join-elimination.",
         "predicted-invalid-functional-dependency": "A functional.dependency.sets entry is not written the way Stardog reads it — a parenthesis, an arrow, a table name or a column is missing or misplaced — so Stardog cannot use it.",
         "predicted-odd-functional-dependency": "A functional.dependency.sets entry is well formed but adds nothing: a column on both sides of the arrow, the same dependency twice, or a determinant that is already a unique key.",
-        "predicted-functional-dependency-candidate": "The plan joins a table to itself, and the mappings over that table mint their instances from one non-key column whose other mapped columns might each have a single value per instance. If that is true of the data, a functional.dependency.sets entry lets Stardog skip the self-join.",
+        "predicted-functional-dependency-candidate": "The mappings over a table mint their instances from one non-key column and take their properties from other columns of the same table, which makes Stardog join the table to itself on that column. If each value of the instance column goes with a single value of each property column, a functional.dependency.sets entry lets Stardog skip the self-join.",
         "validation-invalid-functional-dependency": "SQL validation found values of the determinant column(s) that go with more than one value of the dependent column(s). Stardog does not check functional.dependency.sets, and with a declaration that is not true of the data, query results are undefined.",
+        "validation-invalid-foreign-key": "SQL validation found values in the foreign key's columns that have no matching row in the table it references, so the declared foreign key is not true of the data.",
         "predicted-odd-foreign-key": "A foreign.key.sets entry looks like an editing mistake — it references its own source table, duplicates another entry verbatim, or pairs an uneven number of source and target columns.",
         "predicted-complex-source-sql": "The mapping's source SQL contains features (aggregates, joins, etc.) that constrain what Stardog can push down to SQL.",
         "predicted-virtual-transparency-path": "Stardog is using its Virtual Transparency path instead of the Direct VG path — self-join elimination and the CQ optimizer don't run, so redundant JdbcTableScan joins remain in the plan and cardinality estimates blow up.",
@@ -7379,6 +7397,7 @@ return OntologyLayouts;
         // Unique keys
         "predicted-missing-unique-keys":        "unique-keys",
         "predicted-odd-foreign-key":            "fk-integrity",
+        "validation-invalid-foreign-key":       "fk-integrity",
         "predicted-invalid-functional-dependency":   "functional-dependencies",
         "predicted-odd-functional-dependency":       "functional-dependencies",
         "predicted-functional-dependency-candidate": "functional-dependencies",
@@ -7612,7 +7631,7 @@ return OntologyLayouts;
         },
 
         "predicted-functional-dependency-candidate": {
-          detectionDescription: `<p>When the loaded plan joins a table to itself, the mappings over that table are examined. If they mint their instances from one column that is not a declared unique key, and give those instances properties taken from other columns of the same table, a functional dependency from that column to the others is proposed — unless it is already declared. Nothing is proposed for servers older than Stardog 12.2. The finding is a question: only the owner of the data can say whether each value of the instance column really goes with a single value of each property column. Its <em>Test with SQL</em> button groups the table by the instance column and counts the values that go with more than one value of the property columns, treating an empty value as a value. If any are found the finding is withdrawn.</p>`,
+          detectionDescription: `<p>The mappings are examined table by table, with or without a query plan. Where they mint instances from one column that is not a declared unique key, and give those instances properties taken from other columns of the same table, a functional dependency from that column to the others is proposed — unless it is already declared. When the loaded plan joins that table to itself, the finding is listed with the query's findings and links to those plan nodes. Otherwise it bears on no query, and it is shown only among the finding pills of the ER Diagram panel, where its arrows bring the table into view and flash the columns concerned. Tables with no declared unique key are left to the <em>Missing unique keys</em> finding. Nothing is proposed for servers older than Stardog 12.2. The finding is a question: only the owner of the data can say whether each value of the instance column really goes with a single value of each property column. Its <em>Test with SQL</em> button groups the table by the instance column and counts the values that go with more than one value of the property columns, treating an empty value as a value. If any are found the finding is withdrawn.</p>`,
           rationale: `<p>Mapping a non-key column as instances makes Stardog read the table once for each pattern about those instances and join the results on the column. If each value of the column determines the other columns, those scans can be one. Declaring that in functional.dependency.sets lets Stardog eliminate the self-join. Stardog does not verify the declaration, and a declaration that is not true of the data makes query results undefined, so the data must be confirmed first.</p>`,
           extendedNotes: `<p>Declare it with <code>(SCHEMA.TABLE.INSTANCE_COLUMN-&gt;SCHEMA.TABLE.PROPERTY_COLUMN1,SCHEMA.TABLE.PROPERTY_COLUMN2)</code> in the Functional Dependency Sets pane.</p>`,
         },
@@ -7620,6 +7639,11 @@ return OntologyLayouts;
         "validation-invalid-functional-dependency": {
           detectionDescription: `<p>SQL validation groups the table by the determinant column(s) of each declared dependency and counts the groups in which a dependent column has more than one value, an empty value counting as a value. Any such group means the declaration is not true of the data.</p>`,
           rationale: `<p>Stardog trusts functional.dependency.sets and does not validate it. If a declared dependency does not hold, Stardog removes self-joins it should have kept and query results are undefined — wrong answers rather than an error.</p>`,
+        },
+
+        "validation-invalid-foreign-key": {
+          detectionDescription: `<p>SQL validation (Foreign Keys tab) checks each declared foreign key for inclusion: every value of its columns that is not empty must appear in the referenced columns of the target table. When some values have no matching row, the declaration is reported. In the ER Diagram the arrows of this finding light up the foreign key's line.</p>`,
+          rationale: `<p>Stardog trusts foreign.key.sets and does not check it. A foreign key lets Stardog assume every row joins to exactly one row of the target table and remove joins on that basis; when some rows have no match, those removals change query results instead of only making the query faster.</p>`,
         },
 
         "predicted-odd-foreign-key": {
@@ -8967,6 +8991,7 @@ return OntologyLayouts;
         renderFunctionalDependenciesWarningsHeaderPill();
         renderRulesWarningsHeaderPill();
         renderOntologyWarningsHeaderPill();
+        renderErdFindingPills();
         renderGutterMappingToggles();
         if (typeof renderMappingArtifactWarningToggles === "function") renderMappingArtifactWarningToggles();
         if (typeof renderMappingsWarningMarkers === "function") renderMappingsWarningMarkers();
@@ -19225,7 +19250,7 @@ return OntologyLayouts;
 
       // Finding kinds whose confidence is an observed fact, not a probability estimate.
       const OBJECTIVE_KINDS = new Set([
-        "predicted-missing-unique-keys", "predicted-complex-source-sql", "predicted-odd-foreign-key",
+        "predicted-missing-unique-keys", "predicted-complex-source-sql", "predicted-odd-foreign-key", "validation-invalid-foreign-key",
         "predicted-invalid-functional-dependency", "predicted-odd-functional-dependency", "validation-invalid-functional-dependency",
         "predicted-empty-virtual-graph", "predicted-nonstandard-prefix",
         "validation-invalid-unique-key",    "validation-discovered-unique-key",
@@ -23560,23 +23585,28 @@ ORDER BY ?table ?ordinal`;
         return out;
       }
 
-      // Where a self-join on `planTable` could be removed by declaring a functional dependency: mapping blocks over that
-      // table whose instances are minted from ONE non-key column (the subject IRI template) and whose properties come from
-      // other columns of the same table. If each value of the subject column has only one value of each of those columns,
+      // Where a self-join could be removed by declaring a functional dependency: mapping blocks over a table whose
+      // instances are minted from ONE non-key column (the subject IRI template) and whose properties come from other
+      // columns of the same table. Such mappings make Stardog join the table to itself on that column whenever a query
+      // asks for two of those properties (or follows a link into those instances from another mapping of the table).
+      // If each value of the subject column has only one value of each of those columns,
       // `(table.subject_col -> table.col1, table.col2)` in functional.dependency.sets lets Stardog drop the self-join.
       // Whether that is true of the data is a statement only the data's owner can make, so this only proposes it.
+      // `planTable` limits the search to one table; null or "" searches every table the mappings read.
       // Returns [{ table, det: [col], dep: [col, ...], blocks: [block] }], leaving out what is already declared. A table with no
       // declared unique key at all gets none (declare its keys first).
       const _fdLast = (t) => String(t || "").replace(/[`"]/g, "").split(".").pop().toLowerCase();
+      // the whole table name as written, unquoted and lowercased: tables of the same name in two schemas stay apart
+      const _fdFull = (t) => String(t || "").replace(/[`"]/g, "").toLowerCase();
       // two table names are the same table when equal, or when one is the other with a schema (or catalog) in front
       const _fdSameTable = (a, b) => {
         const x = String(a || "").replace(/[`"]/g, "").toLowerCase(), y = String(b || "").replace(/[`"]/g, "").toLowerCase();
         return Boolean(x) && Boolean(y) && (x === y || x.endsWith("." + y) || y.endsWith("." + x));
       };
       function findFunctionalDependencyCandidates(planTable, blocksByVg, uniqueKeyEntries, declaredFds) {
-        const want = _fdLast(planTable), groups = new Map();
+        const want = planTable ? _fdLast(planTable) : "", groups = new Map();
         Object.values(blocksByVg || {}).flat().forEach((block) => {
-          if (!block || !block.fromTable || _fdLast(block.fromTable) !== want) return;
+          if (!block || !block.fromTable || (want && _fdLast(block.fromTable) !== want)) return;
           if (block.sqlShape && block.sqlShape.kind !== "trivial") return;
           // a table with no declared unique key at all is the missing-unique-keys finding's business; which columns are "not keys" is unknown
           if (!(uniqueKeyEntries || []).some((k) => _fdSameTable(k.fullTable, block.fromTable))) return;
@@ -23607,7 +23637,7 @@ ORDER BY ?table ?ordinal`;
               if (col && col.toLowerCase() !== det.toLowerCase() && !isKey(col) && !dep.some((d) => d.toLowerCase() === col.toLowerCase())) dep.push(col);
             });
             if (!dep.length) return;
-            const key = want + "|" + det.toLowerCase();
+            const key = _fdFull(block.fromTable) + "|" + det.toLowerCase();
             if (!groups.has(key)) groups.set(key, { table: block.fromTable, det: [det], dep: [], blocks: [] });
             const g = groups.get(key);
             if (!g.blocks.includes(block)) g.blocks.push(block);
@@ -24760,41 +24790,50 @@ ORDER BY ?table ?ordinal`;
         // @end-detect
 
         // @detect: predicted-functional-dependency-candidate
-        // Predicted, and only a question: a self-join of a table is observed in the plan, and the mappings over that table
-        // mint their instances from one non-key column whose other mapped columns could each have a single value per
-        // instance. Declaring that dependency in functional.dependency.sets (Stardog 12.2 and later) lets Stardog drop the
-        // self-join. Whether it holds is for the data's owner to assert; the card offers a SQL test of the assertion, and
-        // the finding is withdrawn when the data shows it does not hold.
-        if (planLoaded && planIndex && functionalDependenciesAvailable()) {
+        // Predicted, and only a question: the mappings over a table mint their instances from one non-key column and give
+        // them properties from other columns of the same table — the pattern that makes Stardog join the table to itself
+        // on that column. It is found from the mappings alone; when the loaded plan does join that table to itself, the
+        // finding says so and points at those plan nodes. Declaring the dependency in functional.dependency.sets (Stardog
+        // 12.2 and later) lets Stardog drop the self-join. Whether it holds is for the data's owner to assert; the card
+        // offers a SQL test of the assertion, and the finding is withdrawn when the data shows it does not hold.
+        // Only a candidate whose table the loaded plan joins to itself bears on this query; it goes with the other
+        // findings. Every other candidate goes to `erdFindings`, shown only in the ER Diagram panel's header, which
+        // serves key work away from any one query.
+        const erdFindings = [];
+        if (functionalDependenciesAvailable()) {
           const _fdDeclared = parseFunctionalDependencySetsTextWithDs(state.artifacts.functionalDependencySets?.working || "");
           const _fdUk2 = parseUniqueKeySetsText(state.artifacts.uniqueKeySets?.working || "");
           const _fdTests = state.ui.fdTests || {};
-          evaluateSameTableRepeatedScans(planIndex, blocksByVg).filter((f) => f.isSelfJoin).forEach((f) => {
-            findFunctionalDependencyCandidates(f.table, blocksByVg, _fdUk2, _fdDeclared).forEach((c) => {
+          const _fdPlan = planLoaded && planIndex;
+          const _fdSelfJoins = _fdPlan ? evaluateSameTableRepeatedScans(planIndex, blocksByVg).filter((f) => f.isSelfJoin) : [];
+          findFunctionalDependencyCandidates(null, blocksByVg, _fdUk2, _fdDeclared).forEach((c) => {
+            const f = _fdSelfJoins.find((s) => _fdSameTable(s.table, c.table)) || null;
               const key = fdTestKey(c.table, c.det, c.dep), test = _fdTests[key] || null;
-              if (test && test.status === "fails") return;
-              const entryText = `(${c.det.map((x) => `${c.table}.${x}`).join(",")}->${c.dep.map((x) => `${c.table}.${x}`).join(",")})`;
-              const colsHtml = (cols) => cols.map((x) => `<code>${esc(x)}</code>`).join(", ");
-              pushFinding({
-                kind: "predicted-functional-dependency-candidate",
-                severity: "info",
-                confidence: "low",
-                mode: "predicted",
-                queryLines: [],
-                mappings: c.blocks.map((b) => ({ vg: b.vg, mappingId: b.mappingId, table: b.fromTable, name: b.name, lineRange: b.lineRange })),
-                planNodeIds: f.planNodeIds,
-                fdCandidate: { key, table: c.table, det: c.det, dep: c.dep, entryText, vg: c.blocks[0]?.vg || "" },
-                fdTest: test,
-                evidence: [
-                  { source: "plan", detail: `<code>${esc(f.table)}</code> is joined to itself in the plan.` },
-                  { source: "mappings", detail: `Instances are minted from <code>${esc(c.det[0])}</code>, which is not a declared unique key, and their properties come from ${colsHtml(c.dep)} of the same table.` },
-                  { source: "question", detail: `Does every value of <code>${esc(c.det[0])}</code> go with exactly one value of ${colsHtml(c.dep)} in <code>${esc(c.table)}</code> (an empty value counts as a value)? If so, declaring <code>${esc(entryText)}</code> in functional.dependency.sets lets Stardog skip the self-join.` },
-                  ...(test && test.status === "holds" ? [{ source: "sql", detail: `Tested on the data: no value of <code>${esc(c.det[0])}</code> goes with more than one value of ${colsHtml(c.dep)}.` }] : [])
-                ],
-                hints: [{ type: "metadata fix", text: `If the data owner confirms it, add <code>${esc(entryText)}</code> to functional.dependency.sets (Stardog 12.2 or later). Stardog does not check the declaration; if it is not true, query results are undefined.` }],
-                rootCauseKey: `fd-candidate:${key}`
-              });
-            });
+            if (test && test.status === "fails") return;
+            const entryText = `(${c.det.map((x) => `${c.table}.${x}`).join(",")}->${c.dep.map((x) => `${c.table}.${x}`).join(",")})`;
+            const colsHtml = (cols) => cols.map((x) => `<code>${esc(x)}</code>`).join(", ");
+            const record = {
+              kind: "predicted-functional-dependency-candidate",
+              severity: "info",
+              confidence: "low",
+              mode: "predicted",
+              queryLines: [],
+              mappings: c.blocks.map((b) => ({ vg: b.vg, mappingId: b.mappingId, table: b.fromTable, name: b.name, lineRange: b.lineRange })),
+              planNodeIds: f ? f.planNodeIds : [],
+              irrelevantToPlan: false,
+              fdCandidate: { key, table: c.table, det: c.det, dep: c.dep, entryText, vg: c.blocks[0]?.vg || "", planSelfJoin: Boolean(f) },
+              fdTest: test,
+              evidence: [
+                ...(f ? [{ source: "plan", detail: `<code>${esc(f.table)}</code> is joined to itself in the plan.` }] : []),
+                { source: "mappings", detail: `Instances are minted from <code>${esc(c.det[0])}</code>, which is not a declared unique key, and their properties come from ${colsHtml(c.dep)} of the same table. A query that combines several patterns about these instances, or that reaches them from another mapping of <code>${esc(c.table)}</code>, can make Stardog join the table to itself on <code>${esc(c.det[0])}</code>.` },
+                { source: "question", detail: `Does every value of <code>${esc(c.det[0])}</code> go with exactly one value of ${colsHtml(c.dep)} in <code>${esc(c.table)}</code> (an empty value counts as a value)? If so, declaring <code>${esc(entryText)}</code> in functional.dependency.sets lets Stardog skip the self-join.` },
+                ...(test && test.status === "holds" ? [{ source: "sql", detail: `Tested on the data: no value of <code>${esc(c.det[0])}</code> goes with more than one value of ${colsHtml(c.dep)}.` }] : [])
+              ],
+              hints: [{ type: "metadata fix", text: `If the data owner confirms it, add <code>${esc(entryText)}</code> to functional.dependency.sets (Stardog 12.2 or later). Stardog does not check the declaration; if it is not true, query results are undefined.` }],
+              rootCauseKey: `fd-candidate:${_fdFull(c.table)}|${key}`
+            };
+            if (f) pushFinding(record);
+            else erdFindings.push({ ...record, id: `erd-${erdFindings.length + 1}` });
           });
         }
         // @end-detect
@@ -24883,7 +24922,7 @@ ORDER BY ?table ?ordinal`;
           findingsBySeverity[f.severity] = (findingsBySeverity[f.severity] || 0) + 1;
           findingsByMode[f.mode] = (findingsByMode[f.mode] || 0) + 1;
         });
-        return { findings, tripleMatches };
+        return { findings, tripleMatches, erdFindings };
       }
 
       // Derives time-hotspot, cardinality-mismatch, and service-join findings from
@@ -27391,7 +27430,7 @@ ORDER BY ?table ?ordinal`;
           const planLoaded = Boolean(planText.trim()) && planEvidenceNodes.length > 0;
           const planIndex = planLoaded ? AnalysisDetectors.buildPlanEvidenceIndex(planEvidenceNodes) : null;
           const planSignals = planLoaded ? AnalysisDetectors.harvestPlanSignals(planText, planEvidenceNodes) : [];
-          const { findings: rawFindings, tripleMatches: rawTripleMatches } = AnalysisDetectors.computeMappingFindings({
+          const { findings: rawFindings, tripleMatches: rawTripleMatches, erdFindings: rawErdFindings } = AnalysisDetectors.computeMappingFindings({
             blocksByVg, queryPatterns, expansion, reasoningEnabled, planIndex, planLoaded, queryText
           });
           const findings = rawFindings.map((finding) => AnalysisTypes.normalizeFindingRecord(finding));
@@ -27879,7 +27918,8 @@ ORDER BY ?table ?ordinal`;
               }
             });
           }
-          return { blocksByVg, totalBlocks, vgs, queryPatterns, expansion, planEvidenceNodes, planLoaded, planIndex, findings, tripleMatches: rawTripleMatches };
+          const erdFindings = (rawErdFindings || []).map((finding) => AnalysisTypes.normalizeFindingRecord(finding));
+          return { blocksByVg, totalBlocks, vgs, queryPatterns, expansion, planEvidenceNodes, planLoaded, planIndex, findings, erdFindings, tripleMatches: rawTripleMatches };
         },
 
         applyMappingAnalysisResult(context, result) {
@@ -27888,6 +27928,7 @@ ORDER BY ?table ?ordinal`;
           analysis.queryPatterns = queryPatterns;
           analysis.expansionInfo = { reasoningEnabled, byClass: expansion.byClass, byProperty: expansion.byProperty };
           analysis.findings = findings;
+          analysis.erdFindings = result.erdFindings || [];
           analysis.planSignature = (planText || "").slice(0, 120).trim();
           analysis.findingsByQueryLine = computeFindingsByQueryLine(findings, context.queryText);
           analysis.findingsByMappingBlock = computeFindingsByMappingBlock(findings);
@@ -30096,7 +30137,7 @@ ORDER BY ?table ?ordinal`;
           const planLoaded = Boolean(planText.trim()) && planEvidenceNodes.length > 0;
           const planIndex = planLoaded ? buildPlanEvidenceIndex(planEvidenceNodes) : null;
           // Phase 5 — compute findings
-          const { findings, tripleMatches: _tripleMatches } = computeMappingFindings({
+          const { findings, tripleMatches: _tripleMatches, erdFindings: _erdFindings } = computeMappingFindings({
             blocksByVg, queryPatterns, expansion, reasoningEnabled, planIndex, planLoaded, queryText
           });
           // Phase 5b — merge pure query-structure findings (no mapping data needed)
@@ -30110,6 +30151,7 @@ ORDER BY ?table ?ordinal`;
             });
           }
           analysis.findings = findings;
+          analysis.erdFindings = _erdFindings || [];
           analysis.planSignature = (planText || "").slice(0, 120).trim();
           analysis.findingsByQueryLine = computeFindingsByQueryLine(findings, queryText);
           analysis.findingsByMappingBlock = computeFindingsByMappingBlock(findings);
@@ -30302,7 +30344,7 @@ ORDER BY ?table ?ordinal`;
 
       function jumpFromFindingToMapping(findingId, mappingIdx, jumpMode = "predicate") {
         exitPillFocusMode();
-        const finding = state.ui.mappingAnalysis.findings.find((f) => f.id === findingId);
+        const finding = findAnyMappingFinding(findingId);
         if (!finding) return;
         const m = (finding.mappings || [])[mappingIdx || 0];
         if (!m) return;
@@ -30529,9 +30571,15 @@ ORDER BY ?table ?ordinal`;
       // "Test with SQL" on a functional dependency candidate: counts the values of the instance column that go with more
       // than one value of the proposed dependent columns. None -> the assertion holds on this data (the card then offers to
       // add it); any -> it does not, and the recommendation is withdrawn (and stays withdrawn when analysis runs again).
+      // A finding by id, among the query's findings or those shown only in the ER Diagram panel.
+      function findAnyMappingFinding(findingId) {
+        const a = state.ui.mappingAnalysis || {};
+        return (a.findings || []).find((x) => x.id === findingId) || (a.erdFindings || []).find((x) => x.id === findingId) || null;
+      }
+
       async function testFunctionalDependencyFinding(findingId) {
         const analysis = state.ui.mappingAnalysis;
-        const f = (analysis.findings || []).find((x) => x.id === findingId);
+        const f = findAnyMappingFinding(findingId);
         if (!f || !f.fdCandidate) return;
         state.ui.fdTestRunning = state.ui.fdTestRunning || {};
         if (state.ui.fdTestRunning[findingId]) return;
@@ -30572,7 +30620,7 @@ ORDER BY ?table ?ordinal`;
       // Adds a tested dependency to the Functional Dependency Sets pane: on the last entry line of its data source's
       // section (or of the whole text when it has no sections), comma separated.
       function addFunctionalDependencyFromFinding(findingId) {
-        const f = (state.ui.mappingAnalysis.findings || []).find((x) => x.id === findingId);
+        const f = findAnyMappingFinding(findingId);
         if (!f || !f.fdCandidate) return;
         const c = f.fdCandidate, entry = f.fdCandidate.entryText;
         const dsName = String(_resolveDsForVg(c.vg) || "").trim();
@@ -30797,6 +30845,33 @@ ORDER BY ?table ?ordinal`;
         scroll.scrollTo({ left: newLeft, behavior: "smooth" });
       }
 
+      // A pill partly hidden at either end of its strip scrolls fully into view once it has opened on hover,
+      // so its arrows can be reached. Clear of the fade at that end; the pointer stays on the pill.
+      const _PS_FADE_W = 26; // px — must match the fade width of the .pill-strip-scroll mask
+      function _pillStripRevealPill(pill) {
+        const scroll = pill && pill.parentElement;
+        if (!scroll || !scroll.classList.contains("pill-strip-scroll")) return 0;
+        const host = scroll.parentElement;
+        const sr = scroll.getBoundingClientRect(), pr = pill.getBoundingClientRect();
+        const left = sr.left + (host.classList.contains("ps-fade-left") ? _PS_FADE_W : 0);
+        const right = sr.right - (host.classList.contains("ps-fade-right") ? _PS_FADE_W : 0);
+        let d = 0;
+        if (pr.right > right) d = pr.right - right;
+        if (pr.left - d < left) d = pr.left - left;
+        if (!d) return 0;
+        scroll.scrollBy({ left: d, behavior: "smooth" });
+        return d;
+      }
+      let _psHoverPill = null;
+      document.addEventListener("mouseover", (event) => {
+        const pill = event.target instanceof Element ? event.target.closest(".pill-strip-scroll > *") : null;
+        if (pill === _psHoverPill) return;
+        _psHoverPill = pill;
+        if (!pill) return;
+        // after the hover arrows have opened (their max-width transition is 120ms)
+        setTimeout(() => { if (_psHoverPill === pill && pill.matches(":hover")) _pillStripRevealPill(pill); }, 140);
+      }, { passive: true });
+
       function _pillStripScrollLeft(host) {
         const scroll = host.querySelector(".pill-strip-scroll");
         if (!scroll) return;
@@ -30939,7 +31014,7 @@ ORDER BY ?table ?ordinal`;
         const visibleTopDrivers = [];
         const seenKinds = new Set();
         const _noStripKinds = new Set([
-          "predicted-complex-source-sql", "predicted-missing-unique-keys", "predicted-odd-foreign-key",
+          "predicted-complex-source-sql", "predicted-missing-unique-keys", "predicted-odd-foreign-key", "validation-invalid-foreign-key",
           "predicted-invalid-functional-dependency", "predicted-odd-functional-dependency", "predicted-functional-dependency-candidate", "validation-invalid-functional-dependency",
           "predicted-redundant-rule",      "observed-datatype-mismatch",
           "predicted-empty-virtual-graph", "predicted-missing-model-definition", "predicted-nonstandard-prefix",
@@ -31390,8 +31465,14 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.62.1";
+      const APP_VERSION = "1.63.0";
       const RELEASE_NOTES = [
+        { version: "1.63.0", date: "2026-11-26", title: "Findings in the ER Diagram", items: [
+          "Finding pills in the ER Diagram header list problems with unique keys, foreign keys and functional dependencies, whatever query they bear on, including questions about the data that no query depends on.",
+          "The arrows on a pill step through its findings: the table comes forward, enlarged, the key, its columns or the foreign key line flash, and the finding's card opens beside it, with what to test or change.",
+          "A column that may determine other columns of the same table is suggested from the mappings alone, as a functional dependency you can test against the data and declare (Stardog 12.2 and later).",
+          "A foreign key that fails SQL validation is reported as a finding, in the Foreign Key Sets header and in the ER Diagram."
+        ] },
         { version: "1.62.0", date: "2026-11-26", title: "Tokens, and loading and exporting files on the server", items: [
           "{*All Stardog endpoints…*} can get an authentication token for the connected user, to paste into another app that connects to Stardog.",
           "A file that is already on the server can be loaded into a database in one step, and a database can be exported to a file on the server. The export asks you to confirm first, because it writes a file."
@@ -33067,7 +33148,7 @@ ORDER BY ?table ?ordinal`;
           !finding.probeCleared &&
           mappingFindingVisibleForUi(finding) &&
           !state.ui.dismissedFindingKinds?.[finding.kind] &&
-          finding.kind === "predicted-odd-foreign-key"
+          (finding.kind === "predicted-odd-foreign-key" || finding.kind === "validation-invalid-foreign-key")
         ));
         if (!analysis.active || !findings.length) {
           setPillStripContent(host, "");
@@ -33477,6 +33558,7 @@ ORDER BY ?table ?ordinal`;
         renderFunctionalDependenciesWarningsHeaderPill();
         renderRulesWarningsHeaderPill();
         renderOntologyWarningsHeaderPill();
+        renderErdFindingPills();
         renderArtifactFlowView("sms2Mappings");
         renderPlanAnalysisStatusPill();
         const _ma = state.ui.mappingAnalysis;
@@ -33647,6 +33729,7 @@ ORDER BY ?table ?ordinal`;
         "predicted-missing-model-definition": ["ontologyModel", "sms2Mappings", "inferenceRules"],
         "predicted-nonstandard-prefix":       ["ontologyModel", "inferenceRules"],
         "predicted-odd-foreign-key":          ["foreignKeySets"],
+        "validation-invalid-foreign-key":     ["foreignKeySets"],
         "predicted-invalid-functional-dependency": ["functionalDependencySets"],
         "predicted-odd-functional-dependency": ["functionalDependencySets"],
         "predicted-functional-dependency-candidate": ["sms2Mappings", "functionalDependencySets"],
@@ -33762,7 +33845,7 @@ ORDER BY ?table ?ordinal`;
       // query line from live text (query-invalid-from-context) — safe to navigate even
       // when state.ui.mappingAnalysis._lineLayoutInvalidated is set.
       const _MAPPING_FINDING_QUERY_LINE_SAFE_KINDS = new Set([
-        "observed-datatype-mismatch", "predicted-complex-source-sql", "predicted-missing-unique-keys", "query-invalid-from-context", "predicted-odd-foreign-key",
+        "observed-datatype-mismatch", "predicted-complex-source-sql", "predicted-missing-unique-keys", "query-invalid-from-context", "predicted-odd-foreign-key", "validation-invalid-foreign-key",
         "predicted-invalid-functional-dependency", "predicted-odd-functional-dependency", "predicted-functional-dependency-candidate", "validation-invalid-functional-dependency"
       ]);
 
@@ -33800,7 +33883,7 @@ ORDER BY ?table ?ordinal`;
           }
           return;
         }
-        if (finding.kind === "predicted-odd-foreign-key") {
+        if (finding.kind === "predicted-odd-foreign-key" || finding.kind === "validation-invalid-foreign-key") {
           if (state.currentArtifact !== "foreignKeySets") {
             state.currentArtifact = "foreignKeySets";
             renderEditor();
@@ -54122,6 +54205,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         layoutKind: "tidy", fitNext: false,      // the layout a full re-layout uses (the Layout menu changes it)
         drawer: false, drawerKey: "uniqueKeySets",
         mode: null, link: null, pairFk: null, hot: null, job: null, testAbort: null, model: null,
+        findNav: {}, findOpen: null, findShown: null, findFocus: null,   // finding pills in the header: index per kind, open pill, finding whose card shows
       };
       const kdConnected = () => Boolean(state.connection?.isConnected && state.connection?.baseUrl && !state.ui.demoMode);
 
@@ -54337,6 +54421,8 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         if (_kd.mode || _kd.link || _kd.drag) _kd.pendingCards = true;
         else { _kd.pendingCards = false; kdRenderCards(M); }
         kdUpdateBadge();
+        renderErdFindingPills();
+        kdApplyFindingFocus();
       }
       function kdUpdateBadge() {
         const badge = $("erdStatusBadge");
@@ -55047,6 +55133,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         return `(${a.map((c) => `${n}.${c}`).join(",")} -> ${b.map((c) => `${tn}.${c}`).join(",")})`;
       }
       function kdEnterMode(m) {
+        if (_kd.findFocus) kdClearFindingFocus();
         kdHideMenu();
         kdEndLink();
         _kd.mode = Object.assign({ pick: new Set(), det: new Set(), test: null }, m);
@@ -55071,7 +55158,18 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         _kd.mode = null;
         setTimeout(() => kdRender(), 300);
       }
-      function kdEndModes() { kdHideMenu(); kdEndLink(); if (_kd.mode) kdExitMode(); }
+      // Escape in the ER Diagram peels back one layer (menu, link, key editing, the finding shown) before the
+      // panel itself closes; the app's Escape handler asks here first. Returns true when it took the key.
+      function kdPeelEscape() {
+        if ($("erdPanel")?.classList.contains("hidden")) return false;
+        const menu = $("kdMenu");
+        if (menu && !menu.classList.contains("hidden")) { kdHideMenu(); return true; }
+        if (_kd.link) { kdEndLink(); _kd.pairFk = null; return true; }
+        if (_kd.mode) { kdExitMode(); return true; }
+        if (_kd.findFocus || _kd.findShown) { erdCloseFindingCard(); renderErdFindingPills(); return true; }
+        return false;
+      }
+      function kdEndModes() { kdHideMenu(); kdEndLink(); if (_kd.mode) kdExitMode(); if (_kd.findFocus || _kd.findShown) { erdCloseFindingCard(); renderErdFindingPills(); } }
       function kdPaintMode() {
         const m = _kd.mode, M = _kd.model, t = M?.tables.get(m.id);
         if (!m || !t) return;
@@ -55140,6 +55238,183 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
           return { ok: null, msg: summarizeSchemaDriftError(e.message || String(e)) };
         } finally { if (_kd.testAbort === ctl) _kd.testAbort = null; }
       }
+      // ── Finding pills in the ER Diagram header ──────────────────────────────────
+      // The key findings (unique keys, foreign keys, functional dependencies), whatever query they bear on, plus the
+      // ones that bear on no query and are shown only here (analysis.erdFindings). One pill per kind, built like the
+      // pane header pills; its arrows step through the findings of that kind, bring the table into view, flash the key
+      // chip, the column rows or the foreign key line, and open the finding's card under the header.
+      function erdFindingList() {
+        const a = state.ui.mappingAnalysis || {};
+        const kinds = new Set(CATEGORY_FINDING_KINDS.uniqueKeys || []);
+        const ok = (f) => f && !f.suppressed && !f.probeCleared && !state.ui.dismissedFindingKinds?.[f.kind];
+        return sortFindingsByImpact([...(a.findings || []).filter((f) => kinds.has(f.kind)), ...(a.erdFindings || [])].filter(ok));
+      }
+      function erdFindingPillHtml(kind, items) {
+        const f = items[0], label = mappingFindingShortLabel(f);
+        const idx = _kd.findNav[kind];
+        return `<span class="pill-nav-wrap severity-${esc(f.severity)} kind-${esc(kind)} has-nav${_kd.findOpen === kind ? " nav-open" : ""}" data-erd-pill-kind="${esc(kind)}"><button class="mapping-cost-driver-pill pill-nav-target" data-erd-finding-kind="${esc(kind)}" title="Show ${esc(label)} in the diagram">${esc(label)}</button>${pillNavControlsHtml(idx == null ? -1 : idx, items.length, `data-erd-nav-kind="${esc(kind)}" data-dir="-1"`, `data-erd-nav-kind="${esc(kind)}" data-dir="1"`, `Previous ${label}`, `Next ${label}`)}</span>`;
+      }
+      function renderErdFindingPills() {
+        const host = $("erdFindingsHost");
+        if (!host || $("erdPanel")?.classList.contains("hidden")) return;
+        const list = erdFindingList();
+        const kinds = [...new Set(list.map((f) => f.kind))];
+        kinds.forEach((k) => { const n = list.filter((f) => f.kind === k).length; if (_kd.findNav[k] != null && _kd.findNav[k] >= n) _kd.findNav[k] = n - 1; });
+        setPillStripContent(host, kinds.map((k) => erdFindingPillHtml(k, list.filter((f) => f.kind === k))).join(""));
+        // as wide as the pills plus the arrows one of them shows on hover, measured; the header narrows it when short of room
+        const scroll = host.querySelector(".pill-strip-scroll"), pills = scroll ? [...scroll.children] : [];
+        if (pills.length) {
+          const span = pills[pills.length - 1].getBoundingClientRect().right - pills[0].getBoundingClientRect().left;
+          const grow = Math.max(0, ...[...scroll.querySelectorAll(".pill-nav-controls")].map((c) => c.scrollWidth - c.getBoundingClientRect().width));
+          host.style.flexBasis = `${span + grow}px`;
+        } else host.style.flexBasis = "";
+        // the open card follows its finding: refreshed after a test, closed once the finding is gone
+        if (_kd.findShown) {
+          const f = list.find((x) => x.id === _kd.findShown);
+          if (f) erdShowFindingCard(f); else erdCloseFindingCard();
+        }
+      }
+      // delta 0 shows the current one (the first when none was shown yet)
+      function erdNavigateFinding(kind, delta) {
+        const items = erdFindingList().filter((f) => f.kind === kind);
+        if (!items.length) return;
+        const cur = _kd.findNav[kind];
+        const n = items.length;
+        const next = cur == null ? (delta < 0 ? n - 1 : 0) : (((cur + delta) % n) + n) % n;
+        _kd.findNav[kind] = next;
+        _kd.findOpen = kind;
+        _kd.findShown = items[next].id;
+        renderErdFindingPills();
+        kdRevealFinding(items[next]);
+      }
+      // Where a finding sits in the diagram: { table, cols, chip: "uk"|"fd"|null, fk: {srcTable, srcCols, tgtTable, tgtCols} }
+      function erdFindingTarget(f) {
+        if (f.fdCandidate) return { table: f.fdCandidate.table, cols: [...f.fdCandidate.det, ...f.fdCandidate.dep], chip: null };
+        if (f.fkSpec) return { table: f.fkSpec.srcTable, cols: f.fkSpec.srcCols, fk: f.fkSpec };
+        if (f.fdMatchRaw) {
+          const e = parseFunctionalDependencySetsText(f.fdMatchRaw)[0];
+          if (e) return { table: e.table, cols: [...e.det, ...e.dep], chip: "fd", det: e.det, dep: e.dep };
+        }
+        if (f.fkMatchRaw) {
+          const e = parseForeignKeySetsText(f.fkMatchRaw)[0];
+          if (e) return { table: e.srcTable, cols: e.srcCols, fk: { srcTable: e.srcTable, srcCols: e.srcCols, tgtTable: e.tgtTable, tgtCols: e.tgtCols } };
+        }
+        if (f._tgtTable) return { table: f._tgtTable, cols: f._tgtCols || [], chip: null };
+        if (f.kind === "validation-invalid-unique-key") {
+          const e = parseUniqueKeySetsText(String((f.evidence || [])[0]?.source || ""))[0];
+          if (e) return { table: e.fullTable, cols: e.cols, chip: "uk" };
+        }
+        const m = (f.mappings || [])[0];
+        if (m && m.table) return { table: m.table, cols: [], chip: null };
+        if (f.table) return { table: f.table, cols: [], chip: null };
+        return null;
+      }
+      function kdRevealFinding(f) {
+        const tg = erdFindingTarget(f);
+        if (!tg || !tg.table) return null;
+        if (_erdActiveTab !== "diagram") switchErdTab("diagram");
+        let M = _kd.model || kdModel();
+        const t = M.T(tg.table);
+        if (!t) { showStatusToast(`${tg.table} is not in the diagram.`, "info", 3600); return null; }
+        if (!M.visible.includes(t.id)) { _kd.removed.delete(t.id); _kd.vgOff.clear(); kdRender(); M = _kd.model; }
+        const card = kdCard(t.id), vp = $("kdVp");
+        if (!card || !vp) return null;
+        const lc = (c) => String(c).toLowerCase();
+        const same = (x, y) => x.length === y.length && x.every((c) => y.some((d) => lc(d) === lc(c)));
+        const tt = tg.fk ? M.T(tg.fk.tgtTable) : null;
+        const fkIdx = tt ? M.fks.findIndex((g) => g.from === t.id && g.to === tt.id && same(g.e.cols, tg.fk.srcCols) && same(g.e.tgtCols, tg.fk.tgtCols)) : -1;
+        // the rest of the diagram fades; a single table comes forward, enlarged, above the finding card
+        if (_kd.findFocus) kdClearFindingFocus();
+        _kd.findFocus = { ids: tt && tt.id !== t.id ? [t.id, tt.id] : [t.id], fk: fkIdx >= 0 ? fkIdx : null, lift: !tg.fk };
+        if (tg.fk) {
+          // both ends of a foreign key stay where the line joins them: scroll them into the middle of the view
+          const tgtCard = tt ? kdCard(tt.id) : null;
+          const a = card.getBoundingClientRect(), b = tgtCard ? tgtCard.getBoundingClientRect() : a, v = vp.getBoundingClientRect();
+          const cx = (Math.min(a.left, b.left) + Math.max(a.right, b.right)) / 2, cy = (Math.min(a.top, b.top) + Math.max(a.bottom, b.bottom)) / 2;
+          const bottom = kdFindingAreaBottom(v);
+          vp.scrollBy({ left: cx - (v.left + v.width / 2), top: cy - (v.top + (bottom - v.top) / 2), behavior: "smooth" });
+        }
+        kdApplyFindingFocus();
+        const flash = (el) => flashAttentionBox(el, "nav-jump-highlight", "nav-jump-highlight-fade");
+        const hit = [];
+        if (tg.fk) {
+          const g = fkIdx >= 0 ? document.querySelector(`#kdLines [data-kd-g="fk:${fkIdx}"]`) : null;
+          if (g) hit.push(g);
+          if (tt) tg.fk.tgtCols.forEach((c) => { const r = kdRowEl(tt.id, c); if (r) hit.push(r); });
+        }
+        let chips = [];
+        if (tg.chip === "uk") {
+          const n = t.uks.findIndex((e) => same(e.cols, tg.cols));
+          if (n >= 0) chips = [...card.querySelectorAll(`[data-kd-hk="uk:${n}:${CSS.escape(t.id)}"]`)].filter((el) => el.offsetParent);
+        } else if (tg.chip === "fd") {
+          const n = t.fds.findIndex((e) => same(e.det, tg.det) && same(e.dep, tg.dep));
+          if (n >= 0) chips = [...card.querySelectorAll(`[data-kd-hk="fd:${n}:${CSS.escape(t.id)}"]`)].filter((el) => el.offsetParent);
+        }
+        hit.push(...chips);
+        if (!chips.length || tg.fk) tg.cols.forEach((c) => { const r = kdRowEl(t.id, c); if (r) hit.push(r); });
+        if (hit.length) hit.forEach(flash);
+        else { card.classList.remove("is-flash"); void card.offsetWidth; card.classList.add("is-flash"); hit.push(card); }
+        return hit;
+      }
+      function erdShowFindingCard(f) {
+        const panel = $("erdPanel");
+        if (!panel) return;
+        let box = $("erdFindingCard");
+        if (!box) {
+          box = document.createElement("div");
+          box.id = "erdFindingCard";
+          box.className = "erd-finding-card";
+          panel.appendChild(box);
+        }
+        const items = erdFindingList().filter((x) => x.kind === f.kind), i = items.findIndex((x) => x.id === f.id);
+        box.innerHTML = `<div class="erd-fc-head"><span>${esc(mappingFindingShortLabel(f))} · ${i + 1} of ${items.length}</span><button type="button" class="secondary erd-fc-close" data-erd-card-close title="Close">&times;</button></div>${mappingFindingCardHtml(f)}`;
+        box.hidden = false;
+      }
+      // The open finding card covers the bottom of the view: tables are placed in the part above it.
+      function kdFindingAreaBottom(v) {
+        const box = $("erdFindingCard"), br = box && !box.hidden ? box.getBoundingClientRect() : null;
+        return br && br.top > v.top && br.top < v.bottom ? br.top : v.bottom;
+      }
+      // Fades every table but the finding's (and every line but its foreign key) through a style rule, so redrawing
+      // the lines or the cards keeps it; lifts a single table forward like key editing does. Called again after each render.
+      function kdApplyFindingFocus(relayout) {
+        const ff = _kd.findFocus, cv = $("kdCanvas");
+        if (!cv) return;
+        let st = $("kdFindFocusStyle");
+        if (!st) { st = document.createElement("style"); st.id = "kdFindFocusStyle"; document.head.appendChild(st); }
+        const on = Boolean(ff && !_kd.mode && _erdActiveTab === "diagram");
+        cv.classList.toggle("is-finding", on);
+        if (!on) { st.textContent = ""; return; }
+        const sel = (id) => `#kdCanvas.is-finding [data-kd-card="${CSS.escape(id)}"]`;
+        st.textContent = `${ff.ids.map(sel).join(", ")} { opacity:1; pointer-events:auto; z-index:10; box-shadow:0 20px 50px rgba(0,0,0,0.6), 0 0 0 1.5px rgba(55,198,163,0.55); }`
+          + (ff.fk != null ? ` #kdCanvas.is-finding #kdLines g[data-kd-g="fk:${ff.fk}"] { opacity:1; }` : "");
+        if (!ff.lift) return;
+        const card = kdCard(ff.ids[0]), vp = $("kdVp");
+        if (!card || !vp || (card.style.transform && !relayout)) return;
+        // measured without a transform; a card drawn again by a render takes its place at once, not animated from its slot
+        card.style.transition = "none";
+        card.style.transform = "";
+        const vr = vp.getBoundingClientRect(), cr = card.getBoundingClientRect(), bottom = kdFindingAreaBottom(vr);
+        const s = Math.max(1, Math.min(1.5, (bottom - vr.top - 40) / Math.max(1, cr.height), (vr.width - 40) / Math.max(1, cr.width)));
+        const cx = vr.left + vr.width / 2;
+        const top = Math.max(vr.top + 12, vr.top + (bottom - vr.top) / 2 - cr.height * s / 2);
+        card.style.transform = `translate(${(cx - (cr.left + cr.width * s / 2)) / _kd.zoom}px, ${(top - cr.top) / _kd.zoom}px) scale(${s})`;
+        void card.offsetWidth;
+        card.style.transition = "";
+      }
+      function kdClearFindingFocus() {
+        const ff = _kd.findFocus;
+        _kd.findFocus = null;
+        if (ff && ff.lift) { const c = kdCard(ff.ids[0]); if (c && !c.classList.contains("is-focus")) c.style.transform = ""; }
+        kdApplyFindingFocus();
+      }
+      function erdCloseFindingCard() {
+        _kd.findShown = null; _kd.findOpen = null;
+        if (_kd.findFocus) kdClearFindingFocus();
+        const box = $("erdFindingCard");
+        if (box) { box.hidden = true; box.innerHTML = ""; }
+      }
+
       const kdResHtml = (r) => `<span class="${r.ok ? "kd-ok" : r.ok === false ? "kd-bad" : "kd-hint"}">${r.ok ? "&#10003; " : r.ok === false ? "&#10007; " : ""}${esc(r.msg)}</span>`;
 
       // ── linking columns: click a circle then a column on another table, or drag ────
@@ -55193,6 +55468,11 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
           if (_kd.mode) return;
           const t = e.target instanceof Element ? e.target : null;
           if (!t) return;
+          // a click beside the finding's table, or a drag of its header, puts the diagram back
+          if (_kd.findFocus) {
+            const fc = t.closest("[data-kd-card]");
+            if (!fc || !_kd.findFocus.ids.includes(fc.getAttribute("data-kd-card")) || t.closest(".kd-ch")) kdClearFindingFocus();
+          }
           if (_kd.link && !_kd.link.dragging) {   // second click of click-then-click
             const row = t.closest(".kd-row.is-target");
             if (row) kdFinishLink(row, e.clientX, e.clientY);
@@ -55403,17 +55683,13 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
           const m = $("kdMenu");
           if (m && !m.classList.contains("hidden") && !(e.target instanceof Element && e.target.closest("#kdMenu"))) kdHideMenu();
         }, true);
-        document.addEventListener("keydown", (e) => {
-          if (e.key !== "Escape" || $("erdPanel")?.classList.contains("hidden")) return;
-          if (!$("kdMenu")?.classList.contains("hidden")) { kdHideMenu(); return; }
-          if (_kd.link) { kdEndLink(); _kd.pairFk = null; return; }
-          if (_kd.mode) kdExitMode();
-        });
         // Typing in the mappings redraws the diagram (the key set panes call erdRefreshIfOpen from their own sync).
         document.addEventListener("input", (e) => {
           if (e.target instanceof HTMLTextAreaElement && e.target.getAttribute("data-artifact-editor") === "sms2Mappings") erdRefreshIfOpen();
         });
         window.addEventListener("resize", () => { if (!$("erdPanel")?.classList.contains("hidden") && _kd.model && !_kd.mode) kdDrawLines(_kd.model); });
+        // the table lifted for a finding is placed for the size of the view: place it again when the view resizes
+        if ($("kdVp")) new ResizeObserver(() => { if (_kd.findFocus?.lift) kdApplyFindingFocus(true); }).observe($("kdVp"));
       }
 
       async function kdAct(el, e) {
@@ -56289,6 +56565,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
           }
           checks.push({
             table: srcTable,
+            _fk: { srcTable, srcCols, tgtTable, tgtCols },
             _tgtTable: tgtTable,
             _tgtCols: tgtCols,
             _parentDeclaredUk: parentDeclaredUk,
@@ -57767,8 +58044,31 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         });
 
         // ── 5. FK parent uniqueness — cross-inform UK sets & discover undeclared UKs ────
+        const _fkDeclared = parseForeignKeySetsText(state.artifacts.foreignKeySets?.working || "");
         (_valSqlReport.byCategory["fk-validation"] || []).forEach(chk => {
           const subTests = chk.subTests || [];
+          // The inclusion sub-test (always first): values of the foreign key's columns with no matching row in the target
+          const incl = subTests[0] ? _valSqlRunResults[subTests[0].testNumber] : null;
+          if (incl?.status === "fail" && chk._fk) {
+            const fk = chk._fk;
+            const same = (a, b) => a.length === b.length && a.every((c, i) => String(c).toLowerCase() === String(b[i]).toLowerCase());
+            const entry = _fkDeclared.find((e) => e.srcTable === fk.srcTable && e.tgtTable === fk.tgtTable && same(e.srcCols, fk.srcCols) && same(e.tgtCols, fk.tgtCols));
+            newFindings.push({
+              id: makeId(),
+              kind: "validation-invalid-foreign-key",
+              severity: "expensive",
+              confidence: "high",
+              mode: "observed",
+              _validationGenerated: true,
+              mappings: [],
+              queryLines: [],
+              fkMatchRaw: entry ? entry.raw : null,
+              fkMatchIndex: entry ? entry.matchIndex : null,
+              fkSpec: { srcTable: fk.srcTable, srcCols: fk.srcCols, tgtTable: fk.tgtTable, tgtCols: fk.tgtCols },
+              evidence: [{ source: chk.label, detail: `Some values of <code>${esc(fk.srcTable)}</code> (<code>${esc(fk.srcCols.join(", "))}</code>) have no matching row in <code>${esc(fk.tgtTable)}</code> (<code>${esc(fk.tgtCols.join(", "))}</code>), so the declared foreign key is not true of the data.` }],
+              hints: [{ type: "metadata fix", text: "Remove the entry, or correct the data so every value has a matching row in the referenced table." }],
+            });
+          }
           // Find the parent-uniqueness sub-test (tagged _isParentUniquenessTest by buildFkValidationChecks)
           const uniqSt = subTests.find(st => st._isParentUniquenessTest);
           if (!uniqSt) return;
@@ -68038,6 +68338,25 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
               .catch((err) => { storageRunEl.disabled = false; storageRunEl.dataset.armed = ""; storageRunEl.textContent = "Run optimize now…"; showStatusToast(`Optimize failed: ${err.message}`, "error", 6000); });
             return;
           }
+          // ER Diagram header: finding pills (the label shows the current one, the arrows step) and the card's close button
+          const erdNavEl = target.closest("[data-erd-nav-kind]");
+          if (erdNavEl) {
+            event.stopPropagation();
+            erdNavigateFinding(erdNavEl.getAttribute("data-erd-nav-kind"), Number(erdNavEl.getAttribute("data-dir")) || 1);
+            return;
+          }
+          const erdKindEl = target.closest("[data-erd-finding-kind]");
+          if (erdKindEl) {
+            event.stopPropagation();
+            erdNavigateFinding(erdKindEl.getAttribute("data-erd-finding-kind"), 0);
+            return;
+          }
+          if (target.closest("[data-erd-card-close]")) {
+            event.stopPropagation();
+            erdCloseFindingCard();
+            renderErdFindingPills();
+            return;
+          }
           // Functional dependency candidate: test the assertion with SQL / add it to the pane
           const fdTestEl = target.closest("[data-fd-test]");
           if (fdTestEl) {
@@ -68903,8 +69222,10 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
             .filter((panel) => !panel.classList.contains("hidden"));
           if (!openPanels.length) return;
           const topPanel = openPanels.reduce((top, panel) => (Number(panel.style.zIndex) || 0) > (Number(top.style.zIndex) || 0) ? panel : top);
+          if (topPanel.id === "erdPanel" && kdPeelEscape()) { event.preventDefault(); return; }
           topPanel.classList.add("hidden");
           if (topPanel.id === "investigatePanel") exitInvestigateMode();
+          if (topPanel.id === "erdPanel") kdEndModes();
           event.preventDefault();
         });
 
@@ -71601,7 +71922,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         window.__APP_TESTHOOKS__ = {
           state,
           sqlPreviewTable, sqlTabShow, sqlTabClose, sqlTabsReset, _sqlTabs, _sqlPreviewCache, kdTableMenu,   // SQL Query panel: result tabs and table previews
-          kdModel, kdRender, kdParseArtifact, kdBuildText, kdEditEntry, kdEntryRaw, kdLayoutOrder, kdAddTable, kdArrange, kdJumpToSource, kdImpliedMenu, openKeysDiagram, runGenerateErd, toggleErdPanel, _kd, keySetsTitleHtml,   // ER Diagram key editing
+          kdModel, kdRender, renderFunctionalDependenciesWarningsHeaderPill, erdFindingList, renderErdFindingPills, erdNavigateFinding, erdFindingTarget, kdRevealFinding, erdCloseFindingCard, kdClearFindingFocus, _pillStripRevealPill, findAnyMappingFinding, kdParseArtifact, kdBuildText, kdEditEntry, kdEntryRaw, kdLayoutOrder, kdAddTable, kdArrange, kdJumpToSource, kdImpliedMenu, openKeysDiagram, runGenerateErd, toggleErdPanel, _kd, keySetsTitleHtml,   // ER Diagram key editing
           mappingToBlockAt, mappingToSelectQuery, textareaOffsetAtPoint, getMappingToLastCopy: () => _mappingToLastCopy, // mapping TO → SELECT query copy
           openDebugAnalyticsPanel, seShowTimeline, // Debug Analytics opens the drawer timeline
           typeahead: TA_API,     // typeahead engine (suggestions for a caret position)                 // read analysis findings (state.ui.mappingAnalysis)
