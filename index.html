@@ -9026,7 +9026,7 @@ return OntologyLayouts;
         if (!state.ui.dismissedFindingKinds) state.ui.dismissedFindingKinds = {};
         state.ui.dismissedFindingKinds[kind] = true;
         // Close the nav pill if it was open for this kind
-        if (state.ui.openNavPill === `mappingDriver:${kind}`) state.ui.openNavPill = null;
+        if (String(state.ui.openNavPill || "").endsWith(`:${kind}`)) state.ui.openNavPill = null;
         // Close any expanded query line panels whose visible findings are all of dismissed kinds
         const analysis = state.ui.mappingAnalysis;
         if (analysis.expandedQueryLines?.size) {
@@ -9049,15 +9049,7 @@ return OntologyLayouts;
           analysis.expandedMappingArtifactLines.clear();
           if (typeof renderArtifactFlowView === "function") renderArtifactFlowView("sms2Mappings");
         }
-        renderMappingCostDriversStrip();
-        renderPlanFindingPills();
-        renderMappingsWarningsHeaderPill();
-        renderUniqueKeysWarningsHeaderPill();
-        renderForeignKeysWarningsHeaderPill();
-        renderFunctionalDependenciesWarningsHeaderPill();
-        renderRulesWarningsHeaderPill();
-        renderOntologyWarningsHeaderPill();
-        renderErdFindingPills();
+        renderAllNavPillStrips();
         renderGutterMappingToggles();
         if (typeof renderMappingArtifactWarningToggles === "function") renderMappingArtifactWarningToggles();
         if (typeof renderMappingsWarningMarkers === "function") renderMappingsWarningMarkers();
@@ -30238,7 +30230,7 @@ ORDER BY ?table ?ordinal`;
             });
           }
           analysis.findings = findings;
-          analysis.erdFindings = _erdFindings || [];
+          analysis.erdFindings = (_erdFindings || []).map((finding) => AnalysisTypes.normalizeFindingRecord(finding));
           analysis.planSignature = (planText || "").slice(0, 120).trim();
           analysis.findingsByQueryLine = computeFindingsByQueryLine(findings, queryText);
           analysis.findingsByMappingBlock = computeFindingsByMappingBlock(findings);
@@ -30655,15 +30647,15 @@ ORDER BY ?table ?ordinal`;
         }
       }
 
-      // "Test with SQL" on a functional dependency candidate: counts the values of the instance column that go with more
-      // than one value of the proposed dependent columns. None -> the assertion holds on this data (the card then offers to
-      // add it); any -> it does not, and the recommendation is withdrawn (and stays withdrawn when analysis runs again).
       // A finding by id, among the query's findings or those shown only in the ER Diagram panel.
       function findAnyMappingFinding(findingId) {
         const a = state.ui.mappingAnalysis || {};
         return (a.findings || []).find((x) => x.id === findingId) || (a.erdFindings || []).find((x) => x.id === findingId) || null;
       }
 
+      // "Test with SQL" on a functional dependency candidate: counts the values of the instance column that go with more
+      // than one value of the proposed dependent columns. None -> the assertion holds on this data (the card then offers to
+      // add it); any -> it does not, and the recommendation is withdrawn (and stays withdrawn when analysis runs again).
       async function testFunctionalDependencyFinding(findingId) {
         const analysis = state.ui.mappingAnalysis;
         const f = findAnyMappingFinding(findingId);
@@ -30843,6 +30835,20 @@ ORDER BY ?table ?ordinal`;
         host.innerHTML = "";
       }
 
+      // The one finding pill, wherever finding pills are shown: the label button, the arrows with "i/n" that open on hover,
+      // and the dismiss ×. Which pill is open lives in state.ui.openNavPill (`openKey`), and every strip that shows these
+      // pills registers its renderer with registerNavPillRenderer, so the shared hover handler closes an open pill when
+      // the pointer leaves it. Never write pill-nav-wrap markup anywhere else; pass the attributes the strip's clicks need.
+      function findingPillHtml({ kind, severity, label, title, navIndex, navTotal, openKey, muted = false, wrapAttrs = "", targetAttrs = "", navAttrs = "" }) {
+        const open = Boolean(openKey) && state.ui.openNavPill === openKey;
+        const dismissHtml = `<button class="pill-dismiss-btn" data-dismiss-finding-kind="${esc(kind)}" title="Dismiss — won't reappear until analysis re-runs">&times;</button>`;
+        return `<span class="pill-nav-wrap severity-${esc(severity)} kind-${esc(kind)} has-nav${open ? " nav-open" : ""}${muted ? " is-muted" : ""}" ${wrapAttrs}><button class="mapping-cost-driver-pill pill-nav-target" ${targetAttrs} title="${esc(title)}">${esc(label)}</button>${pillNavControlsHtml(navIndex, navTotal, `${navAttrs} data-dir="-1"`, `${navAttrs} data-dir="1"`, `Previous ${label}`, `Next ${label}`, dismissHtml)}</span>`;
+      }
+      // Renderers of every strip of finding pills: the hover handler and dismissing a kind redraw them all.
+      const _navPillRenderers = new Set();
+      function registerNavPillRenderer(fn) { if (typeof fn === "function") _navPillRenderers.add(fn); }
+      function renderAllNavPillStrips() { _navPillRenderers.forEach((fn) => fn()); }
+
       function renderFindingPillHtml(f) {
         const allOfKind = activeMappingFindingsByKind(f.kind, { includeHidden: true });
         // One navigation entry per finding (not per planNodeId) — a single finding
@@ -30856,10 +30862,12 @@ ORDER BY ?table ?ordinal`;
           ? state.ui.analysisNav?.planDrivers?.[f.kind]
           : state.ui.analysisNav?.mappingDrivers?.[f.kind];
         const navIndex = (navIndexSource != null ? Math.min(Math.max(Number(navIndexSource), 0), Math.max(0, navTotal - 1)) : -1);
-        const navOpen = state.ui.openNavPill === `mappingDriver:${f.kind}`;
-        const muted = isFindingKindHidden(f.kind);
-        const dismissHtml = `<button class="pill-dismiss-btn" data-dismiss-finding-kind="${esc(f.kind)}" title="Dismiss — won't reappear until analysis re-runs">&times;</button>`;
-        return `<span class="pill-nav-wrap severity-${esc(f.severity)} kind-${esc(f.kind)} has-nav${navOpen ? " nav-open" : ""}${muted ? " is-muted" : ""}" data-pill-kind="${esc(f.kind)}"><button class="mapping-cost-driver-pill pill-nav-target" data-mapping-driver-kind="${esc(f.kind)}" title="${muted ? "Show" : "Hide"} ${esc(mappingFindingShortLabel(f))} analysis">${esc(mappingFindingShortLabel(f))}</button>${pillNavControlsHtml(navIndex, navTotal, `data-mapping-driver-nav-kind="${esc(f.kind)}" data-dir="-1"`, `data-mapping-driver-nav-kind="${esc(f.kind)}" data-dir="1"`, `Previous ${esc(mappingFindingShortLabel(f))}`, `Next ${esc(mappingFindingShortLabel(f))}`, dismissHtml)}</span>`;
+        const muted = isFindingKindHidden(f.kind), label = mappingFindingShortLabel(f), k = esc(f.kind);
+        return findingPillHtml({
+          kind: f.kind, severity: f.severity, label, title: `${muted ? "Show" : "Hide"} ${label} analysis`,
+          navIndex, navTotal, openKey: `mappingDriver:${f.kind}`, muted,
+          wrapAttrs: `data-pill-kind="${k}"`, targetAttrs: `data-mapping-driver-kind="${k}"`, navAttrs: `data-mapping-driver-nav-kind="${k}"`
+        });
       }
 
       // ── Universal pill-strip scroll engine ──────────────────────────────────────
@@ -31552,7 +31560,7 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.64.3";
+      const APP_VERSION = "1.64.4";
       const RELEASE_NOTES = [
         { version: "1.64.0", date: "2026-11-26", title: "Users & Roles Report", items: [
           "The {*Users & Roles Report*} lists every user and role on the server: each user's roles, each role's users, and the permissions of every user and role, with what grants each user permission (a direct grant or a role). Click a name to see just that user's or role's permissions.",
@@ -54750,7 +54758,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         layoutKind: "tidy", fitNext: false,      // the layout a full re-layout uses (the Layout menu changes it)
         drawer: false, drawerKey: "uniqueKeySets",
         mode: null, link: null, pairFk: null, hot: null, job: null, testAbort: null, model: null,
-        findNav: {}, findOpen: null, findShown: null, findFocus: null,   // finding pills in the header: index per kind, open pill, finding whose card shows
+        findNav: {}, findShown: null, findFocus: null,   // finding pills in the header: index per kind, finding whose card shows, table in focus
       };
       const kdConnected = () => Boolean(state.connection?.isConnected && state.connection?.baseUrl && !state.ui.demoMode);
 
@@ -55796,8 +55804,12 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
       }
       function erdFindingPillHtml(kind, items) {
         const f = items[0], label = mappingFindingShortLabel(f);
-        const idx = _kd.findNav[kind];
-        return `<span class="pill-nav-wrap severity-${esc(f.severity)} kind-${esc(kind)} has-nav${_kd.findOpen === kind ? " nav-open" : ""}" data-erd-pill-kind="${esc(kind)}"><button class="mapping-cost-driver-pill pill-nav-target" data-erd-finding-kind="${esc(kind)}" title="Show ${esc(label)} in the diagram">${esc(label)}</button>${pillNavControlsHtml(idx == null ? -1 : idx, items.length, `data-erd-nav-kind="${esc(kind)}" data-dir="-1"`, `data-erd-nav-kind="${esc(kind)}" data-dir="1"`, `Previous ${label}`, `Next ${label}`)}</span>`;
+        const idx = _kd.findNav[kind], k = esc(kind);
+        return findingPillHtml({
+          kind, severity: f.severity, label, title: `Show ${label} in the diagram`,
+          navIndex: idx == null ? -1 : idx, navTotal: items.length, openKey: `erd:${kind}`,
+          wrapAttrs: `data-erd-pill-kind="${k}"`, targetAttrs: `data-erd-finding-kind="${k}"`, navAttrs: `data-erd-nav-kind="${k}"`
+        });
       }
       // the pills start above the canvas, at the line between the side list and the diagram (measured; no lift once the tabs reach past it)
       function erdAlignFindingPills() {
@@ -55822,15 +55834,20 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         const list = erdFindingList();
         const kinds = [...new Set(list.map((f) => f.kind))];
         kinds.forEach((k) => { const n = list.filter((f) => f.kind === k).length; if (_kd.findNav[k] != null && _kd.findNav[k] >= n) _kd.findNav[k] = n - 1; });
-        setPillStripContent(host, kinds.map((k) => erdFindingPillHtml(k, list.filter((f) => f.kind === k))).join(""));
-        // as wide as the pills plus the arrows one of them shows on hover, measured; the header narrows it when short of room
-        const scroll = host.querySelector(".pill-strip-scroll"), pills = scroll ? [...scroll.children] : [];
-        if (pills.length) {
-          const span = pills[pills.length - 1].getBoundingClientRect().right - pills[0].getBoundingClientRect().left;
-          const grow = Math.max(0, ...[...scroll.querySelectorAll(".pill-nav-controls")].map((c) => c.scrollWidth - c.getBoundingClientRect().width));
-          host.style.flexBasis = `${span + grow}px`;
-        } else host.style.flexBasis = "";
-        erdAlignFindingPills();
+        const html = kinds.map((k) => erdFindingPillHtml(k, list.filter((f) => f.kind === k))).join("");
+        // every diagram redraw (each keystroke in the mappings) comes here: the strip is rebuilt and measured only when it changed
+        if (html !== host._erdPillsHtml) {
+          host._erdPillsHtml = html;
+          setPillStripContent(host, html);
+          // as wide as the pills plus the arrows one of them shows on hover, measured; the header narrows it when short of room
+          const scroll = host.querySelector(".pill-strip-scroll"), pills = scroll ? [...scroll.children] : [];
+          if (pills.length) {
+            const span = pills[pills.length - 1].getBoundingClientRect().right - pills[0].getBoundingClientRect().left;
+            const grow = Math.max(0, ...[...scroll.querySelectorAll(".pill-nav-controls")].map((c) => c.scrollWidth - c.getBoundingClientRect().width));
+            host.style.flexBasis = `${span + grow}px`;
+          } else host.style.flexBasis = "";
+          erdAlignFindingPills();
+        }
         // the open card follows its finding: refreshed after a test, closed once the finding is gone
         if (_kd.findShown) {
           const f = list.find((x) => x.id === _kd.findShown);
@@ -55845,7 +55862,8 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         const n = items.length;
         const next = cur == null ? (delta < 0 ? n - 1 : 0) : (((cur + delta) % n) + n) % n;
         _kd.findNav[kind] = next;
-        _kd.findOpen = kind;
+        state.ui.openNavPill = `erd:${kind}`;
+        state.ui.navHoverSuppressCloseUntil = Date.now() + 320;
         _kd.findShown = items[next].id;
         renderErdFindingPills();
         kdRevealFinding(items[next]);
@@ -55972,7 +55990,8 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         kdApplyFindingFocus();
       }
       function erdCloseFindingCard() {
-        _kd.findShown = null; _kd.findOpen = null;
+        _kd.findShown = null;
+        if (String(state.ui.openNavPill || "").startsWith("erd:")) state.ui.openNavPill = null;
         if (_kd.findFocus) kdClearFindingFocus();
         const box = $("erdFindingCard");
         if (box) { box.hidden = true; box.innerHTML = ""; }
@@ -58617,7 +58636,8 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           if (incl?.status === "fail" && chk._fk) {
             const fk = chk._fk;
             const same = (a, b) => a.length === b.length && a.every((c, i) => String(c).toLowerCase() === String(b[i]).toLowerCase());
-            const entry = _fkDeclared.find((e) => e.srcTable === fk.srcTable && e.tgtTable === fk.tgtTable && same(e.srcCols, fk.srcCols) && same(e.tgtCols, fk.tgtCols));
+            const sameTable = (a, b) => { const x = String(a || "").replace(/[`"]/g, "").toLowerCase(), y = String(b || "").replace(/[`"]/g, "").toLowerCase(); return Boolean(x) && (x === y || x.endsWith("." + y) || y.endsWith("." + x)); };
+            const entry = _fkDeclared.find((e) => sameTable(e.srcTable, fk.srcTable) && sameTable(e.tgtTable, fk.tgtTable) && same(e.srcCols, fk.srcCols) && same(e.tgtCols, fk.tgtCols));
             newFindings.push({
               id: makeId(),
               kind: "validation-invalid-foreign-key",
@@ -68469,6 +68489,9 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           event.stopPropagation();
           $("analysisVisibilityMenu")?.classList.toggle("hidden");
         });
+        [renderMappingCostDriversStrip, renderPlanFindingPills, renderMappingsWarningsHeaderPill, renderUniqueKeysWarningsHeaderPill,
+          renderForeignKeysWarningsHeaderPill, renderFunctionalDependenciesWarningsHeaderPill, renderRulesWarningsHeaderPill,
+          renderOntologyWarningsHeaderPill, updateInferenceRulesBadge, renderErdFindingPills].forEach(registerNavPillRenderer);
         document.addEventListener("mousemove", (event) => {
           const target = event.target;
           if (!(target instanceof HTMLElement)) return;
@@ -68476,12 +68499,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           if (Date.now() < Number(state.ui.navHoverSuppressCloseUntil || 0)) return;
           if (target.closest(".pill-nav-wrap")) return;
           state.ui.openNavPill = null;
-          renderMappingCostDriversStrip();
-          renderMappingsWarningsHeaderPill();
-          renderRulesWarningsHeaderPill();
-          renderOntologyWarningsHeaderPill();
-          renderPlanFindingPills();
-          updateInferenceRulesBadge();
+          renderAllNavPillStrips();
         });
         document.addEventListener("click", (event) => {
           const target = event.target;
@@ -72512,7 +72530,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           state,
           highlightTurtleHtml, highlightSparqlHtml,   // pane syntax coloring (TEMPLATE column names)
           sqlPreviewTable, sqlTabShow, sqlTabClose, sqlTabsReset, _sqlTabs, _sqlPreviewCache, kdTableMenu,   // SQL Query panel: result tabs and table previews
-          kdModel, kdRender, renderFunctionalDependenciesWarningsHeaderPill, erdFindingList, renderErdFindingPills, erdNavigateFinding, erdFindingTarget, kdRevealFinding, erdCloseFindingCard, kdClearFindingFocus, _pillStripRevealPill, findAnyMappingFinding, kdParseArtifact, kdBuildText, kdEditEntry, kdEntryRaw, kdLayoutOrder, kdAddTable, kdArrange, kdJumpToSource, kdImpliedMenu, openKeysDiagram, runGenerateErd, toggleErdPanel, _kd, keySetsTitleHtml,   // ER Diagram key editing
+          kdModel, kdRender, renderFunctionalDependenciesWarningsHeaderPill, erdFindingList, renderErdFindingPills, erdNavigateFinding, erdFindingTarget, kdRevealFinding, erdCloseFindingCard, kdClearFindingFocus, _pillStripRevealPill, findAnyMappingFinding, _navPillRenderers, kdParseArtifact, kdBuildText, kdEditEntry, kdEntryRaw, kdLayoutOrder, kdAddTable, kdArrange, kdJumpToSource, kdImpliedMenu, openKeysDiagram, runGenerateErd, toggleErdPanel, _kd, keySetsTitleHtml,   // ER Diagram key editing
           mappingToBlockAt, mappingToSelectQuery, textareaOffsetAtPoint, getMappingToLastCopy: () => _mappingToLastCopy, // mapping TO → SELECT query copy
           openDebugAnalyticsPanel, seShowTimeline, // Debug Analytics opens the drawer timeline
           typeahead: TA_API,     // typeahead engine (suggestions for a caret position)                 // read analysis findings (state.ui.mappingAnalysis)
