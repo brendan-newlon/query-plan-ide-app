@@ -24838,6 +24838,10 @@ ORDER BY ?table ?ordinal`;
         });
         // @end-detect
 
+        // A declared unique key, foreign key or functional dependency that failed its test against the data, run by the
+        // SQL validation tool or the ER Diagram's Test (state.ui.keyTests; see keyTestFindings).
+        keyTestFindings().forEach((f) => pushFinding(f));
+
         // @detect: predicted-odd-functional-dependency
         // Predicted: a functional.dependency.sets entry that is well formed but pointless or doubled — a dependent column
         // that is also in the determinant (always true), the same dependency declared twice, or a determinant that is
@@ -31560,8 +31564,11 @@ ORDER BY ?table ?ordinal`;
       // "+<branch-id>" (e.g. "1.27.0+about-app"); the bump happens when the branch merges.
       // RELEASE_NOTES: newest first, a few plain lines per significant version, written for a reader new to the app, about what it can do or what changed.
       // An entry with pending:true belongs to a branch that has not merged; it is listed only while APP_VERSION carries a "+".
-      const APP_VERSION = "1.64.4";
+      const APP_VERSION = "1.65.0";
       const RELEASE_NOTES = [
+        { version: "1.65.0", date: "2026-11-27", title: "Failed key tests become findings", items: [
+          "A unique key, foreign key or functional dependency that fails its {*Test*} in the ER Diagram becomes a finding, in the ER Diagram header and in the header of its key set pane, until a later test passes or the entry is removed."
+        ] },
         { version: "1.64.0", date: "2026-11-26", title: "Users & Roles Report", items: [
           "The {*Users & Roles Report*} lists every user and role on the server: each user's roles, each role's users, and the permissions of every user and role, with what grants each user permission (a direct grant or a role). Click a name to see just that user's or role's permissions.",
           "Each permission is one row of action, resource type and resource. Seven actions held on one resource show as one {{ALL}} row; a permission a broader one already grants names it under {*Covered by*} and can be hidden.",
@@ -54601,7 +54608,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
       function erdRefreshIfOpen() {
         if ($("erdPanel")?.classList.contains("hidden")) return;
         clearTimeout(_erdRefreshTimer);
-        _erdRefreshTimer = setTimeout(() => { if (!$("erdPanel")?.classList.contains("hidden")) runGenerateErd(); }, 200);
+        _erdRefreshTimer = setTimeout(() => { if (!$("erdPanel")?.classList.contains("hidden")) { refreshKeyTestFindings(); runGenerateErd(); } }, 200);
       }
 
       function renderErdOutput() {
@@ -55780,12 +55787,19 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
           const row = Object.values(parsed.mRows || {})[0] || {};
           const v = String(Object.values(row)[0] ?? "").trim();
           const secs = ` · ${((performance.now() - t0) / 1000).toFixed(1)} s`;
+          let r;
           if (kind === "fd") {
             const n = Number(v);
-            return n === 0 ? { ok: true, msg: "Holds for every row" + secs } : { ok: false, msg: `${Number.isFinite(n) ? n.toLocaleString() : "Some"} determinant value${n === 1 ? "" : "s"} go with more than one value` + secs };
-          }
-          if (kind === "uk") return v === "PASS" ? { ok: true, msg: "No two rows share these values" + secs } : { ok: false, msg: "Some rows share these values, so this is not a unique key" + secs };
-          return v === "PASS" ? { ok: true, msg: `Every value has a matching row in ${spec.tgt}` + secs } : { ok: false, msg: `Some values have no matching row in ${spec.tgt}` + secs };
+            if (v === "" || !Number.isFinite(n)) return { ok: null, msg: "The data source returned no count." };
+            r = n === 0 ? { ok: true, msg: "Holds for every row" + secs } : { ok: false, msg: `${n.toLocaleString()} determinant value${n === 1 ? "" : "s"} go with more than one value` + secs };
+          } else if (v !== "PASS" && v !== "FAIL") return { ok: null, msg: "The data source returned no result." };
+          else if (kind === "uk") r = v === "PASS" ? { ok: true, msg: "No two rows share these values" + secs } : { ok: false, msg: "Some rows share these values, so this is not a unique key" + secs };
+          else r = v === "PASS" ? { ok: true, msg: `Every value has a matching row in ${spec.tgt}` + secs } : { ok: false, msg: `Some values have no matching row in ${spec.tgt}` + secs };
+          // Kept like a result of the SQL validation tool: a failed declared entry becomes a finding in this panel's
+          // header and in its key set pane's header.
+          recordKeyTest(kind, spec, r.ok ? "holds" : "fails", { ds: spec.ds });
+          refreshKeyTestFindings();
+          return r;
         } catch (e) {
           if (e?.name === "AbortError") return { ok: null, msg: "Test stopped." };
           return { ok: null, msg: summarizeSchemaDriftError(e.message || String(e)) };
@@ -56762,9 +56776,13 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
         return out;
       }
 
+      // How a check and its finding name an entry; shared by the SQL validation tool and keyTestFindings.
+      function fdEntryLabel(table, det, dep) { return `(${det.map((c) => `${table}.${c}`).join(", ")} -> ${dep.map((c) => `${table}.${c}`).join(", ")})`; }
+      function fkEntryLabel(srcTable, srcCols, tgtTable, tgtCols) { return `${_colRef(srcTable, srcCols)}  →  ${_colRef(tgtTable, tgtCols)}`; }
+
       function buildFunctionalDependencyChecks() {
         return parseFunctionalDependencySetsTextWithDs(state.artifacts.functionalDependencySets?.working || "").map((e) => {
-          const label = `(${e.det.map((c) => `${e.table}.${c}`).join(", ")} -> ${e.dep.map((c) => `${e.table}.${c}`).join(", ")})`;
+          const label = fdEntryLabel(e.table, e.det, e.dep);
           return {
             table: e.table,
             label,
@@ -56809,6 +56827,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
             sql: buildUniqueKeyTestSql(fullTable, cols),
             dsName: dsName || null,
             vgName: null,
+            _uk: { table: fullTable, cols },
           });
         });
         return checks;
@@ -57153,7 +57172,7 @@ functional.dependency.sets|m|none|||Functional dependencies between columns (Sta
             _tgtTable: tgtTable,
             _tgtCols: tgtCols,
             _parentDeclaredUk: parentDeclaredUk,
-            label: `${sColRef}  →  ${tColRef}`,
+            label: fkEntryLabel(srcTable, srcCols, tgtTable, tgtCols),
             comment: `FK: ${sColRef} → ${tColRef}. Inclusion dependency${parentDeclaredUk ? " (parent already a declared unique key — join elimination applies if UK test passes)" : " + parent key strength"}. Coverage rates tested in Relationship Joins tab.`,
             subTests,
           });
@@ -58437,6 +58456,87 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         }
       }
 
+      // ── Key test results, whichever tool ran the test ─────────────────────────────────────────────────────────
+      // The SQL validation tool and the ER Diagram's Test run the same SQL on a declared unique key, foreign key or
+      // functional dependency. Every result is kept in state.ui.keyTests under keyTestKey(kind, spec). A failed test of an
+      // entry that is still declared is a finding (keyTestFindings), shown wherever key findings show: the ER Diagram
+      // header and the key set pane headers. Analysis re-creates these findings from the record each time it runs, so a
+      // finding lasts until the entry is tested again and holds, or the entry is removed.
+      function _keyTestName(t) { return String(t || "").replace(/[`"]/g, "").trim().toLowerCase(); }
+      function keyTestKey(kind, spec) {
+        const cols = (a) => (a || []).map(_keyTestName);
+        if (kind === "uk") return `uk|${_keyTestName(spec.table)}|${cols(spec.cols).sort().join(",")}`;
+        if (kind === "fk") return `fk|${_keyTestName(spec.table)}|${cols(spec.cols).join(",")}|${_keyTestName(spec.tgt)}|${cols(spec.tgtCols).join(",")}`;
+        return `fd|${_keyTestName(spec.table)}|${cols(spec.det).sort().join(",")}|${cols(spec.dep).sort().join(",")}`;
+      }
+      // kind "uk" {table, cols} | "fk" {table, cols, tgt, tgtCols} | "fd" {table, det, dep}; status "holds" | "fails".
+      function recordKeyTest(kind, spec, status, extra = {}) {
+        if (status !== "holds" && status !== "fails") return;
+        const kept = kind === "uk" ? { table: spec.table, cols: spec.cols.slice() }
+          : kind === "fk" ? { table: spec.table, cols: spec.cols.slice(), tgt: spec.tgt, tgtCols: spec.tgtCols.slice() }
+          : { table: spec.table, det: spec.det.slice(), dep: spec.dep.slice() };
+        state.ui.keyTests = state.ui.keyTests || {};
+        state.ui.keyTests[keyTestKey(kind, kept)] = { kind, spec: kept, status, at: Date.now(), server: String(state.connection?.baseUrl || ""), ...extra };
+      }
+      // The findings for every failed test whose entry the key set texts still declare (records without ids).
+      // A result counts only for the server it was read from, and, when the key set puts the entry under a data source
+      // heading, only for that data source: the same table name elsewhere is other data.
+      function keyTestFindings() {
+        const server = String(state.connection?.baseUrl || "");
+        const failed = Object.entries(state.ui.keyTests || {}).filter(([, r]) => r && r.status === "fails" && (r.server || "") === server);
+        if (!failed.length) return [];
+        const sameDs = (r, ds) => !ds || !r.ds || String(ds).toLowerCase() === String(r.ds).toLowerCase();
+        const uks = parseUniqueKeySetsTextWithDs(state.artifacts.uniqueKeySets?.working || "");
+        const fks = parseForeignKeySetsText(state.artifacts.foreignKeySets?.working || "");
+        const fds = parseFunctionalDependencySetsTextWithDs(state.artifacts.functionalDependencySets?.working || "");
+        const base = { severity: "expensive", confidence: "high", mode: "observed", mappings: [], queryLines: [], planNodeIds: [] };
+        const out = [];
+        failed.forEach(([key, r]) => {
+          if (r.kind === "uk") {
+            const e = uks.find((x) => keyTestKey("uk", { table: x.fullTable, cols: x.cols }) === key && sameDs(r, x.dsName));
+            if (!e) return;
+            out.push({ ...base, kind: "validation-invalid-unique-key", keyTestKey: key, rootCauseKey: `key-test:${key}`,
+              evidence: [{ source: _colRef(e.fullTable, e.cols), detail: "Key does not uniquely identify all rows — duplicate values or NULLs detected." }], hints: [] });
+          } else if (r.kind === "fk") {
+            const e = fks.find((x) => keyTestKey("fk", { table: x.srcTable, cols: x.srcCols, tgt: x.tgtTable, tgtCols: x.tgtCols }) === key);
+            if (!e) return;
+            out.push({ ...base, kind: "validation-invalid-foreign-key", keyTestKey: key, rootCauseKey: `key-test:${key}`,
+              fkMatchRaw: e.raw, fkMatchIndex: e.matchIndex,
+              fkSpec: { srcTable: e.srcTable, srcCols: e.srcCols, tgtTable: e.tgtTable, tgtCols: e.tgtCols },
+              evidence: [{ source: fkEntryLabel(e.srcTable, e.srcCols, e.tgtTable, e.tgtCols), detail: `Some values of <code>${esc(e.srcTable)}</code> (<code>${esc(e.srcCols.join(", "))}</code>) have no matching row in <code>${esc(e.tgtTable)}</code> (<code>${esc(e.tgtCols.join(", "))}</code>), so the declared foreign key is not true of the data.` }],
+              hints: [{ type: "metadata fix", text: "Remove the entry, or correct the data so every value has a matching row in the referenced table." }] });
+          } else {
+            const e = fds.find((x) => keyTestKey("fd", { table: x.table, det: x.det, dep: x.dep }) === key && sameDs(r, x.dsName));
+            if (!e) return;
+            const colsHtml = (cols) => cols.map((c) => `<code>${esc(c)}</code>`).join(", ");
+            out.push({ ...base, kind: "validation-invalid-functional-dependency", keyTestKey: key, rootCauseKey: `key-test:${key}`,
+              fdMatchRaw: e.raw, fdMatchIndex: e.matchIndex,
+              evidence: [{ source: fdEntryLabel(e.table, e.det, e.dep), detail: `Some values of ${colsHtml(e.det)} in <code>${esc(e.table)}</code> go with more than one value of ${colsHtml(e.dep)} (an empty value counts as a value), so the declared dependency is not true of the data. Stardog does not check it; results of queries that rely on it are undefined.` }],
+              hints: [{ type: "metadata fix", text: "Remove the entry, or correct the data so each value of the determinant has a single value of the dependent columns." }] });
+          }
+        });
+        return out;
+      }
+      let _keyTestFindingSeq = 0;
+      // Puts the current analysis in step with state.ui.keyTests and the key set texts, without waiting for analysis to
+      // run again: replaces the key test findings, sets the unique key outlines, and redraws every finding pill strip.
+      function refreshKeyTestFindings({ outlines = true } = {}) {
+        const a = state.ui.mappingAnalysis;
+        if (!a) return;
+        a.findings = (a.findings || []).filter((f) => !f.keyTestKey);
+        keyTestFindings().forEach((f) => a.findings.push(AnalysisTypes.normalizeFindingRecord(f, { id: `kt-${++_keyTestFindingSeq}` })));
+        const server = String(state.connection?.baseUrl || "");
+        if (outlines) Object.values(state.ui.keyTests || {}).forEach((r) => {
+          if (r.kind !== "uk" || (r.server || "") !== server) return;
+          const label = _colRef(r.spec.table, r.spec.cols);
+          (r.status === "fails" ? _valFailedUkSet : _valPassedUkSet).add(label);
+          (r.status === "fails" ? _valPassedUkSet : _valFailedUkSet).delete(label);
+        });
+        a.summary = buildMappingSummary(a.findings);
+        renderAllNavPillStrips();
+        renderKeySetSyntaxOverlay("uniqueKeySets");
+      }
+
       function _clearValidationFindings() {
         if (state.ui.mappingAnalysis?.findings) {
           state.ui.mappingAnalysis.findings = state.ui.mappingAnalysis.findings.filter(f => !f._validationGenerated);
@@ -58461,45 +58561,17 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           return { vg: vgName, mappingId: block.mappingId, name: block.name };
         }
 
-        // ── 1. Unique key failures ────────────────────────────────────────────
+        // ── 1. Unique keys and functional dependencies: results go to the key test record (keyTestFindings) ──
         (_valSqlReport.byCategory["unique-keys"] || []).forEach(chk => {
           const result = _valSqlRunResults[chk.testNumber];
           if (result?.status === "pass") _valPassedUkSet.add(chk.label);
-          if (!result || result.status !== "fail") return;
-          _valFailedUkSet.add(chk.label); // chk.label = "(table.col)" format from _colRef
-          newFindings.push({
-            id: makeId(),
-            kind: "validation-invalid-unique-key",
-            severity: "expensive",
-            confidence: "high",
-            mode: "observed",
-            _validationGenerated: true,
-            mappings: [],
-            queryLines: [],
-            evidence: [{ source: chk?.label || chk?.table || "key", detail: "Key does not uniquely identify all rows — duplicate values or NULLs detected." }],
-            hints: [],
-          });
+          if (result?.status === "fail") _valFailedUkSet.add(chk.label); // chk.label = "(table.col)" format from _colRef
+          if (chk._uk && (result?.status === "pass" || result?.status === "fail")) recordKeyTest("uk", chk._uk, result.status === "pass" ? "holds" : "fails", { ds: chk.dsName || null });
         });
-
-        // ── 1b. Functional dependency failures ────────────────────────────────
         (_valSqlReport.byCategory["fd-validation"] || []).forEach((chk) => {
           const result = _valSqlRunResults[chk.testNumber];
-          if (!result || result.status !== "fail" || !chk._fd) return;
-          const fd = chk._fd, colsHtml = (cols) => cols.map((c) => `<code>${esc(c)}</code>`).join(", ");
-          newFindings.push({
-            id: makeId(),
-            kind: "validation-invalid-functional-dependency",
-            severity: "expensive",
-            confidence: "high",
-            mode: "observed",
-            _validationGenerated: true,
-            mappings: [],
-            queryLines: [],
-            fdMatchRaw: fd.raw,
-            fdMatchIndex: fd.matchIndex,
-            evidence: [{ source: chk.label, detail: `Some values of ${colsHtml(fd.det)} in <code>${esc(fd.table)}</code> go with more than one value of ${colsHtml(fd.dep)} (an empty value counts as a value), so the declared dependency is not true of the data. Stardog does not check it; results of queries that rely on it are undefined.` }],
-            hints: [{ type: "metadata fix", text: "Remove the entry, or correct the data so each value of the determinant has a single value of the dependent columns." }],
-          });
+          if (!chk._fd || (result?.status !== "pass" && result?.status !== "fail")) return;
+          recordKeyTest("fd", { table: chk._fd.table, det: chk._fd.det, dep: chk._fd.dep }, result.status === "pass" ? "holds" : "fails", { ds: chk.dsName || null });
         });
 
         // ── 2. IRI template failures ──────────────────────────────────────────
@@ -58628,31 +58700,13 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         });
 
         // ── 5. FK parent uniqueness — cross-inform UK sets & discover undeclared UKs ────
-        const _fkDeclared = parseForeignKeySetsText(state.artifacts.foreignKeySets?.working || "");
         (_valSqlReport.byCategory["fk-validation"] || []).forEach(chk => {
           const subTests = chk.subTests || [];
           // The inclusion sub-test (always first): values of the foreign key's columns with no matching row in the target
           const incl = subTests[0] ? _valSqlRunResults[subTests[0].testNumber] : null;
-          if (incl?.status === "fail" && chk._fk) {
+          if (chk._fk && (incl?.status === "pass" || incl?.status === "fail")) {
             const fk = chk._fk;
-            const same = (a, b) => a.length === b.length && a.every((c, i) => String(c).toLowerCase() === String(b[i]).toLowerCase());
-            const sameTable = (a, b) => { const x = String(a || "").replace(/[`"]/g, "").toLowerCase(), y = String(b || "").replace(/[`"]/g, "").toLowerCase(); return Boolean(x) && (x === y || x.endsWith("." + y) || y.endsWith("." + x)); };
-            const entry = _fkDeclared.find((e) => sameTable(e.srcTable, fk.srcTable) && sameTable(e.tgtTable, fk.tgtTable) && same(e.srcCols, fk.srcCols) && same(e.tgtCols, fk.tgtCols));
-            newFindings.push({
-              id: makeId(),
-              kind: "validation-invalid-foreign-key",
-              severity: "expensive",
-              confidence: "high",
-              mode: "observed",
-              _validationGenerated: true,
-              mappings: [],
-              queryLines: [],
-              fkMatchRaw: entry ? entry.raw : null,
-              fkMatchIndex: entry ? entry.matchIndex : null,
-              fkSpec: { srcTable: fk.srcTable, srcCols: fk.srcCols, tgtTable: fk.tgtTable, tgtCols: fk.tgtCols },
-              evidence: [{ source: chk.label, detail: `Some values of <code>${esc(fk.srcTable)}</code> (<code>${esc(fk.srcCols.join(", "))}</code>) have no matching row in <code>${esc(fk.tgtTable)}</code> (<code>${esc(fk.tgtCols.join(", "))}</code>), so the declared foreign key is not true of the data.` }],
-              hints: [{ type: "metadata fix", text: "Remove the entry, or correct the data so every value has a matching row in the referenced table." }],
-            });
+            recordKeyTest("fk", { table: fk.srcTable, cols: fk.srcCols, tgt: fk.tgtTable, tgtCols: fk.tgtCols }, incl.status === "pass" ? "holds" : "fails", { ds: chk.dsName || null });
           }
           // Find the parent-uniqueness sub-test (tagged _isParentUniquenessTest by buildFkValidationChecks)
           const uniqSt = subTests.find(st => st._isParentUniquenessTest);
@@ -58703,6 +58757,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
         if (state.ui.mappingAnalysis) {
           state.ui.mappingAnalysis.findings = [...existing, ...newFindings];
         }
+        refreshKeyTestFindings({ outlines: false });
         if (newFindings.length || _valFailedUkSet.size || _valDiscoveredUkSet.size) {
           // Targeted renders only — avoid renderMappingAnalysis() which can throw
           // in contexts where mapping analysis isn't fully active.
@@ -72530,7 +72585,7 @@ SELECT CASE WHEN COUNT(*) = 0 THEN 'PASS' ELSE 'FAIL' END AS validation_test_7_1
           state,
           highlightTurtleHtml, highlightSparqlHtml,   // pane syntax coloring (TEMPLATE column names)
           sqlPreviewTable, sqlTabShow, sqlTabClose, sqlTabsReset, _sqlTabs, _sqlPreviewCache, kdTableMenu,   // SQL Query panel: result tabs and table previews
-          kdModel, kdRender, renderFunctionalDependenciesWarningsHeaderPill, erdFindingList, renderErdFindingPills, erdNavigateFinding, erdFindingTarget, kdRevealFinding, erdCloseFindingCard, kdClearFindingFocus, _pillStripRevealPill, findAnyMappingFinding, _navPillRenderers, kdParseArtifact, kdBuildText, kdEditEntry, kdEntryRaw, kdLayoutOrder, kdAddTable, kdArrange, kdJumpToSource, kdImpliedMenu, openKeysDiagram, runGenerateErd, toggleErdPanel, _kd, keySetsTitleHtml,   // ER Diagram key editing
+          kdModel, kdRender, renderFunctionalDependenciesWarningsHeaderPill, erdFindingList, renderErdFindingPills, erdNavigateFinding, erdFindingTarget, kdRevealFinding, erdCloseFindingCard, kdClearFindingFocus, _pillStripRevealPill, findAnyMappingFinding, _navPillRenderers, kdRunTest, recordKeyTest, keyTestKey, keyTestFindings, refreshKeyTestFindings, kdParseArtifact, kdBuildText, kdEditEntry, kdEntryRaw, kdLayoutOrder, kdAddTable, kdArrange, kdJumpToSource, kdImpliedMenu, openKeysDiagram, runGenerateErd, toggleErdPanel, _kd, keySetsTitleHtml,   // ER Diagram key editing
           mappingToBlockAt, mappingToSelectQuery, textareaOffsetAtPoint, getMappingToLastCopy: () => _mappingToLastCopy, // mapping TO → SELECT query copy
           openDebugAnalyticsPanel, seShowTimeline, // Debug Analytics opens the drawer timeline
           typeahead: TA_API,     // typeahead engine (suggestions for a caret position)                 // read analysis findings (state.ui.mappingAnalysis)
